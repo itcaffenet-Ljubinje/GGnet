@@ -5,7 +5,8 @@ Application configuration using Pydantic Settings
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
-from pydantic import BaseSettings, validator
+from pydantic_settings import BaseSettings
+from pydantic import field_validator
 import os
 
 
@@ -70,21 +71,24 @@ class Settings(BaseSettings):
     AUTO_BACKUP_ENABLED: bool = True
     AUTO_BACKUP_SCHEDULE: str = "0 2 * * *"  # Daily at 2 AM
     
-    @validator("UPLOAD_DIR", "IMAGES_DIR", "BACKUP_DIR", pre=True)
+    @field_validator("UPLOAD_DIR", "IMAGES_DIR", "BACKUP_DIR", mode="before")
+    @classmethod
     def create_directories(cls, v):
         """Create directories if they don't exist"""
         path = Path(v)
         path.mkdir(parents=True, exist_ok=True)
         return path
     
-    @validator("AUDIT_LOG_FILE", "ERROR_LOG_FILE", pre=True)
+    @field_validator("AUDIT_LOG_FILE", "ERROR_LOG_FILE", mode="before")
+    @classmethod
     def create_log_directories(cls, v):
         """Create log directories if they don't exist"""
         path = Path(v)
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
     
-    @validator("ALLOWED_IMAGE_FORMATS")
+    @field_validator("ALLOWED_IMAGE_FORMATS")
+    @classmethod
     def validate_image_formats(cls, v):
         """Validate image formats"""
         allowed = {"vhd", "vhdx", "raw", "qcow2", "vmdk", "vdi"}

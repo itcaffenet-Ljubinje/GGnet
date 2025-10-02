@@ -4,7 +4,6 @@ import {
   HardDrive,
   Monitor,
   Target,
-  Users,
   AlertTriangle,
   CheckCircle,
   Clock,

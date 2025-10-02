@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
-import { Settings, User, Shield, Database, Network, Bell } from 'lucide-react'
+import { User, Shield, Database, Network, Bell } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { apiHelpers } from '../lib/api'
 

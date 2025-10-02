@@ -3,13 +3,11 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import {
   Upload,
   HardDrive,
-  Download,
   Trash2,
   Edit,
   Eye,
   Plus,
   Search,
-  Filter,
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import { apiHelpers } from '../lib/api'
