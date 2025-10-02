@@ -1,0 +1,229 @@
+"""
+FastAPI dependencies for authentication and authorization
+"""
+
+from typing import Optional
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+import structlog
+
+from app.core.database import get_db
+from app.core.security import verify_token, create_credentials_exception, create_permission_exception
+from app.models.user import User, UserRole
+from app.models.audit import AuditLog, AuditAction, AuditSeverity
+
+logger = structlog.get_logger()
+
+# Security scheme
+security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Get current authenticated user"""
+    
+    if not credentials:
+        logger.warning("No credentials provided", ip=request.client.host)
+        raise create_credentials_exception("No authentication token provided")
+    
+    try:
+        # Verify token
+        payload = verify_token(credentials.credentials, "access")
+        user_id: int = payload.get("sub")
+        
+        if user_id is None:
+            raise create_credentials_exception("Invalid token payload")
+        
+        # Get user from database
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            logger.warning("User not found", user_id=user_id, ip=request.client.host)
+            raise create_credentials_exception("User not found")
+        
+        if not user.is_active:
+            logger.warning("Inactive user attempted access", user_id=user_id, ip=request.client.host)
+            raise create_credentials_exception("Inactive user")
+        
+        if user.is_locked:
+            logger.warning("Locked user attempted access", user_id=user_id, ip=request.client.host)
+            raise create_credentials_exception("Account is locked")
+        
+        # Update last activity
+        user.last_login = user.last_login or user.created_at
+        await db.commit()
+        
+        return user
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Authentication failed", error=str(e), ip=request.client.host)
+        raise create_credentials_exception("Authentication failed")
+
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Get current active user (alias for backward compatibility)"""
+    return current_user
+
+
+def require_role(required_role: UserRole):
+    """Dependency factory for role-based access control"""
+    
+    async def check_role(
+        request: Request,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+    ) -> User:
+        """Check if user has required role"""
+        
+        # Admin can access everything
+        if current_user.role == UserRole.ADMIN:
+            return current_user
+        
+        # Check specific role requirements
+        if required_role == UserRole.ADMIN and current_user.role != UserRole.ADMIN:
+            logger.warning(
+                "Insufficient permissions - admin required",
+                user_id=current_user.id,
+                user_role=current_user.role,
+                required_role=required_role,
+                ip=request.client.host
+            )
+            
+            # Log security event
+            audit_log = AuditLog.create_log(
+                action=AuditAction.PERMISSION_DENIED,
+                message=f"User {current_user.username} attempted admin action without permissions",
+                user_id=current_user.id,
+                username=current_user.username,
+                severity=AuditSeverity.WARNING,
+                ip_address=request.client.host,
+                endpoint=str(request.url.path),
+                http_method=request.method
+            )
+            db.add(audit_log)
+            await db.commit()
+            
+            raise create_permission_exception("Admin privileges required")
+        
+        if required_role == UserRole.OPERATOR and current_user.role not in [UserRole.ADMIN, UserRole.OPERATOR]:
+            logger.warning(
+                "Insufficient permissions - operator required",
+                user_id=current_user.id,
+                user_role=current_user.role,
+                required_role=required_role,
+                ip=request.client.host
+            )
+            
+            # Log security event
+            audit_log = AuditLog.create_log(
+                action=AuditAction.PERMISSION_DENIED,
+                message=f"User {current_user.username} attempted operator action without permissions",
+                user_id=current_user.id,
+                username=current_user.username,
+                severity=AuditSeverity.WARNING,
+                ip_address=request.client.host,
+                endpoint=str(request.url.path),
+                http_method=request.method
+            )
+            db.add(audit_log)
+            await db.commit()
+            
+            raise create_permission_exception("Operator privileges required")
+        
+        return current_user
+    
+    return check_role
+
+
+# Convenience dependencies for common roles
+require_admin = require_role(UserRole.ADMIN)
+require_operator = require_role(UserRole.OPERATOR)
+
+
+async def get_optional_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Get current user if authenticated, None otherwise"""
+    
+    if not credentials:
+        return None
+    
+    try:
+        return await get_current_user(request, credentials, db)
+    except HTTPException:
+        return None
+    except Exception:
+        return None
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request"""
+    # Check for forwarded headers first (reverse proxy)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    
+    # Fallback to direct connection
+    return request.client.host if request.client else "unknown"
+
+
+def get_user_agent(request: Request) -> str:
+    """Get user agent from request"""
+    return request.headers.get("User-Agent", "unknown")
+
+
+async def log_user_activity(
+    action: AuditAction,
+    message: str,
+    request: Request,
+    user: Optional[User] = None,
+    severity: AuditSeverity = AuditSeverity.INFO,
+    resource_type: Optional[str] = None,
+    resource_id: Optional[int] = None,
+    resource_name: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Log user activity for audit purposes"""
+    
+    audit_log = AuditLog.create_log(
+        action=action,
+        message=message,
+        user_id=user.id if user else None,
+        username=user.username if user else None,
+        severity=severity,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        resource_name=resource_name,
+        ip_address=get_client_ip(request),
+        user_agent=get_user_agent(request),
+        endpoint=str(request.url.path),
+        http_method=request.method
+    )
+    
+    db.add(audit_log)
+    await db.commit()
+    
+    logger.info(
+        "User activity logged",
+        action=action,
+        user_id=user.id if user else None,
+        username=user.username if user else None,
+        ip=get_client_ip(request)
+    )
+

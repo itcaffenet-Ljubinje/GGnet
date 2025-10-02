@@ -1,0 +1,48 @@
+[Unit]
+Description=GGnet Diskless Server Backend
+Documentation=https://github.com/ggnet/diskless-server
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+Requires=network.target
+
+[Service]
+Type=exec
+User=ggnet
+Group=ggnet
+WorkingDirectory=/opt/ggnet/backend
+Environment=PATH=/opt/ggnet/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/opt/ggnet/backend
+EnvironmentFile=/etc/ggnet/backend.env
+ExecStart=/opt/ggnet/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ggnet/backend/uploads /opt/ggnet/backend/images /opt/ggnet/backend/logs /var/log/ggnet
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ggnet-backend
+
+[Install]
+WantedBy=multi-user.target
+

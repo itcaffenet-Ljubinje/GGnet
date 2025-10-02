@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ggnet-postgres
+    environment:
+      POSTGRES_DB: ggnet
+      POSTGRES_USER: ggnet
+      POSTGRES_PASSWORD: ggnet_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - ggnet-network
+    restart: unless-stopped
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: ggnet-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ggnet-network
+    restart: unless-stopped
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ggnet-backend
+    environment:
+      - DATABASE_URL=postgresql://ggnet:ggnet_password@postgres:5432/ggnet
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ENVIRONMENT=development
+      - UPLOAD_DIR=/app/uploads
+      - IMAGES_DIR=/app/images
+    volumes:
+      - ./backend:/app
+      - ggnet_uploads:/app/uploads
+      - ggnet_images:/app/images
+      - /dev:/dev  # Potrebno za iSCSI operacije
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ggnet-network
+    privileged: true  # Potrebno za iSCSI targetcli
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ggnet-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - ggnet-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ggnet-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - ggnet-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ggnet_uploads:
+  ggnet_images:
+
+networks:
+  ggnet-network:
+    driver: bridge
