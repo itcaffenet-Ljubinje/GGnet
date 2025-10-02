@@ -35,6 +35,8 @@ slowapi==0.1.9
 # File handling
 python-magic==0.4.27
 pillow==10.1.0
+pytest
+pytest-asyncio
 
 # Utilities
 click==8.1.7
