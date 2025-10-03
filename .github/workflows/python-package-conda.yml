@@ -44,6 +44,6 @@ jobs:
 
     - name: Run tests
       env:
-        PYTHONPATH: ${{ github.workspace }}/backend
+       PYTHONPATH: ${{ github.workspace }}/backend
       run: |
-        pytest tests -v --disable-warnings --cov=app
+       pytest backend/tests -v --disable-warnings --cov=app
