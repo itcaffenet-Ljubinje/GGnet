@@ -1,15 +1,18 @@
 name: Python Package using Conda
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 5
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v3
@@ -26,12 +29,17 @@ jobs:
         use-mamba: false
 
     - name: Lint with flake8
+      shell: bash
       run: |
-        conda run -n base flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        conda run -n base flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        source ~/miniconda/etc/profile.d/conda.sh
+        conda activate base
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Run tests
+      shell: bash
       run: |
-        # Dodaj PYTHONPATH da bi 'app' modul bio vidljiv
-        export PYTHONPATH=$PWD
-        conda run -n base pytest backend/tests -v --disable-warnings
+        source ~/miniconda/etc/profile.d/conda.sh
+        conda activate base
+        export PYTHONPATH=$PWD/backend
+        pytest backend/tests -v --disable-warnings
