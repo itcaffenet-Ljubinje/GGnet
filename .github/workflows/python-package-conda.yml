@@ -1,4 +1,4 @@
-name: Python Package using Conda
+name: GGnet CI
 
 on:
   push:
@@ -7,36 +7,82 @@ on:
   pull_request:
 
 jobs:
-  build-linux:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.11'
 
     - name: Install Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         python-version: 3.11
-        environment-file: environment.yml
         activate-environment: base
+        environment-file: environment.yml
         use-mamba: false
-        # shell: bash
+
+    - name: Run install.sh
+      run: |
+        chmod +x scripts/install.sh
+        ./scripts/install.sh
 
     - name: Lint with flake8
       run: |
-        cd backend
-        export PYTHONPATH=$(pwd)
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate base
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        conda run -n base flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+        conda run -n base flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Run backend tests
       run: |
-        cd backend
-        export PYTHONPATH=$(pwd)
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate base
-        pytest tests -v --disable-warnings --cov=app
+        export PYTHONPATH=$PWD/backend
+        conda run -n base pytest backend/tests -v --disable-warnings --cov=app
+name: GGnet CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.11'
+
+    - name: Install Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: 3.11
+        activate-environment: base
+        environment-file: environment.yml
+        use-mamba: false
+
+    - name: Run install.sh
+      run: |
+        chmod +x scripts/install.sh
+        ./scripts/install.sh
+
+    - name: Lint with flake8
+      run: |
+        conda run -n base flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+        conda run -n base flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run backend tests
+      run: |
+        export PYTHONPATH=$PWD/backend
+        conda run -n base pytest backend/tests -v --disable-warnings --cov=app
