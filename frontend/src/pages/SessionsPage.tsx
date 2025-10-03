@@ -1,22 +1,20 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Activity, Play, Square, Search } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 
 export default function SessionsPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
-  const { data: sessionsData, isLoading } = useQuery(
-    ['sessions', searchTerm],
-    () => apiHelpers.getSessions({
+  const { data: sessionsData, isLoading } = useQuery({
+    queryKey: ['sessions', searchTerm],
+    queryFn: () => apiHelpers.getSessions({
       search: searchTerm || undefined,
     }),
-    {
-      refetchInterval: 5000, // Refresh every 5 seconds
-    }
-  )
+    refetchInterval: 5000, // Refresh every 5 seconds
+  })
 
-  const sessions = sessionsData?.data || []
+  const sessions = (sessionsData as any)?.data || []
 
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload,
   HardDrive,
@@ -32,23 +32,21 @@ function ImageUploadModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
   const [isUploading, setIsUploading] = useState(false)
   const queryClient = useQueryClient()
 
-  const uploadMutation = useMutation(
-    (formData: FormData) => apiHelpers.uploadImage(formData, setUploadProgress),
-    {
-      onSuccess: () => {
-        toast.success('Image uploaded successfully')
-        queryClient.invalidateQueries('images')
-        onClose()
-        setUploadProgress(0)
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.detail || 'Upload failed')
-      },
-      onSettled: () => {
-        setIsUploading(false)
-      },
-    }
-  )
+  const uploadMutation = useMutation({
+    mutationFn: (formData: FormData) => apiHelpers.uploadImage(formData, setUploadProgress),
+    onSuccess: () => {
+      toast.success('Image uploaded successfully')
+      queryClient.invalidateQueries({ queryKey: ['images'] })
+      onClose()
+      setUploadProgress(0)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Upload failed')
+    },
+    onSettled: () => {
+      setIsUploading(false)
+    },
+  })
 
   const onDrop = (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -135,18 +133,16 @@ function ImageUploadModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 function ImageCard({ image }: { image: Image }) {
   const queryClient = useQueryClient()
 
-  const deleteMutation = useMutation(
-    (id: number) => apiHelpers.deleteImage(id),
-    {
-      onSuccess: () => {
-        toast.success('Image deleted successfully')
-        queryClient.invalidateQueries('images')
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.detail || 'Delete failed')
-      },
-    }
-  )
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiHelpers.deleteImage(id),
+    onSuccess: () => {
+      toast.success('Image deleted successfully')
+      queryClient.invalidateQueries({ queryKey: ['images'] })
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Delete failed')
+    },
+  })
 
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to delete "${image.name}"?`)) {
@@ -221,7 +217,7 @@ function ImageCard({ image }: { image: Image }) {
             </button>
             <button
               onClick={handleDelete}
-              disabled={deleteMutation.isLoading}
+              disabled={deleteMutation.isPending}
               className="p-1 text-gray-400 hover:text-red-600"
               title="Delete"
             >
@@ -239,18 +235,16 @@ export default function ImagesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
-  const { data: imagesData, isLoading, error } = useQuery(
-    ['images', searchTerm, filterStatus],
-    () => apiHelpers.getImages({
+  const { data: imagesData, isLoading, error } = useQuery({
+    queryKey: ['images', searchTerm, filterStatus],
+    queryFn: () => apiHelpers.getImages({
       search: searchTerm || undefined,
       status: filterStatus || undefined,
     }),
-    {
-      refetchInterval: 10000, // Refresh every 10 seconds
-    }
-  )
+    refetchInterval: 10000, // Refresh every 10 seconds
+  })
 
-  const images = imagesData?.data || []
+  const images = (imagesData as any)?.data || []
 
   return (
     <div className="space-y-6">

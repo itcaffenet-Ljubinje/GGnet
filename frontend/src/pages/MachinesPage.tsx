@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Monitor, Plus, Search, Wifi, WifiOff } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 
@@ -97,15 +97,15 @@ export default function MachinesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
-  const { data: machinesData, isLoading, error } = useQuery(
-    ['machines', searchTerm, filterStatus],
-    () => apiHelpers.getMachines({
+  const { data: machinesData, isLoading, error } = useQuery({
+    queryKey: ['machines', searchTerm, filterStatus],
+    queryFn: () => apiHelpers.getMachines({
       search: searchTerm || undefined,
       status: filterStatus || undefined,
     })
-  )
+  })
 
-  const machines = machinesData?.data || []
+  const machines = (machinesData as any)?.data || []
 
   return (
     <div className="space-y-6">

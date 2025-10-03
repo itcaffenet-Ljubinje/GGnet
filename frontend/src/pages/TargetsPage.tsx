@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Target, Plus, Search } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 
 export default function TargetsPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
-  const { data: targetsData, isLoading } = useQuery(
-    ['targets', searchTerm],
-    () => apiHelpers.getTargets({
+  const { data: targetsData, isLoading } = useQuery({
+    queryKey: ['targets', searchTerm],
+    queryFn: () => apiHelpers.getTargets({
       search: searchTerm || undefined,
     })
-  )
+  })
 
-  const targets = targetsData?.data || []
+  const targets = (targetsData as any)?.data || []
 
   return (
     <div className="space-y-6">

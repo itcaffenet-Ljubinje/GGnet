@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { User, Shield, Database, Network, Bell } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { apiHelpers } from '../lib/api'
@@ -8,8 +8,14 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const { user } = useAuthStore()
 
-  const { data: storageData } = useQuery('storage', () => apiHelpers.getStorageInfo())
-  const { data: healthData } = useQuery('health', () => apiHelpers.getDetailedHealth())
+  const { data: storageData } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => apiHelpers.getStorageInfo()
+  })
+  const { data: healthData } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => apiHelpers.getDetailedHealth()
+  })
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: User },

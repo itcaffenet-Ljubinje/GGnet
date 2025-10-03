@@ -1,4 +1,4 @@
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
   HardDrive,
@@ -136,21 +136,17 @@ export default function DashboardPage() {
   const { user } = useAuthStore()
 
   // Fetch dashboard data
-  const { data: healthData } = useQuery(
-    'health',
-    () => apiHelpers.getDetailedHealth(),
-    {
-      refetchInterval: 30000, // Refresh every 30 seconds
-    }
-  )
+  const { data: healthData } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => apiHelpers.getDetailedHealth(),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  })
 
-  const { data: storageData } = useQuery(
-    'storage',
-    () => apiHelpers.getStorageInfo(),
-    {
-      refetchInterval: 60000, // Refresh every minute
-    }
-  )
+  const { data: storageData } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => apiHelpers.getStorageInfo(),
+    refetchInterval: 60000, // Refresh every minute
+  })
 
   // Mock data for demo
   const stats = {
