@@ -1,6 +1,6 @@
 name: ggnet
 channels:
-  - conda-forge
+  #- conda-forge
   - defaults
 dependencies:
   - python=3.11
