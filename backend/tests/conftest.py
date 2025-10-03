@@ -1,203 +1,92 @@
 """
-Test configuration and fixtures
+Pytest fixtures for testing FastAPI app with async support
 """
 
 import asyncio
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
-
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
 from app.main import app
-from app.core.database import get_db, Base
-from app.core.config import get_settings
-from app.models.user import User, UserRole, UserStatus
-from app.core.security import get_password_hash
+from app.models.base import Base
+from app.models.user import User, UserRole
+from app.core.security import get_password_hash, create_access_token
 
+DATABASE_URL_TEST = "sqlite+aiosqlite:///./test.db"
 
-# Test database URL
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
-
-# Create test engine
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-TestSessionLocal = async_sessionmaker(
-    test_engine,
+# Create async engine and session factory
+engine_test = create_async_engine(DATABASE_URL_TEST, future=True, echo=False)
+AsyncSessionLocal = sessionmaker(
+    bind=engine_test,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-
-@pytest_asyncio.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture
-async def db_session():
-    """Create a test database session."""
-    async with test_engine.begin() as conn:
+@pytest.fixture(scope="session")
+async def prepare_db():
+    """Create test database schema once per session"""
+    async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    async with TestSessionLocal() as session:
-        yield session
-    
-    async with test_engine.begin() as conn:
+    yield
+    async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
+@pytest.fixture()
+async def db_session(prepare_db):
+    """Provide a transactional scope around a test."""
+    async with AsyncSessionLocal() as session:
+        yield session
+        await session.rollback()
 
-@pytest_asyncio.fixture
+@pytest.fixture()
 async def client(db_session):
-    """Create a test client."""
-    
-    async def override_get_db():
-        yield db_session
-    
-    app.dependency_overrides[get_db] = override_get_db
-    
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    """Provide an AsyncClient for testing FastAPI routes."""
+    async with AsyncClient(app=app, base_url="http://testserver") as ac:
         yield ac
-    
-    app.dependency_overrides.clear()
 
+# ------------------------
+# User & token fixtures
+# ------------------------
 
-@pytest_asyncio.fixture
+@pytest.fixture()
 async def admin_user(db_session):
-    """Create an admin user for testing."""
+    """Create an admin user."""
     user = User(
         username="admin",
-        email="admin@test.com",
-        full_name="Test Admin",
-        hashed_password=get_password_hash("admin123"),
-        role=UserRole.ADMIN,
-        status=UserStatus.ACTIVE,
-        is_active=True
+        password=get_password_hash("admin123"),
+        role=UserRole.ADMIN
     )
-    
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
-    
     return user
 
-
-@pytest_asyncio.fixture
-async def operator_user(db_session):
-    """Create an operator user for testing."""
-    user = User(
-        username="operator",
-        email="operator@test.com",
-        full_name="Test Operator",
-        hashed_password=get_password_hash("operator123"),
-        role=UserRole.OPERATOR,
-        status=UserStatus.ACTIVE,
-        is_active=True
-    )
-    
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    
-    return user
-
-
-@pytest_asyncio.fixture
+@pytest.fixture()
 async def viewer_user(db_session):
-    """Create a viewer user for testing."""
+    """Create a viewer user."""
     user = User(
         username="viewer",
-        email="viewer@test.com",
-        full_name="Test Viewer",
-        hashed_password=get_password_hash("viewer123"),
-        role=UserRole.VIEWER,
-        status=UserStatus.ACTIVE,
-        is_active=True
+        password=get_password_hash("viewer123"),
+        role=UserRole.VIEWER
     )
-    
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
-    
     return user
 
+@pytest.fixture()
+def auth_headers():
+    """Return a function to generate auth headers for a user token."""
+    def _auth_headers(token: str):
+        return {"Authorization": f"Bearer {token}"}
+    return _auth_headers
 
-@pytest_asyncio.fixture
-async def admin_token(client, admin_user):
-    """Get admin access token."""
-    response = await client.post("/auth/login", json={
-        "username": "admin",
-        "password": "admin123"
-    })
-    
-    assert response.status_code == 200
-    data = response.json()
-    return data["access_token"]
+@pytest.fixture()
+async def admin_token(admin_user):
+    """Return access token for admin user."""
+    return create_access_token({"sub": str(admin_user.id), "role": admin_user.role.value})
 
-
-@pytest_asyncio.fixture
-async def operator_token(client, operator_user):
-    """Get operator access token."""
-    response = await client.post("/auth/login", json={
-        "username": "operator",
-        "password": "operator123"
-    })
-    
-    assert response.status_code == 200
-    data = response.json()
-    return data["access_token"]
-
-
-@pytest_asyncio.fixture
-async def viewer_token(client, viewer_user):
-    """Get viewer access token."""
-    response = await client.post("/auth/login", json={
-        "username": "viewer",
-        "password": "viewer123"
-    })
-    
-    assert response.status_code == 200
-    data = response.json()
-    return data["access_token"]
-
-
-def auth_headers(token: str) -> dict:
-    """Create authorization headers."""
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
-def sample_image_data():
-    """Sample image data for testing."""
-    return {
-        "name": "Test Image",
-        "description": "Test image description",
-        "format": "vhdx",
-        "size_bytes": 1073741824,  # 1GB
-        "image_type": "system",
-        "status": "ready"
-    }
-
-
-@pytest.fixture
-def sample_machine_data():
-    """Sample machine data for testing."""
-    return {
-        "name": "Test Machine",
-        "description": "Test machine description",
-        "mac_address": "00:11:22:33:44:55",
-        "ip_address": "192.168.1.100",
-        "hostname": "test-machine",
-        "boot_mode": "uefi",
-        "secure_boot_enabled": True,
-        "location": "Test Lab",
-        "room": "Room 101"
-    }
-
+@pytest.fixture()
+async def viewer_token(viewer_user):
+    """Return access token for viewer user."""
+    return create_access_token({"sub": str(viewer_user.id), "role": viewer_user.role.value})
