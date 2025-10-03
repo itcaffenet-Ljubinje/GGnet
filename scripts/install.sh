@@ -196,7 +196,9 @@ install_frontend() {
     
     # Install Node.js dependencies and build
     cd "$INSTALL_DIR/frontend"
-    sudo -u "$GGNET_USER" npm install
+    
+    # Install dependencies as ggnet user (package-lock.json will be generated)
+    sudo -u "$GGNET_USER" npm install --no-audit --no-fund
     sudo -u "$GGNET_USER" npm run build
     
     # Copy built files to nginx
