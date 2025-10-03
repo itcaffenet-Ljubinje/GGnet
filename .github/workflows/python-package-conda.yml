@@ -1,10 +1,16 @@
 name: Python Package using Conda
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 5
 
     steps:
     - name: Checkout repository
@@ -15,7 +21,7 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Miniconda
+    - name: Install Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
@@ -28,11 +34,11 @@ jobs:
       run: |
         cd backend
         export PYTHONPATH=$(pwd)
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        conda run -n base flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        conda run -n base flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    - name: Run tests with coverage
+    - name: Run backend tests
       run: |
         cd backend
         export PYTHONPATH=$(pwd)
-        python -m pytest tests -v --disable-warnings --cov=app
+        conda run -n base pytest tests -v --disable-warnings --cov=app
