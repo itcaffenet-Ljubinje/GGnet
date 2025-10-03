@@ -1,9 +1,10 @@
-name: Python Package CI
+name: Python CI
 
 on:
   push:
     branches:
       - main
+      - 'feature/**'
   pull_request:
 
 jobs:
@@ -11,25 +12,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Upgrade pip, setuptools, wheel
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install -r requirements.txt
+        python -m pip install -e backend
 
     - name: Lint with flake8
       run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 backend app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 backend app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Run tests
+      env:
+        PYTHONPATH: ${{ github.workspace }}/backend  # omogućava da 'app' bude vidljiv
       run: |
-        export PYTHONPATH=$PWD/backend
         pytest backend/tests -v --disable-warnings
