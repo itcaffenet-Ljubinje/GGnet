@@ -8,6 +8,7 @@ faker==20.1.0
 # FastAPI & ASGI server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+anyio>=3.7.1
 
 # Database
 sqlalchemy==2.0.23
