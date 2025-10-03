@@ -9,36 +9,34 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 5
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.11'
 
     - name: Install Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         python-version: 3.11
-        activate-environment: base
         environment-file: environment.yml
+        activate-environment: base
         use-mamba: false
+        # shell: bash
 
     - name: Lint with flake8
       run: |
         cd backend
         export PYTHONPATH=$(pwd)
-        conda run -n base flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        conda run -n base flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        source $(conda info --base)/etc/profile.d/conda.sh
+        conda activate base
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Run backend tests
       run: |
         cd backend
         export PYTHONPATH=$(pwd)
-        conda run -n base pytest tests -v --disable-warnings --cov=app
+        source $(conda info --base)/etc/profile.d/conda.sh
+        conda activate base
+        pytest tests -v --disable-warnings --cov=app
