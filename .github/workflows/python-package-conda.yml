@@ -30,8 +30,8 @@ jobs:
 
     - name: Run install.sh
       run: |
-        chmod +x scripts/install.sh
-        ./scripts/install.sh
+        sudo chmod +x scripts/install.sh
+        sudo ./scripts/install.sh
 
     - name: Lint with flake8
       run: |
