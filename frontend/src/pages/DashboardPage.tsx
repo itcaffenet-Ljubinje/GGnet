@@ -9,7 +9,7 @@ import {
   Clock,
   TrendingUp,
 } from 'lucide-react'
-import { apiHelpers } from '../lib/api'
+import { apiHelpers } from '../lib'
 import { useAuthStore } from '../stores/authStore'
 
 interface StatsCardProps {
