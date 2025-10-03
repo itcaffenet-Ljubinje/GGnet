@@ -1,12 +1,6 @@
 name: Python Package using Conda
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push]
 
 jobs:
   build-linux:
@@ -15,26 +9,21 @@ jobs:
       max-parallel: 5
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v3
       with:
         python-version: '3.11'
 
-    - name: Install Miniconda
-      uses: conda-incubator/setup-miniconda@v3
+    - name: Install Conda
+      uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
         python-version: 3.11
         activate-environment: base
         environment-file: environment.yml
-        use-mamba: true
-        mamba-args: "--strict-channel-priority"
-
-    - name: Install editable backend (if any)
-      run: conda run -n base pip install -e backend
+        use-mamba: false
 
     - name: Lint with flake8
       run: |
@@ -43,5 +32,6 @@ jobs:
 
     - name: Run tests
       run: |
+        # Dodaj PYTHONPATH da bi 'app' modul bio vidljiv
         export PYTHONPATH=$PWD
         conda run -n base pytest backend/tests -v --disable-warnings
