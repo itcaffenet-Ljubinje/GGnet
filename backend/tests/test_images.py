@@ -4,7 +4,7 @@ Test image management endpoints
 
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
 from io import BytesIO
 
 from app.models.image import Image, ImageFormat, ImageStatus, ImageType
@@ -15,9 +15,10 @@ from tests.conftest import auth_headers
 class TestImages:
     """Test image management functionality."""
 
-    async def test_list_images_empty(self, client: AsyncClient, admin_token):
+    async def test_list_images_empty(self, client, admin_token):
         """Test listing images when none exist."""
-        response = await client.get(
+        async_client = await client
+        response = await async_client.get(
             "/images",
             headers=auth_headers(admin_token)
         )
@@ -26,9 +27,10 @@ class TestImages:
         assert isinstance(data, list)
         assert len(data) == 0
 
-    async def test_list_images_unauthorized(self, client: AsyncClient):
+    async def test_list_images_unauthorized(self, client):
         """Test listing images without authentication."""
-        response = await client.get("/images")
+        async_client = await client
+        response = await async_client.get("/images")
         assert response.status_code == 401
 
     async def test_upload_image_success(self, client: AsyncClient, admin_token, db_session):
@@ -108,6 +110,7 @@ class TestImageModel:
     """Test image model functionality."""
 
     async def test_create_image(self, db_session, admin_user):
+        admin = await admin_user
         image = Image(
             name="Test Image",
             description="Test description",
@@ -117,7 +120,7 @@ class TestImageModel:
             size_bytes=1073741824,
             status=ImageStatus.READY,
             image_type=ImageType.SYSTEM,
-            created_by=admin_user.id
+            created_by=admin.id
         )
         db_session.add(image)
         await db_session.commit()
@@ -128,6 +131,7 @@ class TestImageModel:
         assert image.status == ImageStatus.READY
 
     async def test_image_properties(self, db_session, admin_user):
+        admin = await admin_user
         image = Image(
             name="Test Image",
             filename="test.vhd",
@@ -136,7 +140,7 @@ class TestImageModel:
             size_bytes=1073741824,
             status=ImageStatus.READY,
             image_type=ImageType.SYSTEM,
-            created_by=admin_user.id
+            created_by=admin.id
         )
         db_session.add(image)
         await db_session.commit()
