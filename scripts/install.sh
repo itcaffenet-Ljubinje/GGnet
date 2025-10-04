@@ -14,6 +14,9 @@ INSTALL_DIR="/opt/ggnet"
 CONFIG_DIR="/etc/ggnet"
 LOG_DIR="/var/log/ggnet"
 DATA_DIR="/var/lib/ggnet"
+DB_USER="ggnet"
+DB_PASS="ggnet_password"
+DB_NAME="ggnet"
 
 # Colors for output
 RED='\033[0;31m'
@@ -139,10 +142,13 @@ setup_postgresql() {
     systemctl enable postgresql
     systemctl start postgresql
     
+    # Wait for PostgreSQL to start
+    sleep 5
+    
     # Create database and user
-    sudo -u postgres psql -c "CREATE USER ggnet WITH PASSWORD 'ggnet_password';" || true
-    sudo -u postgres psql -c "CREATE DATABASE ggnet OWNER ggnet;" || true
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ggnet TO ggnet;" || true
+    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || log_info "User $DB_USER already exists"
+    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" 2>/dev/null || log_info "Database $DB_NAME already exists"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || log_info "Privileges already granted"
     
     log_success "PostgreSQL configured"
 }
@@ -171,12 +177,15 @@ install_backend() {
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
     
+    # Install PostgreSQL driver and additional dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary asyncpg
+    
     # Copy environment file
     cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
     chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
     chmod 640 "$CONFIG_DIR/backend.env"
     
-    # Update environment file with correct paths
+    # Update environment file with correct paths and PostgreSQL database
     sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
     sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
     sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
@@ -186,11 +195,143 @@ install_backend() {
     sed -i "s|DEBUG=.*|DEBUG=false|g" "$CONFIG_DIR/backend.env"
     sed -i "s|SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|g" "$CONFIG_DIR/backend.env"
     
-    # Run database migrations
+    # Set PostgreSQL database URL
+    if grep -q "DATABASE_URL=" "$CONFIG_DIR/backend.env"; then
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME|g" "$CONFIG_DIR/backend.env"
+    else
+        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
+    fi
+    
+    # Test PostgreSQL connection
+    log_info "Testing PostgreSQL connection..."
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+import psycopg2
+try:
+    conn = psycopg2.connect('postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME')
+    print('PostgreSQL connection successful')
+    conn.close()
+except Exception as e:
+    print(f'PostgreSQL connection failed: {e}')
+    exit(1)
+"; then
+        log_success "PostgreSQL connection test passed"
+    else
+        log_error "PostgreSQL connection test failed"
+        exit 1
+    fi
+    
+    # Run database migrations with PostgreSQL
+    log_info "Running database migrations..."
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/alembic" upgrade head
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
     
     log_success "Backend installed"
+}# Install backend
+install_backend() {
+    log_info "Installing backend..."
+    
+    # Copy backend files
+    cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
+    
+    # Create virtual environment
+    sudo -u "$GGNET_USER" python3.11 -m venv "$INSTALL_DIR/venv"
+    
+    # Install Python dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
+    
+    # Install PostgreSQL driver and additional dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary asyncpg
+    
+    # Copy environment file
+    cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
+    chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
+    chmod 640 "$CONFIG_DIR/backend.env"
+    
+    # Update environment file with correct paths and PostgreSQL database
+    sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
+    
+    # Set PostgreSQL database URL
+    if grep -q "DATABASE_URL=" "$CONFIG_DIR/backend.env"; then
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME|g" "$CONFIG_DIR/backend.env"
+    else
+        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
+    fi
+    
+    # Test PostgreSQL connection
+    log_info "Testing PostgreSQL connection..."
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+import psycopg2
+try:
+    conn = psycopg2.connect('postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME')
+    print('PostgreSQL connection successful')
+    conn.close()
+except Exception as e:
+    print(f'PostgreSQL connection failed: {e}')
+    exit(1)
+"; then
+        log_success "PostgreSQL connection test passed"
+    else
+        log_error "PostgreSQL connection test failed"
+        exit 1
+    fi
+    
+    # Run database migrations with PostgreSQL
+    log_info "Running database migrations..."
+    cd "$INSTALL_DIR/backend"
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
+    
+    log_success "Backend installed"
+}
+
+# Create initial admin user
+create_admin_user() {
+    log_info "Creating initial admin user..."
+    
+    cd "$INSTALL_DIR/backend"
+    
+    # Use PostgreSQL connection string
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
+import asyncio
+import os
+from sqlalchemy import select
+from app.core.database import AsyncSessionLocal
+from app.models.user import User, UserRole, UserStatus
+from app.core.security import get_password_hash
+
+async def create_admin():
+    async with AsyncSessionLocal() as db:
+        # Check if admin user exists
+        result = await db.execute(select(User).where(User.username == 'admin'))
+        if result.scalar_one_or_none():
+            print("Admin user already exists")
+            return
+        
+        # Create admin user
+        admin_user = User(
+            username="admin",
+            email="admin@ggnet.local",
+            full_name="System Administrator",
+            hashed_password=get_password_hash("admin123"),
+            role=UserRole.ADMIN,
+            status=UserStatus.ACTIVE,
+            is_active=True
+        )
+        
+        db.add(admin_user)
+        await db.commit()
+        print("Admin user created successfully")
+        print("Username: admin")
+        print("Password: admin123")
+        print("Please change the password after first login!")
+
+asyncio.run(create_admin())
+EOF
+    
+    log_success "Initial admin user created"
 }
 
 # Install frontend
@@ -750,4 +891,3 @@ main() {
 
 # Run main function
 main "$@"
-
