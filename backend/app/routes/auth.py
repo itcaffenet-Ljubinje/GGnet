@@ -110,7 +110,7 @@ async def login(
     
     # Rate limiting
     rate_key = f"login:{client_ip}"
-    if not rate_limiter.is_allowed(rate_key, max_attempts=5, window_minutes=15):
+    if not rate_limiter.is_allowed(rate_key, max_attempts=10, window_minutes=5):
         logger.warning("Login rate limit exceeded", ip=client_ip)
         
         # Log security event

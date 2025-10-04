@@ -54,7 +54,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # Rate limit rules: {path_pattern: (requests_per_minute, window_seconds)}
         self.rules = {
-            "/auth/login": (5, 300),  # 5 requests per 5 minutes
+            "/auth/login": (10, 300),  # 10 requests per 5 minutes
             "/auth/refresh": (10, 60),  # 10 requests per minute
             "/images/upload": (3, 60),  # 3 uploads per minute
             "default": (100, 60)  # 100 requests per minute for other endpoints
