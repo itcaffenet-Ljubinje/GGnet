@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 import structlog
 
 from app.core.database import get_db
@@ -45,6 +45,20 @@ class TokenRefresh(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+    
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Username cannot be empty')
+        return v.strip()
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Password cannot be empty')
+        return v
 
 
 class UserCreate(BaseModel):
