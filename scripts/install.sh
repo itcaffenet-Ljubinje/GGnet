@@ -809,7 +809,8 @@ from app.core.database import AsyncSessionLocal
 async def check_db():
     try:
         async with AsyncSessionLocal() as db:
-            await db.execute('SELECT 1')
+            from sqlalchemy import text
+            await db.execute(text('SELECT 1'))
             print('Database is ready')
     except Exception as e:
         print(f'Database not ready: {e}')

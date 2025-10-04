@@ -5,9 +5,9 @@ Audit log model for security and compliance tracking
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
+from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
 
