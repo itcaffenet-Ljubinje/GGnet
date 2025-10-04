@@ -226,65 +226,6 @@ except Exception as e:
     sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
     
     log_success "Backend installed"
-}# Install backend
-install_backend() {
-    log_info "Installing backend..."
-    
-    # Copy backend files
-    cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
-    
-    # Create virtual environment
-    sudo -u "$GGNET_USER" python3.11 -m venv "$INSTALL_DIR/venv"
-    
-    # Install Python dependencies
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
-    
-    # Install PostgreSQL driver and additional dependencies
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary asyncpg
-    
-    # Copy environment file
-    cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
-    chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
-    chmod 640 "$CONFIG_DIR/backend.env"
-    
-    # Update environment file with correct paths and PostgreSQL database
-    sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
-    sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
-    sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
-    sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
-    
-    # Set PostgreSQL database URL
-    if grep -q "DATABASE_URL=" "$CONFIG_DIR/backend.env"; then
-        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME|g" "$CONFIG_DIR/backend.env"
-    else
-        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
-    fi
-    
-    # Test PostgreSQL connection
-    log_info "Testing PostgreSQL connection..."
-    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
-import psycopg2
-try:
-    conn = psycopg2.connect('postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME')
-    print('PostgreSQL connection successful')
-    conn.close()
-except Exception as e:
-    print(f'PostgreSQL connection failed: {e}')
-    exit(1)
-"; then
-        log_success "PostgreSQL connection test passed"
-    else
-        log_error "PostgreSQL connection test failed"
-        exit 1
-    fi
-    
-    # Run database migrations with PostgreSQL
-    log_info "Running database migrations..."
-    cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
-    
-    log_success "Backend installed"
 }
 
 # Create initial admin user
@@ -757,64 +698,6 @@ start_services() {
     else
         log_warning "Worker service failed to start (this is normal if no background tasks are configured)"
     fi
-}
-
-# Create initial admin user
-create_admin_user() {
-    log_info "Creating initial admin user..."
-    
-    cd "$INSTALL_DIR/backend"
-    
-    # Create a temporary Python script
-    cat > /tmp/create_admin.py << 'EOF'
-import asyncio
-import sys
-import os
-sys.path.insert(0, os.getcwd())
-
-from app.core.database import AsyncSessionLocal
-from app.models.user import User, UserRole, UserStatus
-from app.core.security import get_password_hash
-
-async def create_admin():
-    try:
-        async with AsyncSessionLocal() as db:
-            # Check if admin user exists
-            from sqlalchemy import select
-            result = await db.execute(select(User).where(User.username == 'admin'))
-            if result.scalar_one_or_none():
-                print('Admin user already exists')
-                return
-            
-            # Create admin user
-            admin_user = User(
-                username='admin',
-                email='admin@ggnet.local',
-                full_name='System Administrator',
-                hashed_password=get_password_hash('admin123'),
-                role=UserRole.ADMIN,
-                status=UserStatus.ACTIVE,
-                is_active=True
-            )
-            
-            db.add(admin_user)
-            await db.commit()
-            print('Admin user created successfully')
-            print('Username: admin')
-            print('Password: admin123')
-            print('Please change the password after first login!')
-    except Exception as e:
-        print(f'Error creating admin user: {e}')
-        sys.exit(1)
-
-if __name__ == "__main__":
-    asyncio.run(create_admin())
-EOF
-    
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" /tmp/create_admin.py
-    rm -f /tmp/create_admin.py
-    
-    log_success "Initial admin user created"
 }
 
 # Print installation summary
