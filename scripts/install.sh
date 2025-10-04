@@ -241,21 +241,30 @@ except Exception as e:
         exit 1
     fi
     
+    # Create versions directory if it doesn't exist
+    mkdir -p "$INSTALL_DIR/backend/alembic/versions"
+    
     # Run database migrations with PostgreSQL
     log_info "Running database migrations..."
     cd "$INSTALL_DIR/backend"
-    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head; then
+    
+    # Check if migrations exist, if not create initial migration
+    if [[ ! -f "$INSTALL_DIR/backend/alembic/versions"/*.py ]]; then
+        log_info "No migration files found, creating initial migration..."
+        if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" PYTHONPATH="$INSTALL_DIR/backend" "$INSTALL_DIR/venv/bin/alembic" revision --autogenerate -m "Initial migration"; then
+            log_success "Initial migration created"
+        else
+            log_error "Failed to create initial migration"
+            exit 1
+        fi
+    fi
+    
+    # Run migrations
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" PYTHONPATH="$INSTALL_DIR/backend" "$INSTALL_DIR/venv/bin/alembic" upgrade head; then
         log_success "Database migrations completed successfully"
     else
         log_error "Database migrations failed"
-        log_info "Checking if migrations directory exists..."
-        if [[ -d "$INSTALL_DIR/backend/alembic/versions" ]]; then
-            log_info "Migration files found, trying to initialize..."
-            sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" stamp head
-        else
-            log_error "No migration files found in alembic/versions/"
-            exit 1
-        fi
+        exit 1
     fi
     
     log_success "Backend installed"
