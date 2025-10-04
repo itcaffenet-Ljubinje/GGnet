@@ -4,13 +4,17 @@ Pytest fixtures for testing FastAPI app with async support
 
 import asyncio
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # pyright: ignore[reportMissingImports]
 from sqlalchemy.orm import sessionmaker  # pyright: ignore[reportMissingImports]
 from app.main import app
-from app.core.database import Base
+from app.core.database import Base, get_db
 from app.models.user import User, UserRole
 from app.core.security import get_password_hash, create_access_token
+
+# Import all models to ensure they are registered
+from app.models import user, image, machine, target, session, audit
 
 DATABASE_URL_TEST = "sqlite+aiosqlite:///./test.db"
 
@@ -22,7 +26,7 @@ AsyncSessionLocal = sessionmaker(
     expire_on_commit=False
 )
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def db_session():
     """Provide a transactional scope around a test."""
     # Create tables for this test
@@ -38,17 +42,26 @@ async def db_session():
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def client(db_session):
     """Provide an AsyncClient for testing FastAPI routes."""
+    # Override the database dependency to use test database
+    def override_get_db():
+        return db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
     async with AsyncClient(app=app, base_url="http://testserver") as ac:
         yield ac
+    
+    # Clean up dependency override
+    app.dependency_overrides.clear()
 
 # ------------------------
 # User & token fixtures
 # ------------------------
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def admin_user(db_session):
     """Create an admin user."""
     user = User(
@@ -61,7 +74,7 @@ async def admin_user(db_session):
     await db_session.refresh(user)
     return user
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def viewer_user(db_session):
     """Create a viewer user."""
     user = User(
@@ -81,12 +94,25 @@ def auth_headers():
         return {"Authorization": f"Bearer {token}"}
     return _auth_headers
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def admin_token(admin_user):
     """Return access token for admin user."""
     return create_access_token({"sub": str(admin_user.id), "role": admin_user.role.value})
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
+async def operator_token(db_session):
+    """Return access token for operator user."""
+    user = User(
+        username="operator",
+        hashed_password=get_password_hash("operator123"),
+        role=UserRole.OPERATOR
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return create_access_token({"sub": str(user.id), "role": user.role.value})
+
+@pytest_asyncio.fixture(scope="function")
 async def viewer_token(viewer_user):
     """Return access token for viewer user."""
     return create_access_token({"sub": str(viewer_user.id), "role": viewer_user.role.value})

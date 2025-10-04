@@ -10,7 +10,10 @@ from pydantic import BaseModel
 import structlog
 import os
 import hashlib
-import magic
+try:
+    import magic
+except ImportError:
+    magic = None
 from pathlib import Path
 import aiofiles
 import uuid

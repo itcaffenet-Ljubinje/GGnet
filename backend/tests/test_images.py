@@ -11,14 +11,13 @@ from app.models.image import Image, ImageFormat, ImageStatus, ImageType
 from tests.conftest import auth_headers
 
 
-@pytest.mark.asyncio
 class TestImages:
     """Test image management functionality."""
 
-    async def test_list_images_empty(self, client, admin_token):
+    @pytest.mark.asyncio
+    async def test_list_images_empty(self, client, admin_token, auth_headers):
         """Test listing images when none exist."""
-        async_client = await client
-        response = await async_client.get(
+        response = await client.get(
             "/images",
             headers=auth_headers(admin_token)
         )
@@ -27,13 +26,14 @@ class TestImages:
         assert isinstance(data, list)
         assert len(data) == 0
 
+    @pytest.mark.asyncio
     async def test_list_images_unauthorized(self, client):
         """Test listing images without authentication."""
-        async_client = await client
-        response = await async_client.get("/images")
+        response = await client.get("/images")
         assert response.status_code == 401
 
-    async def test_upload_image_success(self, client: AsyncClient, admin_token, db_session):
+    @pytest.mark.asyncio
+    async def test_upload_image_success(self, client: AsyncClient, admin_token, db_session, auth_headers):
         """Test successful image upload."""
         fake_file_content = b"VHD_FAKE_CONTENT" * 1000
         files = {
@@ -52,6 +52,7 @@ class TestImages:
         )
         assert response.status_code in [200, 201, 500]
 
+    @pytest.mark.asyncio
     async def test_upload_image_unauthorized(self, client: AsyncClient):
         """Test image upload without authentication."""
         files = {
@@ -61,7 +62,8 @@ class TestImages:
         response = await client.post("/images/upload", files=files, data=data)
         assert response.status_code == 401
 
-    async def test_upload_image_viewer_forbidden(self, client: AsyncClient, viewer_token):
+    @pytest.mark.asyncio
+    async def test_upload_image_viewer_forbidden(self, client: AsyncClient, viewer_token, auth_headers):
         """Test image upload as viewer (should be forbidden)."""
         files = {"file": ("test.vhd", BytesIO(b"fake content"), "application/octet-stream")}
         data = {"name": "Test Image", "image_type": "system"}
@@ -73,11 +75,13 @@ class TestImages:
         )
         assert response.status_code == 403
 
-    async def test_get_image_not_found(self, client: AsyncClient, admin_token):
+    @pytest.mark.asyncio
+    async def test_get_image_not_found(self, client: AsyncClient, admin_token, auth_headers):
         response = await client.get("/images/999", headers=auth_headers(admin_token))
         assert response.status_code == 404
 
-    async def test_update_image_not_found(self, client: AsyncClient, admin_token):
+    @pytest.mark.asyncio
+    async def test_update_image_not_found(self, client: AsyncClient, admin_token, auth_headers):
         response = await client.put(
             "/images/999",
             headers=auth_headers(admin_token),
@@ -85,11 +89,13 @@ class TestImages:
         )
         assert response.status_code == 404
 
-    async def test_delete_image_not_found(self, client: AsyncClient, admin_token):
+    @pytest.mark.asyncio
+    async def test_delete_image_not_found(self, client: AsyncClient, admin_token, auth_headers):
         response = await client.delete("/images/999", headers=auth_headers(admin_token))
         assert response.status_code == 404
 
-    async def test_list_images_with_filters(self, client: AsyncClient, admin_token):
+    @pytest.mark.asyncio
+    async def test_list_images_with_filters(self, client: AsyncClient, admin_token, auth_headers):
         response = await client.get(
             "/images?image_type=system&status=ready",
             headers=auth_headers(admin_token)
@@ -98,19 +104,19 @@ class TestImages:
         data = response.json()
         assert isinstance(data, list)
 
-    async def test_list_images_pagination(self, client: AsyncClient, admin_token):
+    @pytest.mark.asyncio
+    async def test_list_images_pagination(self, client: AsyncClient, admin_token, auth_headers):
         response = await client.get("/images?skip=0&limit=10", headers=auth_headers(admin_token))
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
 
-@pytest.mark.asyncio
 class TestImageModel:
     """Test image model functionality."""
 
+    @pytest.mark.asyncio
     async def test_create_image(self, db_session, admin_user):
-        admin = await admin_user
         image = Image(
             name="Test Image",
             description="Test description",
@@ -120,7 +126,7 @@ class TestImageModel:
             size_bytes=1073741824,
             status=ImageStatus.READY,
             image_type=ImageType.SYSTEM,
-            created_by=admin.id
+            created_by=admin_user.id
         )
         db_session.add(image)
         await db_session.commit()
@@ -130,8 +136,8 @@ class TestImageModel:
         assert image.format == ImageFormat.VHD
         assert image.status == ImageStatus.READY
 
+    @pytest.mark.asyncio
     async def test_image_properties(self, db_session, admin_user):
-        admin = await admin_user
         image = Image(
             name="Test Image",
             filename="test.vhd",
@@ -140,7 +146,7 @@ class TestImageModel:
             size_bytes=1073741824,
             status=ImageStatus.READY,
             image_type=ImageType.SYSTEM,
-            created_by=admin.id
+            created_by=admin_user.id
         )
         db_session.add(image)
         await db_session.commit()
