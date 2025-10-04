@@ -71,9 +71,9 @@ install_dependencies() {
     
     apt-get update
     apt-get install -y \
-        python3.11 \
-        python3.11-venv \
-        python3.11-dev \
+        python3 \
+        python3-venv \
+        python3-dev \
         python3-pip \
         nodejs \
         npm \
@@ -93,7 +93,9 @@ install_dependencies() {
         build-essential \
         libpq-dev \
         supervisor \
-        logrotate
+        logrotate \
+        ipxe \
+        grub-efi-amd64-bin
     
     log_success "System dependencies installed"
 }
@@ -163,7 +165,7 @@ install_backend() {
     cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
     
     # Create virtual environment
-    sudo -u "$GGNET_USER" python3.11 -m venv "$INSTALL_DIR/venv"
+    sudo -u "$GGNET_USER" python3 -m venv "$INSTALL_DIR/venv"
     
     # Install Python dependencies
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
@@ -179,6 +181,10 @@ install_backend() {
     sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
     sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
     sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|BACKUP_DIR=.*|BACKUP_DIR=$DATA_DIR/backups|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|ENVIRONMENT=.*|ENVIRONMENT=production|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|DEBUG=.*|DEBUG=false|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|g" "$CONFIG_DIR/backend.env"
     
     # Run database migrations
     cd "$INSTALL_DIR/backend"
@@ -204,6 +210,9 @@ install_frontend() {
     # Copy built files to nginx
     rm -rf /var/www/html/*
     cp -r "$INSTALL_DIR/frontend/dist"/* /var/www/html/
+    
+    # Set proper ownership
+    chown -R www-data:www-data /var/www/html
     
     log_success "Frontend installed"
 }
@@ -231,8 +240,106 @@ install_scripts() {
 setup_systemd() {
     log_info "Setting up systemd services..."
     
-    # Copy service files
-    cp "$PROJECT_ROOT/systemd"/*.service /etc/systemd/system/
+    # Create backend service file
+    cat > /etc/systemd/system/ggnet-backend.service << EOF
+[Unit]
+Description=GGnet Diskless Server Backend
+Documentation=https://github.com/ggnet/diskless-server
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+Requires=network.target
+
+[Service]
+Type=exec
+User=$GGNET_USER
+Group=$GGNET_GROUP
+WorkingDirectory=$INSTALL_DIR/backend
+Environment=PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=$INSTALL_DIR/backend
+EnvironmentFile=$CONFIG_DIR/backend.env
+ExecStart=$INSTALL_DIR/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP \$MAINPID
+KillMode=mixed
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$DATA_DIR $LOG_DIR
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ggnet-backend
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Create worker service file
+    cat > /etc/systemd/system/ggnet-worker.service << EOF
+[Unit]
+Description=GGnet Background Worker
+Documentation=https://github.com/ggnet/diskless-server
+After=network.target postgresql.service redis.service ggnet-backend.service
+Wants=postgresql.service redis.service
+Requires=network.target
+
+[Service]
+Type=exec
+User=$GGNET_USER
+Group=$GGNET_GROUP
+WorkingDirectory=$INSTALL_DIR/backend
+Environment=PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=$INSTALL_DIR/backend
+EnvironmentFile=$CONFIG_DIR/backend.env
+ExecStart=$INSTALL_DIR/venv/bin/python -m app.worker
+ExecReload=/bin/kill -HUP \$MAINPID
+KillMode=mixed
+Restart=always
+RestartSec=10
+TimeoutStopSec=60
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$DATA_DIR $LOG_DIR
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ggnet-worker
+
+[Install]
+WantedBy=multi-user.target
+EOF
     
     # Reload systemd
     systemctl daemon-reload
@@ -251,8 +358,163 @@ setup_nginx() {
     # Backup original config
     cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
     
-    # Copy our nginx config
-    cp "$PROJECT_ROOT/docker/nginx/nginx.conf" /etc/nginx/nginx.conf
+    # Create nginx config for native installation
+    cat > /etc/nginx/nginx.conf << 'EOF'
+user www-data;
+worker_processes auto;
+error_log /var/log/nginx/error.log notice;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logging format
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    'rt=$request_time uct="$upstream_connect_time" '
+                    'uht="$upstream_header_time" urt="$upstream_response_time"';
+
+    access_log /var/log/nginx/access.log main;
+
+    # Basic settings
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    server_tokens off;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/javascript
+        application/xml+rss
+        application/json
+        application/xml
+        image/svg+xml;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=upload:10m rate=2r/s;
+
+    # Upstream backend
+    upstream ggnet_backend {
+        server 127.0.0.1:8000;
+        keepalive 32;
+    }
+
+    # Main server block
+    server {
+        listen 80;
+        server_name _;
+        root /var/www/html;
+        index index.html;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+        # Client max body size for uploads
+        client_max_body_size 10G;
+        client_body_timeout 300s;
+        client_header_timeout 60s;
+
+        # Frontend static files
+        location / {
+            try_files $uri $uri/ /index.html;
+            
+            # Cache static assets
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                access_log off;
+            }
+        }
+
+        # API proxy
+        location /api/ {
+            # Rate limiting
+            limit_req zone=api burst=20 nodelay;
+            
+            # Proxy settings
+            proxy_pass http://ggnet_backend/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+            
+            # Timeouts
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+            
+            # Buffer settings
+            proxy_buffering on;
+            proxy_buffer_size 128k;
+            proxy_buffers 4 256k;
+            proxy_busy_buffers_size 256k;
+        }
+
+        # Special handling for file uploads
+        location /api/images/upload {
+            limit_req zone=upload burst=5 nodelay;
+            
+            proxy_pass http://ggnet_backend/images/upload;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Extended timeouts for large uploads
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 600s;
+            proxy_read_timeout 600s;
+            
+            # Disable buffering for uploads
+            proxy_buffering off;
+            proxy_request_buffering off;
+        }
+
+        # Health check endpoint
+        location /health {
+            proxy_pass http://ggnet_backend/health;
+            access_log off;
+        }
+
+        # Error pages
+        error_page 404 /index.html;
+        error_page 500 502 503 504 /50x.html;
+        
+        location = /50x.html {
+            root /var/www/html;
+        }
+    }
+}
+EOF
     
     # Test nginx config
     nginx -t
@@ -279,8 +541,30 @@ EOF
     # Create TFTP directory structure
     mkdir -p /var/lib/tftpboot/{EFI/BOOT,pxelinux.cfg}
     
+    # Copy UEFI boot files
+    if [[ -f /usr/lib/ipxe/ipxe.efi ]]; then
+        cp /usr/lib/ipxe/ipxe.efi /var/lib/tftpboot/bootx64.efi
+    elif [[ -f /usr/share/ipxe/ipxe.efi ]]; then
+        cp /usr/share/ipxe/ipxe.efi /var/lib/tftpboot/bootx64.efi
+    else
+        log_warning "iPXE EFI binary not found, please install ipxe package"
+    fi
+    
+    # Create iPXE boot script
+    cat > /var/lib/tftpboot/boot.ipxe << 'EOF'
+#!ipxe
+dhcp
+set server-ip ${next-server}
+set iscsi-server ${server-ip}
+set initiator-iqn iqn.2025.ggnet.client:${mac}
+set target-name ${mac}
+sanboot iscsi:${iscsi-server}:::1:${initiator-iqn}:${target-name}
+EOF
+    
     # Set permissions
     chown -R tftp:tftp /var/lib/tftpboot
+    chmod 644 /var/lib/tftpboot/bootx64.efi
+    chmod 644 /var/lib/tftpboot/boot.ipxe
     
     # Enable and start TFTP
     systemctl enable tftpd-hpa
@@ -339,41 +623,55 @@ create_admin_user() {
     log_info "Creating initial admin user..."
     
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" -c "
+    
+    # Create a temporary Python script
+    cat > /tmp/create_admin.py << 'EOF'
 import asyncio
+import sys
+import os
+sys.path.insert(0, os.getcwd())
+
 from app.core.database import AsyncSessionLocal
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash
 
 async def create_admin():
-    async with AsyncSessionLocal() as db:
-        # Check if admin user exists
-        from sqlalchemy import select
-        result = await db.execute(select(User).where(User.username == 'admin'))
-        if result.scalar_one_or_none():
-            print('Admin user already exists')
-            return
-        
-        # Create admin user
-        admin_user = User(
-            username='admin',
-            email='admin@ggnet.local',
-            full_name='System Administrator',
-            hashed_password=get_password_hash('admin123'),
-            role=UserRole.ADMIN,
-            status=UserStatus.ACTIVE,
-            is_active=True
-        )
-        
-        db.add(admin_user)
-        await db.commit()
-        print('Admin user created successfully')
-        print('Username: admin')
-        print('Password: admin123')
-        print('Please change the password after first login!')
+    try:
+        async with AsyncSessionLocal() as db:
+            # Check if admin user exists
+            from sqlalchemy import select
+            result = await db.execute(select(User).where(User.username == 'admin'))
+            if result.scalar_one_or_none():
+                print('Admin user already exists')
+                return
+            
+            # Create admin user
+            admin_user = User(
+                username='admin',
+                email='admin@ggnet.local',
+                full_name='System Administrator',
+                hashed_password=get_password_hash('admin123'),
+                role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                is_active=True
+            )
+            
+            db.add(admin_user)
+            await db.commit()
+            print('Admin user created successfully')
+            print('Username: admin')
+            print('Password: admin123')
+            print('Please change the password after first login!')
+    except Exception as e:
+        print(f'Error creating admin user: {e}')
+        sys.exit(1)
 
-asyncio.run(create_admin())
-"
+if __name__ == "__main__":
+    asyncio.run(create_admin())
+EOF
+    
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" /tmp/create_admin.py
+    rm -f /tmp/create_admin.py
     
     log_success "Initial admin user created"
 }
@@ -414,8 +712,18 @@ print_summary() {
     echo "Backend: $CONFIG_DIR/backend.env"
     echo "Nginx: /etc/nginx/nginx.conf"
     echo "TFTP: /etc/default/tftpd-hpa"
+    echo "Backend Service: /etc/systemd/system/ggnet-backend.service"
+    echo "Worker Service: /etc/systemd/system/ggnet-worker.service"
+    echo
+    echo "=== Useful Commands ==="
+    echo "Check backend status: systemctl status ggnet-backend"
+    echo "View backend logs: journalctl -u ggnet-backend -f"
+    echo "Restart backend: systemctl restart ggnet-backend"
+    echo "Check nginx status: systemctl status nginx"
+    echo "Test nginx config: nginx -t"
     echo
     log_warning "Remember to configure your firewall and network settings!"
+    log_warning "Make sure to open ports 80 (HTTP), 3260 (iSCSI), and 69 (TFTP) in your firewall!"
 }
 
 # Main installation function
