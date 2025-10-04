@@ -338,4 +338,75 @@ start_services() {
         systemctl status ggnet-backend
     fi
     
-    if systemctl is-active --
+    if systemctl is-active --quiet ggnet-worker; then
+        log_success "Worker service started"
+    else
+        log_warning "Worker service failed to start (this is normal if no background tasks are configured)"
+    fi
+}
+
+# Print installation summary
+print_summary() {
+    log_success "GGnet Diskless Server installation completed!"
+    echo
+    echo "=== Installation Summary ==="
+    echo "Install Directory: $INSTALL_DIR"
+    echo "Config Directory: $CONFIG_DIR"
+    echo "Data Directory: $DATA_DIR"
+    echo "Log Directory: $LOG_DIR"
+    echo
+    echo "=== Services ==="
+    echo "Backend: systemctl status ggnet-backend"
+    echo "Worker: systemctl status ggnet-worker"
+    echo "Nginx: systemctl status nginx"
+    echo "PostgreSQL: systemctl status postgresql"
+    echo "Redis: systemctl status redis-server"
+    echo
+    echo "=== Access ==="
+    echo "Web Interface: http://$(hostname -I | awk '{print $1}')"
+    echo "API Documentation: http://$(hostname -I | awk '{print $1}')/api/docs"
+    echo
+    echo "=== Default Credentials ==="
+    echo "Username: admin"
+    echo "Password: admin123"
+    echo
+    echo "=== Next Steps ==="
+    echo "1. Change the default admin password"
+    echo "2. Configure DHCP server for network boot"
+    echo "3. Upload your first disk image"
+    echo "4. Add client machines"
+    echo "5. Create iSCSI targets"
+    echo
+    echo "=== Configuration Files ==="
+    echo "Backend: $CONFIG_DIR/backend.env"
+    echo "Nginx: /etc/nginx/nginx.conf"
+    echo "TFTP: /etc/default/tftpd-hpa"
+    echo
+    log_warning "Remember to configure your firewall and network settings!"
+}
+
+# Main installation function
+main() {
+    log_info "Starting GGnet Diskless Server installation..."
+    
+    check_root
+    detect_os
+    install_dependencies
+    setup_user_and_dirs
+    setup_postgresql
+    setup_redis
+    install_backend
+    create_admin_user
+    install_frontend
+    install_scripts
+    setup_systemd
+    setup_nginx
+    setup_tftp
+    setup_logrotate
+    start_services
+    print_summary
+}
+
+# Run main
+main "$@"
+
