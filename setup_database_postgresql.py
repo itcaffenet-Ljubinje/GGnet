@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from app.core.database import Base
-from app.models.user import User, UserRole, UserStatus
-from app.core.security import get_password_hash
+from app.core.database import Base  # pyright: ignore[reportMissingImports]
+from app.models.user import User, UserRole, UserStatus  # pyright: ignore[reportMissingImports]
+from app.core.security import get_password_hash  # pyright: ignore[reportMissingImports]
 
 async def setup_database():
     """Setup PostgreSQL database and create admin user"""
