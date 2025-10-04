@@ -78,6 +78,7 @@ install_dependencies() {
         python3-venv \
         python3-dev \
         python3-pip \
+        software-properties-common \
         nodejs \
         npm \
         postgresql \
@@ -99,6 +100,20 @@ install_dependencies() {
         logrotate \
         ipxe \
         grub-efi-amd64-bin
+    
+    # Try to install Python 3.12 if available, otherwise use system Python
+    log_info "Checking Python version availability..."
+    if apt-cache search python3.12 | grep -q python3.12; then
+        log_info "Installing Python 3.12..."
+        apt-get install -y python3.12 python3.12-venv python3.12-dev || {
+            log_warning "Python 3.12 not available, using system Python"
+            PYTHON_CMD="python3"
+        }
+        PYTHON_CMD="python3.12"
+    else
+        log_info "Using system Python 3"
+        PYTHON_CMD="python3"
+    fi
     
     log_success "System dependencies installed"
 }
@@ -171,7 +186,7 @@ install_backend() {
     cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
     
     # Create virtual environment
-    sudo -u "$GGNET_USER" python3 -m venv "$INSTALL_DIR/venv"
+    sudo -u "$GGNET_USER" "$PYTHON_CMD" -m venv "$INSTALL_DIR/venv"
     
     # Install Python dependencies
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip

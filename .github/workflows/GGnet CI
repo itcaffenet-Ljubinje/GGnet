@@ -14,15 +14,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip nodejs npm postgresql postgresql-contrib redis-server nginx targetcli-fb open-iscsi qemu-utils tftpd-hpa isc-dhcp-server git curl wget unzip build-essential libpq-dev supervisor logrotate ipxe grub-efi-amd64-bin
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository ppa:deadsnakes/ppa -y
+        sudo apt-get update
+        sudo apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip nodejs npm postgresql postgresql-contrib redis-server nginx targetcli-fb open-iscsi qemu-utils tftpd-hpa isc-dhcp-server git curl wget unzip build-essential libpq-dev supervisor logrotate ipxe grub-efi-amd64-bin
 
     - name: Start PostgreSQL and Redis
       run: |
