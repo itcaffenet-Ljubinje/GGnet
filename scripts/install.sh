@@ -192,8 +192,9 @@ create_admin_user() {
     log_info "Creating initial admin user..."
     
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" -c "
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
 import asyncio
+from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash
@@ -201,18 +202,17 @@ from app.core.security import get_password_hash
 async def create_admin():
     async with AsyncSessionLocal() as db:
         # Check if admin user exists
-        from sqlalchemy import select
         result = await db.execute(select(User).where(User.username == 'admin'))
         if result.scalar_one_or_none():
-            print('Admin user already exists')
+            print("Admin user already exists")
             return
         
         # Create admin user
         admin_user = User(
-            username='admin',
-            email='admin@ggnet.local',
-            full_name='System Administrator',
-            hashed_password=get_password_hash('admin123'),
+            username="admin",
+            email="admin@ggnet.local",
+            full_name="System Administrator",
+            hashed_password=get_password_hash("admin123"),
             role=UserRole.ADMIN,
             status=UserStatus.ACTIVE,
             is_active=True
@@ -220,13 +220,13 @@ async def create_admin():
         
         db.add(admin_user)
         await db.commit()
-        print('Admin user created successfully')
-        print('Username: admin')
-        print('Password: admin123')
-        print('Please change the password after first login!')
+        print("Admin user created successfully")
+        print("Username: admin")
+        print("Password: admin123")
+        print("Please change the password after first login!")
 
 asyncio.run(create_admin())
-"
+EOF
     
     log_success "Initial admin user created"
 }
