@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: Path = Path("./uploads")
     IMAGES_DIR: Path = Path("./images")
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10GB
-    ALLOWED_IMAGE_FORMATS: List[str] = ["vhd", "vhdx", "raw", "qcow2"]
+    ALLOWED_IMAGE_FORMATS: str = "vhd,vhdx,raw,qcow2"  # Comma-separated string from env
     
     # iSCSI Configuration
     ISCSI_TARGET_PREFIX: str = "iqn.2025.ggnet"
@@ -87,20 +87,43 @@ class Settings(BaseSettings):
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
     
-    @field_validator("ALLOWED_IMAGE_FORMATS")
+    @field_validator("ALLOWED_IMAGE_FORMATS", mode="before")
     @classmethod
     def validate_image_formats(cls, v):
         """Validate image formats"""
-        allowed = {"vhd", "vhdx", "raw", "qcow2", "vmdk", "vdi"}
-        for fmt in v:
-            if fmt.lower() not in allowed:
-                raise ValueError(f"Unsupported image format: {fmt}")
-        return [fmt.lower() for fmt in v]
+        # Handle list input (default value)
+        if isinstance(v, list):
+            allowed = {"vhd", "vhdx", "raw", "qcow2", "vmdk", "vdi"}
+            for fmt in v:
+                if fmt.lower() not in allowed:
+                    raise ValueError(f"Unsupported image format: {fmt}")
+            return ",".join([fmt.lower() for fmt in v])
+        
+        # Handle string input (comma-separated values from env)
+        if isinstance(v, str):
+            if not v.strip():
+                return "vhd,vhdx,raw,qcow2"  # Default values
+            # Validate the formats
+            formats = [fmt.strip() for fmt in v.split(",") if fmt.strip()]
+            allowed = {"vhd", "vhdx", "raw", "qcow2", "vmdk", "vdi"}
+            for fmt in formats:
+                if fmt.lower() not in allowed:
+                    raise ValueError(f"Unsupported image format: {fmt}")
+            return ",".join([fmt.lower() for fmt in formats])
+        
+        return v
     
     @property
     def is_production(self) -> bool:
         """Check if running in production"""
         return self.ENVIRONMENT.lower() == "production"
+    
+    @property
+    def allowed_image_formats_list(self) -> List[str]:
+        """Get allowed image formats as a list"""
+        if not self.ALLOWED_IMAGE_FORMATS.strip():
+            return ["vhd", "vhdx", "raw", "qcow2"]
+        return [fmt.strip() for fmt in self.ALLOWED_IMAGE_FORMATS.split(",") if fmt.strip()]
     
     @property
     def database_url_sync(self) -> str:

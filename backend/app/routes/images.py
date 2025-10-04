@@ -73,7 +73,7 @@ def validate_image_file(file: UploadFile) -> ImageFormat:
     
     # Check file extension
     file_ext = Path(file.filename).suffix.lower().lstrip('.')
-    if file_ext not in settings.ALLOWED_IMAGE_FORMATS:
+    if file_ext not in settings.allowed_image_formats_list:
         raise ValidationError(f"Unsupported file format: {file_ext}")
     
     # Map extension to format
