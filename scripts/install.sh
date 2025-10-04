@@ -14,6 +14,9 @@ INSTALL_DIR="/opt/ggnet"
 CONFIG_DIR="/etc/ggnet"
 LOG_DIR="/var/log/ggnet"
 DATA_DIR="/var/lib/ggnet"
+DB_USER="ggnet"
+DB_PASS="ggnet_password"
+DB_NAME="ggnet"
 
 # Colors for output
 RED='\033[0;31m'
@@ -137,10 +140,13 @@ setup_postgresql() {
     systemctl enable postgresql
     systemctl start postgresql
     
+    # Wait for PostgreSQL to start
+    sleep 5
+    
     # Create database and user
-    sudo -u postgres psql -c "CREATE USER ggnet WITH PASSWORD 'ggnet_password';" || true
-    sudo -u postgres psql -c "CREATE DATABASE ggnet OWNER ggnet;" || true
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ggnet TO ggnet;" || true
+    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || log_info "User $DB_USER already exists"
+    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" 2>/dev/null || log_info "Database $DB_NAME already exists"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || log_info "Privileges already granted"
     
     log_success "PostgreSQL configured"
 }
@@ -174,15 +180,22 @@ install_backend() {
     chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
     chmod 640 "$CONFIG_DIR/backend.env"
     
-    # Update environment file with correct paths
+    # Update environment file with correct paths and PostgreSQL database
     sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
     sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
     sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
     sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
     
-    # Run database migrations
+    # Set PostgreSQL database URL
+    if grep -q "DATABASE_URL=" "$CONFIG_DIR/backend.env"; then
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME|g" "$CONFIG_DIR/backend.env"
+    else
+        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
+    fi
+    
+    # Run database migrations with PostgreSQL
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/alembic" upgrade head
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
     
     log_success "Backend installed"
 }
@@ -192,8 +205,11 @@ create_admin_user() {
     log_info "Creating initial admin user..."
     
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
+    
+    # Use PostgreSQL connection string
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
 import asyncio
+import os
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.models.user import User, UserRole, UserStatus
@@ -442,4 +458,3 @@ main() {
 
 # Run main function
 main "$@"
-
