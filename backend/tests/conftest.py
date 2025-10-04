@@ -22,9 +22,9 @@ AsyncSessionLocal = sessionmaker(
     expire_on_commit=False
 )
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def prepare_db():
-    """Create test database schema once per session"""
+    """Create test database schema for each test"""
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
