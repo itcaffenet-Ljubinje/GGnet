@@ -220,10 +220,28 @@ except Exception as e:
         exit 1
     fi
     
+    # Check if Alembic is configured
+    if [[ ! -f "$INSTALL_DIR/backend/alembic.ini" ]]; then
+        log_error "Alembic configuration not found"
+        exit 1
+    fi
+    
     # Run database migrations with PostgreSQL
     log_info "Running database migrations..."
     cd "$INSTALL_DIR/backend"
-    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head; then
+        log_success "Database migrations completed successfully"
+    else
+        log_error "Database migrations failed"
+        log_info "Checking if migrations directory exists..."
+        if [[ -d "$INSTALL_DIR/backend/alembic/versions" ]]; then
+            log_info "Migration files found, trying to initialize..."
+            sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" stamp head
+        else
+            log_error "No migration files found in alembic/versions/"
+            exit 1
+        fi
+    fi
     
     log_success "Backend installed"
 }
@@ -235,44 +253,53 @@ create_admin_user() {
     cd "$INSTALL_DIR/backend"
     
     # Use PostgreSQL connection string
-    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
 import asyncio
 import os
+import sys
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash
 
 async def create_admin():
-    async with AsyncSessionLocal() as db:
-        # Check if admin user exists
-        result = await db.execute(select(User).where(User.username == 'admin'))
-        if result.scalar_one_or_none():
-            print("Admin user already exists")
-            return
-        
-        # Create admin user
-        admin_user = User(
-            username="admin",
-            email="admin@ggnet.local",
-            full_name="System Administrator",
-            hashed_password=get_password_hash("admin123"),
-            role=UserRole.ADMIN,
-            status=UserStatus.ACTIVE,
-            is_active=True
-        )
-        
-        db.add(admin_user)
-        await db.commit()
-        print("Admin user created successfully")
-        print("Username: admin")
-        print("Password: admin123")
-        print("Please change the password after first login!")
+    try:
+        async with AsyncSessionLocal() as db:
+            # Check if admin user exists
+            result = await db.execute(select(User).where(User.username == 'admin'))
+            if result.scalar_one_or_none():
+                print("Admin user already exists")
+                return
+            
+            # Create admin user
+            admin_user = User(
+                username="admin",
+                email="admin@ggnet.local",
+                full_name="System Administrator",
+                hashed_password=get_password_hash("admin123"),
+                role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                is_active=True
+            )
+            
+            db.add(admin_user)
+            await db.commit()
+            print("Admin user created successfully")
+            print("Username: admin")
+            print("Password: admin123")
+            print("Please change the password after first login!")
+    except Exception as e:
+        print(f"Error creating admin user: {e}")
+        sys.exit(1)
 
 asyncio.run(create_admin())
 EOF
-    
-    log_success "Initial admin user created"
+    then
+        log_success "Initial admin user created"
+    else
+        log_error "Failed to create admin user"
+        exit 1
+    fi
 }
 
 # Install frontend
@@ -768,7 +795,34 @@ main() {
     setup_tftp
     setup_logrotate
     start_services
-    create_admin_user
+    
+    # Wait a moment for services to start
+    sleep 5
+    
+    # Verify database is ready before creating admin user
+    log_info "Verifying database is ready..."
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+import asyncio
+from app.core.database import AsyncSessionLocal
+
+async def check_db():
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute('SELECT 1')
+            print('Database is ready')
+    except Exception as e:
+        print(f'Database not ready: {e}')
+        exit(1)
+
+asyncio.run(check_db())
+"; then
+        log_success "Database verification passed"
+        create_admin_user
+    else
+        log_error "Database verification failed"
+        exit 1
+    fi
+    
     print_summary
 }
 
