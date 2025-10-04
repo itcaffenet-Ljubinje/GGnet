@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
-from app.models.base import Base
+from app.core.database import Base
 from app.models.user import User, UserRole
 from app.core.security import get_password_hash, create_access_token
 
@@ -53,7 +53,7 @@ async def admin_user(db_session):
     """Create an admin user."""
     user = User(
         username="admin",
-        password=get_password_hash("admin123"),
+        hashed_password=get_password_hash("admin123"),
         role=UserRole.ADMIN
     )
     db_session.add(user)
@@ -66,7 +66,7 @@ async def viewer_user(db_session):
     """Create a viewer user."""
     user = User(
         username="viewer",
-        password=get_password_hash("viewer123"),
+        hashed_password=get_password_hash("viewer123"),
         role=UserRole.VIEWER
     )
     db_session.add(user)
