@@ -175,8 +175,8 @@ install_backend() {
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
     
-    # Install PostgreSQL driver
-    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary
+    # Install PostgreSQL driver and additional dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary asyncpg
     
     # Copy environment file
     cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
@@ -196,7 +196,85 @@ install_backend() {
         echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
     fi
     
+    # Test PostgreSQL connection
+    log_info "Testing PostgreSQL connection..."
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+import psycopg2
+try:
+    conn = psycopg2.connect('postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME')
+    print('PostgreSQL connection successful')
+    conn.close()
+except Exception as e:
+    print(f'PostgreSQL connection failed: {e}')
+    exit(1)
+"; then
+        log_success "PostgreSQL connection test passed"
+    else
+        log_error "PostgreSQL connection test failed"
+        exit 1
+    fi
+    
     # Run database migrations with PostgreSQL
+    log_info "Running database migrations..."
+    cd "$INSTALL_DIR/backend"
+    sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
+    
+    log_success "Backend installed"
+}# Install backend
+install_backend() {
+    log_info "Installing backend..."
+    
+    # Copy backend files
+    cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
+    
+    # Create virtual environment
+    sudo -u "$GGNET_USER" python3.11 -m venv "$INSTALL_DIR/venv"
+    
+    # Install Python dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
+    
+    # Install PostgreSQL driver and additional dependencies
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary asyncpg
+    
+    # Copy environment file
+    cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
+    chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
+    chmod 640 "$CONFIG_DIR/backend.env"
+    
+    # Update environment file with correct paths and PostgreSQL database
+    sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
+    sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
+    
+    # Set PostgreSQL database URL
+    if grep -q "DATABASE_URL=" "$CONFIG_DIR/backend.env"; then
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME|g" "$CONFIG_DIR/backend.env"
+    else
+        echo "DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" >> "$CONFIG_DIR/backend.env"
+    fi
+    
+    # Test PostgreSQL connection
+    log_info "Testing PostgreSQL connection..."
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+import psycopg2
+try:
+    conn = psycopg2.connect('postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME')
+    print('PostgreSQL connection successful')
+    conn.close()
+except Exception as e:
+    print(f'PostgreSQL connection failed: {e}')
+    exit(1)
+"; then
+        log_success "PostgreSQL connection test passed"
+    else
+        log_error "PostgreSQL connection test failed"
+        exit 1
+    fi
+    
+    # Run database migrations with PostgreSQL
+    log_info "Running database migrations..."
     cd "$INSTALL_DIR/backend"
     sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/alembic" upgrade head
     
