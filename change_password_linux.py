@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from app.models.user import User
-from app.core.security import get_password_hash
+from app.models.user import User  # pyright: ignore[reportMissingImports]
+from app.core.security import get_password_hash  # pyright: ignore[reportMissingImports]
 
 async def change_password(new_password=None):
     """Change admin user password"""
