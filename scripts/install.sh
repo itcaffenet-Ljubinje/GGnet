@@ -133,9 +133,11 @@ setup_user_and_dirs() {
 setup_postgresql() {
     log_info "Setting up PostgreSQL..."
     
+    # Start PostgreSQL
     systemctl enable postgresql
     systemctl start postgresql
     
+    # Create database and user
     sudo -u postgres psql -c "CREATE USER ggnet WITH PASSWORD 'ggnet_password';" || true
     sudo -u postgres psql -c "CREATE DATABASE ggnet OWNER ggnet;" || true
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ggnet TO ggnet;" || true
@@ -157,25 +159,28 @@ setup_redis() {
 install_backend() {
     log_info "Installing backend..."
     
+    # Copy backend files
     cp -r "$PROJECT_ROOT/backend"/* "$INSTALL_DIR/backend/"
     
+    # Create virtual environment
     sudo -u "$GGNET_USER" python3.11 -m venv "$INSTALL_DIR/venv"
     
+    # Install Python dependencies
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
     
+    # Copy environment file
     cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
     chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
     chmod 640 "$CONFIG_DIR/backend.env"
     
+    # Update environment file with correct paths
     sed -i "s|UPLOAD_DIR=.*|UPLOAD_DIR=$DATA_DIR/uploads|g" "$CONFIG_DIR/backend.env"
     sed -i "s|IMAGES_DIR=.*|IMAGES_DIR=$DATA_DIR/images|g" "$CONFIG_DIR/backend.env"
     sed -i "s|AUDIT_LOG_FILE=.*|AUDIT_LOG_FILE=$LOG_DIR/audit.log|g" "$CONFIG_DIR/backend.env"
     sed -i "s|ERROR_LOG_FILE=.*|ERROR_LOG_FILE=$LOG_DIR/error.log|g" "$CONFIG_DIR/backend.env"
     
-    # Export environment variables for Alembic
-    export $(grep -v '^#' "$CONFIG_DIR/backend.env" | xargs)
-    
+    # Run database migrations
     cd "$INSTALL_DIR/backend"
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/alembic" upgrade head
     
@@ -195,12 +200,14 @@ from app.core.security import get_password_hash
 
 async def create_admin():
     async with AsyncSessionLocal() as db:
+        # Check if admin user exists
         from sqlalchemy import select
         result = await db.execute(select(User).where(User.username == 'admin'))
         if result.scalar_one_or_none():
             print('Admin user already exists')
             return
         
+        # Create admin user
         admin_user = User(
             username='admin',
             email='admin@ggnet.local',
@@ -228,13 +235,17 @@ asyncio.run(create_admin())
 install_frontend() {
     log_info "Installing frontend..."
     
+    # Copy frontend files
     cp -r "$PROJECT_ROOT/frontend"/* "$INSTALL_DIR/frontend/"
     
+    # Install Node.js dependencies and build
     cd "$INSTALL_DIR/frontend"
     
+    # Install dependencies as ggnet user (package-lock.json will be generated)
     sudo -u "$GGNET_USER" npm install --no-audit --no-fund
     sudo -u "$GGNET_USER" npm run build
     
+    # Copy built files to nginx
     rm -rf /var/www/html/*
     cp -r "$INSTALL_DIR/frontend/dist"/* /var/www/html/
     
@@ -245,11 +256,14 @@ install_frontend() {
 install_scripts() {
     log_info "Installing scripts..."
     
+    # Copy scripts
     cp -r "$PROJECT_ROOT/scripts"/* "$INSTALL_DIR/scripts/"
     
+    # Make scripts executable
     chmod +x "$INSTALL_DIR/scripts"/*.py
     chmod +x "$INSTALL_DIR/scripts"/*.sh
     
+    # Create symlinks in PATH
     ln -sf "$INSTALL_DIR/scripts/iscsi_manager.py" /usr/local/bin/ggnet-iscsi
     ln -sf "$INSTALL_DIR/scripts/image_converter.py" /usr/local/bin/ggnet-convert
     ln -sf "$INSTALL_DIR/scripts/uefi_boot_manager.py" /usr/local/bin/ggnet-boot
@@ -261,8 +275,13 @@ install_scripts() {
 setup_systemd() {
     log_info "Setting up systemd services..."
     
+    # Copy service files
     cp "$PROJECT_ROOT/systemd"/*.service /etc/systemd/system/
+    
+    # Reload systemd
     systemctl daemon-reload
+    
+    # Enable services
     systemctl enable ggnet-backend.service
     systemctl enable ggnet-worker.service
     
@@ -273,10 +292,16 @@ setup_systemd() {
 setup_nginx() {
     log_info "Setting up Nginx..."
     
+    # Backup original config
     cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup
+    
+    # Copy our nginx config
     cp "$PROJECT_ROOT/docker/nginx/nginx.conf" /etc/nginx/nginx.conf
     
+    # Test nginx config
     nginx -t
+    
+    # Enable and start nginx
     systemctl enable nginx
     systemctl restart nginx
     
@@ -287,6 +312,7 @@ setup_nginx() {
 setup_tftp() {
     log_info "Setting up TFTP server..."
     
+    # Configure TFTP
     cat > /etc/default/tftpd-hpa << EOF
 TFTP_USERNAME="tftp"
 TFTP_DIRECTORY="/var/lib/tftpboot"
@@ -294,8 +320,13 @@ TFTP_ADDRESS="0.0.0.0:69"
 TFTP_OPTIONS="--secure"
 EOF
     
+    # Create TFTP directory structure
     mkdir -p /var/lib/tftpboot/{EFI/BOOT,pxelinux.cfg}
+    
+    # Set permissions
     chown -R tftp:tftp /var/lib/tftpboot
+    
+    # Enable and start TFTP
     systemctl enable tftpd-hpa
     systemctl restart tftpd-hpa
     
@@ -328,9 +359,11 @@ EOF
 start_services() {
     log_info "Starting services..."
     
+    # Start backend services
     systemctl start ggnet-backend
     systemctl start ggnet-worker
     
+    # Check service status
     if systemctl is-active --quiet ggnet-backend; then
         log_success "Backend service started"
     else
@@ -396,7 +429,6 @@ main() {
     setup_postgresql
     setup_redis
     install_backend
-    create_admin_user
     install_frontend
     install_scripts
     setup_systemd
@@ -404,9 +436,10 @@ main() {
     setup_tftp
     setup_logrotate
     start_services
+    create_admin_user
     print_summary
 }
 
-# Run main
+# Run main function
 main "$@"
 
