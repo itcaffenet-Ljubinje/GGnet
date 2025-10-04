@@ -175,6 +175,9 @@ install_backend() {
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
     sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/backend/requirements.txt"
     
+    # Install PostgreSQL driver
+    sudo -u "$GGNET_USER" "$INSTALL_DIR/venv/bin/pip" install psycopg2-binary
+    
     # Copy environment file
     cp "$PROJECT_ROOT/env.example" "$CONFIG_DIR/backend.env"
     chown "$GGNET_USER:$GGNET_GROUP" "$CONFIG_DIR/backend.env"
