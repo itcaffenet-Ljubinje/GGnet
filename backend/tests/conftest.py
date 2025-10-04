@@ -4,9 +4,9 @@ Pytest fixtures for testing FastAPI app with async support
 
 import asyncio
 import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import sessionmaker  # pyright: ignore[reportMissingImports]
 from app.main import app
 from app.core.database import Base
 from app.models.user import User, UserRole
@@ -23,20 +23,20 @@ AsyncSessionLocal = sessionmaker(
 )
 
 @pytest.fixture(scope="function")
-async def prepare_db():
-    """Create test database schema for each test"""
+async def db_session():
+    """Provide a transactional scope around a test."""
+    # Create tables for this test
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine_test.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-@pytest.fixture()
-async def db_session(prepare_db):
-    """Provide a transactional scope around a test."""
+    
+    # Provide session
     async with AsyncSessionLocal() as session:
         yield session
         await session.rollback()
+    
+    # Clean up tables after test
+    async with engine_test.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 @pytest.fixture()
 async def client(db_session):
