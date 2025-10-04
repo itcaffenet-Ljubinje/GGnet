@@ -2,6 +2,7 @@
 # app/models/__init__.py
 
 # Import glavnih modela
+from .audit import AuditLog
 from .user import User
 from .image import Image
 from .machine import Machine
@@ -13,6 +14,7 @@ from .target import Target    # ako imaš target model
 
 # Napravi __all__ za lakši import
 __all__ = [
+    "AuditLog",
     "User",
     "Image",
     "Machine",
