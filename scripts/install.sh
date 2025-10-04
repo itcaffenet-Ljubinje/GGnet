@@ -253,7 +253,7 @@ create_admin_user() {
     cd "$INSTALL_DIR/backend"
     
     # Use PostgreSQL connection string
-    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" PYTHONPATH="$INSTALL_DIR/backend" "$INSTALL_DIR/venv/bin/python" - <<'EOF'
 import asyncio
 import os
 import sys
@@ -801,7 +801,8 @@ main() {
     
     # Verify database is ready before creating admin user
     log_info "Verifying database is ready..."
-    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" "$INSTALL_DIR/venv/bin/python" -c "
+    cd "$INSTALL_DIR/backend"
+    if sudo -u "$GGNET_USER" env DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME" PYTHONPATH="$INSTALL_DIR/backend" "$INSTALL_DIR/venv/bin/python" -c "
 import asyncio
 from app.core.database import AsyncSessionLocal
 
