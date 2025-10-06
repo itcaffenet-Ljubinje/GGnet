@@ -8,6 +8,16 @@
   "ignorePatterns": ["dist", ".eslintrc.cjs"],
   "parser": "@typescript-eslint/parser",
   "plugins": ["react-refresh", "@typescript-eslint"],
+  "globals": {
+    "process": "readonly",
+    "__dirname": "readonly",
+    "React": "writable",
+    "NodeJS": "readonly",
+    "global": "readonly",
+    "vi": "readonly",
+    "beforeAll": "readonly",
+    "afterAll": "readonly"
+  },
   "rules": {
     "react-refresh/only-export-components": [
       "warn",
@@ -15,8 +25,23 @@
     ],
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/prefer-const": "error",
+    "@typescript-eslint/prefer-const": "off",
     "prefer-const": "error",
     "no-var": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "parserOptions": { "project": null }
+    },
+    {
+      "files": ["**/*.config.ts", "vite.config.ts"],
+      "env": { "node": true }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "src/setupTests.ts"],
+      "env": { "jest": true },
+      "globals": { "vi": "readonly", "beforeAll": "readonly", "afterAll": "readonly" }
+    }
+  ]
 }
