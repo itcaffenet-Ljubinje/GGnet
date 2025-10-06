@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '../lib/api'
-import toast from 'react-hot-toast'
 
 export interface User {
   id: number
@@ -34,8 +33,7 @@ interface AuthActions {
 type AuthStore = AuthState & AuthActions
 
 export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       // State
       user: null,
       accessToken: null,
@@ -70,12 +68,8 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
           })
 
-          toast.success(`Welcome back, ${user.full_name || user.username}!`)
           return true
         } catch (error: any) {
-          const message = error.response?.data?.detail || 'Login failed'
-          toast.error(message)
-          
           set({ isLoading: false })
           return false
         }
@@ -103,8 +97,6 @@ export const useAuthStore = create<AuthStore>()(
           isAuthenticated: false,
           isLoading: false,
         })
-
-        toast.success('Logged out successfully')
       },
 
       refreshAuth: async () => {
@@ -153,22 +145,6 @@ export const useAuthStore = create<AuthStore>()(
           isLoading: false,
         })
       },
-    }),
-    {
-      name: 'ggnet-auth',
-      partialize: (state) => ({
-        user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
-      onRehydrateStorage: () => (state) => {
-        // Set up API token on app load
-        if (state?.accessToken) {
-          api.defaults.headers.common['Authorization'] = `Bearer ${state.accessToken}`
-        }
-      },
-    }
-  )
+    })
 )
 

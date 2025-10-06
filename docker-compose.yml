@@ -11,24 +11,33 @@ services:
       POSTGRES_PASSWORD: ggnet_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
-    networks:
-      - ggnet-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ggnet -d ggnet"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Redis for caching and sessions
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: ggnet-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
-    networks:
-      - ggnet-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Backend FastAPI
+  # Backend API
   backend:
     build:
       context: ./backend
@@ -38,66 +47,113 @@ services:
       - DATABASE_URL=postgresql://ggnet:ggnet_password@postgres:5432/ggnet
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=your-secret-key-change-in-production
-      - ENVIRONMENT=development
-      - UPLOAD_DIR=/app/uploads
-      - IMAGES_DIR=/app/images
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - UPLOAD_DIR=/opt/ggnet/images
+      - TARGET_DIR=/opt/ggnet/targets
     volumes:
-      - ./backend:/app
-      - ggnet_uploads:/app/uploads
-      - ggnet_images:/app/images
-      - /dev:/dev  # Potrebno za iSCSI operacije
+      - ggnet_data:/opt/ggnet
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
-    networks:
-      - ggnet-network
-    privileged: true  # Potrebno za iSCSI targetcli
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Frontend React
+  # Frontend Web Interface
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: ggnet-frontend
-    ports:
-      - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    ports:
+      - "3000:80"
     depends_on:
       - backend
-    networks:
-      - ggnet-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: ggnet-nginx
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./docker/nginx/ssl:/etc/nginx/ssl
+    ports:
+      - "80:80"
+      - "443:443"
     depends_on:
-      - backend
       - frontend
-    networks:
-      - ggnet-network
+      - backend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # DHCP Server (requires host network access)
+  dhcp:
+    image: networkboot/dhcpd
+    container_name: ggnet-dhcp
+    network_mode: host
+    volumes:
+      - ./docker/dhcp/dhcpd.conf:/data/dhcpd.conf
+      - ./docker/dhcp/dhcpd.leases:/data/dhcpd.leases
+    restart: unless-stopped
+    privileged: true
+
+  # TFTP Server
+  tftp:
+    image: pghalliday/tftp
+    container_name: ggnet-tftp
+    ports:
+      - "69:69/udp"
+    volumes:
+      - ./docker/tftp:/var/tftpboot
+    restart: unless-stopped
+
+  # iSCSI Target (requires privileged access)
+  iscsi:
+    image: openebs/tgt
+    container_name: ggnet-iscsi
+    ports:
+      - "3260:3260"
+    volumes:
+      - ggnet_data:/opt/ggnet
+      - /dev:/dev
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
 
 volumes:
   postgres_data:
-  ggnet_uploads:
-  ggnet_images:
+    driver: local
+  redis_data:
+    driver: local
+  ggnet_data:
+    driver: local
 
 networks:
-  ggnet-network:
+  default:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense, lazy } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Upload,
@@ -381,7 +381,9 @@ function ImageCard({ image, onEdit, onDelete, onView }: {
 export default function ImagesPage() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<Image | null>(null)
+  const [editingImage, setEditingImage] = useState<Image | null>(null)
   const [filters, setFilters] = useState<ImageFilters>({
     status: '',
     format: '',
@@ -391,6 +393,7 @@ export default function ImagesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   
   const queryClient = useQueryClient()
+  // Notifications are handled by NotificationProvider
 
   // Fetch images
   const { data: images = [], isLoading, error } = useQuery({
@@ -439,13 +442,15 @@ export default function ImagesPage() {
   }
 
   const handleEdit = (image: Image) => {
-    // TODO: Implement edit functionality
-    toast.info('Edit functionality coming soon')
+    // Set the image to edit
+    setEditingImage(image)
+    setShowEditModal(true)
   }
 
   const handleView = (image: Image) => {
-    // TODO: Implement view functionality
-    toast.info('View functionality coming soon')
+    // Open image in new tab
+    const imageUrl = `/api/images/${image.id}/download`
+    window.open(imageUrl, '_blank')
   }
 
   if (isLoading) {
@@ -627,6 +632,8 @@ export default function ImagesPage() {
         variant="danger"
         isLoading={deleteMutation.isPending}
       />
+
+      {/* Notification Center - removed as it's handled by NotificationProvider */}
     </div>
   )
 }

@@ -11,9 +11,9 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     const baseStyles = 'rounded-xl transition-all duration-200'
     
     const variants = {
-      default: 'bg-white border border-gray-200',
-      elevated: 'bg-white shadow-lg hover:shadow-xl',
-      outlined: 'bg-white border-2 border-gray-200 hover:border-gray-300'
+      default: 'bg-white/90 dark:bg-gray-800/90 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm shadow-modern hover:shadow-lg',
+      elevated: 'bg-white/95 dark:bg-gray-800/95 shadow-xl hover:shadow-2xl backdrop-blur-md',
+      outlined: 'bg-white/80 dark:bg-gray-800/80 border-2 border-gray-200/60 dark:border-gray-700/60 hover:border-gray-300/80 dark:hover:border-gray-600/80 backdrop-blur-sm'
     }
     
     const paddings = {
@@ -30,6 +30,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
           baseStyles,
           variants[variant],
           paddings[padding],
+          'hover:scale-[1.02] transform transition-all duration-300',
           className
         )}
         {...props}
@@ -67,7 +68,7 @@ export const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
     return (
       <h3
         ref={ref}
-        className={clsx('text-lg font-semibold text-gray-900', className)}
+        className={clsx('text-lg font-semibold text-gray-900 dark:text-gray-100', className)}
         {...props}
       >
         {children}
@@ -85,7 +86,7 @@ export const CardDescription = React.forwardRef<HTMLParagraphElement, CardDescri
     return (
       <p
         ref={ref}
-        className={clsx('text-sm text-gray-600 mt-1', className)}
+        className={clsx('text-sm text-gray-600 dark:text-gray-400 mt-1', className)}
         {...props}
       >
         {children}
@@ -121,7 +122,7 @@ export const CardFooter = React.forwardRef<HTMLDivElement, CardFooterProps>(
     return (
       <div
         ref={ref}
-        className={clsx('mt-4 pt-4 border-t border-gray-100', className)}
+        className={clsx('mt-4 pt-4 border-t border-gray-100 dark:border-gray-700', className)}
         {...props}
       >
         {children}

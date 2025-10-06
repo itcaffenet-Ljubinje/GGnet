@@ -26,7 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           v7_relativeSplatPath: true,
         }}
       >
-        <App />
+        <div className="dark">
+          <App />
+        </div>
         <Toaster
           position="top-right"
           toastOptions={{

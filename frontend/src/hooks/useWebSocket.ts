@@ -40,17 +40,18 @@ export const useWebSocket = (options: WebSocketOptions) => {
   const reconnectAttemptsRef = useRef(0)
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
       return
     }
 
     setState(prev => ({ ...prev, isConnecting: true, error: null }))
 
     try {
+      console.log('Creating WebSocket connection to:', url)
       wsRef.current = new WebSocket(url)
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected')
+        console.log('WebSocket connected successfully')
         setState({
           isConnected: true,
           isConnecting: false,
@@ -62,18 +63,21 @@ export const useWebSocket = (options: WebSocketOptions) => {
       }
 
       wsRef.current.onclose = (event) => {
-        console.log('WebSocket disconnected', event.code, event.reason)
+        console.log('WebSocket disconnected', { code: event.code, reason: event.reason, wasClean: event.wasClean })
         setState(prev => ({ ...prev, isConnected: false, isConnecting: false }))
         onClose?.()
 
-        // Attempt to reconnect if not a normal closure
+        // Only attempt to reconnect if it wasn't a manual disconnect (code 1000)
         if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current++
           setState(prev => ({ ...prev, reconnectAttempts: reconnectAttemptsRef.current }))
           
+          console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts}) in ${reconnectInterval}ms`)
           reconnectTimeoutRef.current = setTimeout(() => {
             connect()
           }, reconnectInterval)
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          console.log('Max reconnection attempts reached')
         }
       }
 
@@ -135,7 +139,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     return () => {
       disconnect()
     }
-  }, [connect, disconnect])
+  }, []) // Empty dependency array - only run once on mount
 
   return {
     ...state,

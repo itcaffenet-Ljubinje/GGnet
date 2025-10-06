@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # File Storage
     UPLOAD_DIR: Path = Path("./uploads")
     IMAGES_DIR: Path = Path("./images")
+    IMAGE_STORAGE_PATH: Path = Path("./storage/images")
+    TEMP_STORAGE_PATH: Path = Path("./storage/temp")
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10GB
     ALLOWED_IMAGE_FORMATS: str = "vhd,vhdx,raw,qcow2"  # Comma-separated string from env
     

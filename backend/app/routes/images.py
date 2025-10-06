@@ -105,7 +105,7 @@ async def calculate_checksums(file_path: Path) -> tuple:
 
 
 async def process_image_background(image_id: int, file_path: Path, db: AsyncSession):
-    """Background task to process uploaded image"""
+    """Background task to process uploaded image and trigger conversion"""
     try:
         # Get image record
         result = await db.execute(select(Image).where(Image.id == image_id))
@@ -129,7 +129,13 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
         image.size_bytes = file_size
         image.checksum_md5 = md5_checksum
         image.checksum_sha256 = sha256_checksum
-        image.status = ImageStatus.READY
+        
+        # For VHDX files, keep status as PROCESSING to trigger conversion
+        # For other formats, mark as READY
+        if image.format == ImageFormat.VHDX:
+            image.status = ImageStatus.PROCESSING  # Will be converted by worker
+        else:
+            image.status = ImageStatus.READY
         
         await db.commit()
         
@@ -137,7 +143,8 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
             "Image processing completed",
             image_id=image_id,
             size_mb=round(file_size / 1024 / 1024, 2),
-            md5=md5_checksum[:8]
+            md5=md5_checksum[:8],
+            status=image.status.value
         )
         
     except Exception as e:
@@ -457,4 +464,79 @@ async def delete_image(
     logger.info("Image deleted", image_id=image_id, name=image.name, user_id=current_user.id)
     
     return {"message": f"Image '{image.name}' deleted successfully"}
+
+
+@router.post("/{image_id}/convert")
+async def trigger_conversion(
+    image_id: int,
+    request: Request,
+    current_user: User = Depends(require_operator),
+    db: AsyncSession = Depends(get_db)
+):
+    """Manually trigger image conversion"""
+    
+    result = await db.execute(select(Image).where(Image.id == image_id))
+    image = result.scalar_one_or_none()
+    
+    if not image:
+        raise NotFoundError(f"Image with ID {image_id} not found")
+    
+    if image.status not in [ImageStatus.READY, ImageStatus.ERROR]:
+        raise ValidationError(f"Image must be in READY or ERROR status to convert. Current status: {image.status}")
+    
+    # Update status to processing to trigger conversion
+    image.status = ImageStatus.PROCESSING
+    await db.commit()
+    
+    await log_user_activity(
+        action=AuditAction.IMAGE_UPLOADED,
+        message=f"Conversion triggered for image '{image.name}'",
+        request=request,
+        user=current_user,
+        resource_type="image",
+        resource_id=image.id,
+        resource_name=image.name,
+        db=db
+    )
+    
+    logger.info(f"Conversion triggered for image {image_id} by user {current_user.username}")
+    
+    return {"message": "Conversion triggered successfully", "image_id": image_id}
+
+
+@router.get("/{image_id}/conversion-status")
+async def get_conversion_status(
+    image_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get conversion status and progress for an image"""
+    
+    result = await db.execute(select(Image).where(Image.id == image_id))
+    image = result.scalar_one_or_none()
+    
+    if not image:
+        raise NotFoundError(f"Image with ID {image_id} not found")
+    
+    # Parse processing log if available
+    processing_info = {}
+    if image.processing_log:
+        try:
+            import json
+            processing_info = json.loads(image.processing_log)
+        except (json.JSONDecodeError, TypeError):
+            processing_info = {"raw_log": image.processing_log}
+    
+    return {
+        "image_id": image.id,
+        "name": image.name,
+        "status": image.status,
+        "format": image.format,
+        "size_bytes": image.size_bytes,
+        "virtual_size_bytes": image.virtual_size_bytes,
+        "error_message": image.error_message,
+        "processing_info": processing_info,
+        "created_at": image.created_at.isoformat(),
+        "updated_at": image.updated_at.isoformat()
+    }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
@@ -17,11 +17,13 @@ import {
   Users,
   Zap,
   Wifi,
-  WifiOff
+  WifiOff,
+  Filter,
+  RefreshCw
 } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 import { useAuthStore } from '../stores/authStore'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, Button } from '../components/ui'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
 interface StatsCardProps {
@@ -39,12 +41,42 @@ interface StatsCardProps {
 
 function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, isLoading }: StatsCardProps) {
   const colorClasses = {
-    blue: 'bg-blue-500 text-blue-600 bg-blue-50',
-    green: 'bg-green-500 text-green-600 bg-green-50',
-    yellow: 'bg-yellow-500 text-yellow-600 bg-yellow-50',
-    red: 'bg-red-500 text-red-600 bg-red-50',
-    purple: 'bg-purple-500 text-purple-600 bg-purple-50',
-    indigo: 'bg-indigo-500 text-indigo-600 bg-indigo-50',
+    blue: {
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      icon: 'bg-blue-500 text-white',
+      text: 'text-blue-600 dark:text-blue-400',
+      trend: 'text-blue-600 dark:text-blue-400'
+    },
+    green: {
+      bg: 'bg-green-50 dark:bg-green-900/20',
+      icon: 'bg-green-500 text-white',
+      text: 'text-green-600 dark:text-green-400',
+      trend: 'text-green-600 dark:text-green-400'
+    },
+    yellow: {
+      bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+      icon: 'bg-yellow-500 text-white',
+      text: 'text-yellow-600 dark:text-yellow-400',
+      trend: 'text-yellow-600 dark:text-yellow-400'
+    },
+    red: {
+      bg: 'bg-red-50 dark:bg-red-900/20',
+      icon: 'bg-red-500 text-white',
+      text: 'text-red-600 dark:text-red-400',
+      trend: 'text-red-600 dark:text-red-400'
+    },
+    purple: {
+      bg: 'bg-purple-50 dark:bg-purple-900/20',
+      icon: 'bg-purple-500 text-white',
+      text: 'text-purple-600 dark:text-purple-400',
+      trend: 'text-purple-600 dark:text-purple-400'
+    },
+    indigo: {
+      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+      icon: 'bg-indigo-500 text-white',
+      text: 'text-indigo-600 dark:text-indigo-400',
+      trend: 'text-indigo-600 dark:text-indigo-400'
+    },
   }
 
   if (isLoading) {
@@ -58,22 +90,22 @@ function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, 
   }
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200">
+    <Card className="hover:shadow-lg transition-all duration-200 dark:bg-gray-800 dark:border-gray-700">
       <CardContent className="p-6">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className={`p-3 rounded-lg ${colorClasses[color].split(' ')[2]}`}>
-              <Icon className={`h-6 w-6 ${colorClasses[color].split(' ')[1]}`} />
+            <div className={`p-3 rounded-lg ${colorClasses[color].bg}`}>
+              <Icon className={`h-6 w-6 ${colorClasses[color].icon}`} />
             </div>
           </div>
           <div className="ml-5 w-0 flex-1">
             <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{title}</dt>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{title}</dt>
               <dd className="flex items-baseline">
-                <div className="text-2xl font-semibold text-gray-900">{value}</div>
+                <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{value}</div>
                 {trend && (
                   <div className={`ml-2 flex items-baseline text-sm font-semibold ${
-                    trend.isPositive ? 'text-green-600' : 'text-red-600'
+                    trend.isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                   }`}>
                     {trend.isPositive ? (
                       <TrendingUp className="self-center flex-shrink-0 h-4 w-4" />
@@ -86,7 +118,7 @@ function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, 
                 )}
               </dd>
               {subtitle && (
-                <dd className="text-sm text-gray-500 mt-1">{subtitle}</dd>
+                <dd className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</dd>
               )}
             </dl>
           </div>
@@ -105,6 +137,7 @@ interface ActivityItem {
 }
 
 function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
+  const [filter, setFilter] = useState<'all' | 'success' | 'warning' | 'error' | 'info'>('all')
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'success':
@@ -131,25 +164,52 @@ function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
     }
   }
 
+  const filteredActivities = filter === 'all' 
+    ? activities 
+    : activities.filter(activity => activity.type === filter)
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Activity</CardTitle>
-        <CardDescription>Latest system events and user actions</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest system events and user actions</CardDescription>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as any)}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            >
+              <option value="all">All</option>
+              <option value="success">Success</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {activities.map((activity) => (
+          {filteredActivities.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No activities found for the selected filter
+            </div>
+          ) : (
+            filteredActivities.map((activity) => (
             <div
               key={activity.id}
-              className={`flex items-start p-3 bg-gray-50 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
+                className={`flex items-start p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
             >
               <div className="flex-shrink-0 mr-3">
                 {getActivityIcon(activity.type)}
       </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900">{activity.message}</p>
-                <div className="flex items-center mt-1 text-xs text-gray-500">
+                <p className="text-sm text-gray-900 dark:text-gray-100">{activity.message}</p>
+                <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
                   <Clock className="h-3 w-3 mr-1" />
                   {new Date(activity.timestamp).toLocaleString()}
                   {activity.user && (
@@ -162,7 +222,8 @@ function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
                     </div>
                   </div>
                 </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>
@@ -254,6 +315,7 @@ function SystemStatus({ status, details }: SystemStatusProps) {
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const [refreshInterval, setRefreshInterval] = useState(30000) // 30 seconds
+  // Notifications are handled by NotificationProvider
 
   // Fetch dashboard data
   const { data: healthData, isLoading: healthLoading } = useQuery({
@@ -326,11 +388,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Welcome back, {user?.full_name || user?.username}! Here's what's happening with your GGnet system.
-        </p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
+              Welcome back, {user?.full_name || user?.username}! Here's what's happening with your GGnet system.
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <Button variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -390,25 +462,27 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-lg transition-colors">
+            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
               <HardDrive className="h-8 w-8 text-blue-600 mb-2" />
-              <span className="text-sm font-medium text-gray-900">Upload Image</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Upload Image</span>
             </button>
-            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-lg transition-colors">
+            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
               <Monitor className="h-8 w-8 text-green-600 mb-2" />
-              <span className="text-sm font-medium text-gray-900">Add Machine</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Add Machine</span>
             </button>
-            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-lg transition-colors">
+            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
               <Target className="h-8 w-8 text-purple-600 mb-2" />
-              <span className="text-sm font-medium text-gray-900">Create Target</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Create Target</span>
             </button>
-            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 rounded-lg transition-colors">
+            <button className="flex flex-col items-center p-4 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors">
               <Zap className="h-8 w-8 text-yellow-600 mb-2" />
-              <span className="text-sm font-medium text-gray-900">Start Session</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Start Session</span>
             </button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Notification Center - removed as it's handled by NotificationProvider */}
     </div>
   )
 }

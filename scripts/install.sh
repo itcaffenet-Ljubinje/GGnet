@@ -843,7 +843,7 @@ async def check_db():
 asyncio.run(check_db())
 "; then
         log_success "Database verification passed"
-        create_admin_user
+    create_admin_user
     else
         log_error "Database verification failed"
         exit 1
