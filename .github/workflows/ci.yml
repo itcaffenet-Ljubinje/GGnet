@@ -102,8 +102,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: frontend/node_modules
+        key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-npm-
 
     - name: Install frontend dependencies
       run: |
@@ -217,9 +223,18 @@ jobs:
         format: 'sarif'
         output: 'trivy-results.sarif'
         
+    - name: Check if SARIF file exists
+      id: check-sarif
+      run: |
+        if [ -f "trivy-results.sarif" ]; then
+          echo "sarif-exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "sarif-exists=false" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
-      if: ${{ always() && github.event_name != 'pull_request' }}
+      if: ${{ always() && github.event_name != 'pull_request' && steps.check-sarif.outputs.sarif-exists == 'true' }}
       with:
         sarif_file: 'trivy-results.sarif'
 
