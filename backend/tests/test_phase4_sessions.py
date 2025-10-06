@@ -195,48 +195,47 @@ class TestSessionOrchestration:
     async def test_stop_session_success(self, client: AsyncClient, admin_user, admin_token, test_machine, test_image, db_session):
         """Test successful session stop"""
         
-        # Create active session
+        # Create target first (let database assign ID)
+        target = Target(
+            target_id="target-stop-001",
+            iqn="iqn.2025.ggnet:target-stop-001",
+            machine_id=test_machine.id,
+            image_id=test_image.id,
+            image_path="/storage/images/test-stop.vhdx",
+            initiator_iqn="iqn.2025.ggnet:initiator-stop-001",
+            lun_id=0,
+            status=TargetStatus.ACTIVE,
+            created_by=1
+        )
+        db_session.add(target)
+        await db_session.flush()  # Get the ID without committing
+        
+        # Create active session (let database assign ID)
         session = Session(
-            id=1,
-            session_id="test-session-1",
-            machine_id=1,
-            target_id=1,
+            session_id="test-session-stop-1",
+            machine_id=test_machine.id,
+            target_id=target.id,
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
             server_ip="192.168.1.10"
         )
         db_session.add(session)
-        
-        # Create target
-        target = Target(
-            id=1,
-            target_id="target-001",
-            iqn="iqn.2025.ggnet:target-001",
-            machine_id=1,
-            image_id=1,
-            image_path="/storage/images/test.vhdx",
-            initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
-            lun_id=0,
-            status=TargetStatus.ACTIVE,
-            created_by=1
-        )
-        db_session.add(target)
         await db_session.commit()
         
         headers = {"Authorization": f"Bearer {admin_token}"}
         
         # Mock cleanup operations
-        with patch("app.adapters.targetcli.delete_target_for_machine") as mock_delete_target:
+        with patch("app.api.sessions.delete_target_for_machine") as mock_delete_target:
             mock_delete_target.return_value = True
             
-            with patch("app.adapters.dhcp.remove_machine_from_dhcp") as mock_remove_dhcp:
+            with patch("app.api.sessions.remove_machine_from_dhcp") as mock_remove_dhcp:
                 mock_remove_dhcp.return_value = True
                 
                 with patch("app.adapters.tftp.TFTPAdapter.remove_boot_script") as mock_remove_script:
                     mock_remove_script.return_value = True
                     
-                    response = await client.post("/api/v1/sessions/1/stop", headers=headers)
+                    response = await client.post(f"/api/v1/sessions/{session.id}/stop", headers=headers)
                     
                     assert response.status_code == 200
                     data = response.json()
@@ -348,39 +347,42 @@ class TestSessionOrchestration:
     async def test_get_session_stats(self, client: AsyncClient, admin_user, admin_token, db_session):
         """Test getting session statistics"""
         
-        # Create test image first
+        # Create test image first (let database assign ID)
         image = Image(
-            id=1,
-            name="test-image",
-            filename="test.vhdx",
-            file_path="/storage/images/test.vhdx",
+            name="test-image-stats",
+            filename="test-stats.vhdx",
+            file_path="/storage/images/test-stats.vhdx",
             format=ImageFormat.VHDX,
             status=ImageStatus.READY,
             size_bytes=1024*1024*1024,
             created_by=1
         )
         db_session.add(image)
+        await db_session.flush()  # Get the ID without committing
         
-        # Create test machines and targets first
+        # Create test machines (let database assign IDs)
         machines = [
-            Machine(id=1, name="machine-1", mac_address="00:11:22:33:44:55", ip_address="192.168.1.101", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
-            Machine(id=2, name="machine-2", mac_address="00:11:22:33:44:56", ip_address="192.168.1.102", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
-            Machine(id=3, name="machine-3", mac_address="00:11:22:33:44:57", ip_address="192.168.1.103", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+            Machine(name="machine-stats-1", mac_address="00:11:22:33:44:60", ip_address="192.168.1.110", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+            Machine(name="machine-stats-2", mac_address="00:11:22:33:44:61", ip_address="192.168.1.111", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+            Machine(name="machine-stats-3", mac_address="00:11:22:33:44:62", ip_address="192.168.1.112", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
         ]
         db_session.add_all(machines)
+        await db_session.flush()  # Get the IDs without committing
         
+        # Create test targets (let database assign IDs)
         targets = [
-            Target(id=1, target_id="target-1", iqn="iqn.2025.ggnet:target-1", machine_id=1, image_id=1, image_path="/storage/images/test1.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-1", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
-            Target(id=2, target_id="target-2", iqn="iqn.2025.ggnet:target-2", machine_id=2, image_id=1, image_path="/storage/images/test2.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-2", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
-            Target(id=3, target_id="target-3", iqn="iqn.2025.ggnet:target-3", machine_id=3, image_id=1, image_path="/storage/images/test3.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-3", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+            Target(target_id="target-stats-1", iqn="iqn.2025.ggnet:target-stats-1", machine_id=machines[0].id, image_id=image.id, image_path="/storage/images/test-stats1.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-stats-1", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+            Target(target_id="target-stats-2", iqn="iqn.2025.ggnet:target-stats-2", machine_id=machines[1].id, image_id=image.id, image_path="/storage/images/test-stats2.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-stats-2", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+            Target(target_id="target-stats-3", iqn="iqn.2025.ggnet:target-stats-3", machine_id=machines[2].id, image_id=image.id, image_path="/storage/images/test-stats3.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-stats-3", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
         ]
         db_session.add_all(targets)
+        await db_session.flush()  # Get the IDs without committing
         
-        # Create test sessions with different statuses
+        # Create test sessions with different statuses (let database assign IDs)
         sessions = [
-            Session(id=1, session_id="session-1", machine_id=1, target_id=1, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
-            Session(id=2, session_id="session-2", machine_id=2, target_id=2, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), server_ip="192.168.1.10"),
-            Session(id=3, session_id="session-3", machine_id=3, target_id=3, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(session_id="session-stats-1", machine_id=machines[0].id, target_id=targets[0].id, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(session_id="session-stats-2", machine_id=machines[1].id, target_id=targets[1].id, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(session_id="session-stats-3", machine_id=machines[2].id, target_id=targets[2].id, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
         ]
         db_session.add_all(sessions)
         await db_session.commit()
@@ -388,6 +390,9 @@ class TestSessionOrchestration:
         headers = {"Authorization": f"Bearer {admin_token}"}
         
         response = await client.get("/api/v1/sessions/stats", headers=headers)
+        
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
         
         assert response.status_code == 200
         data = response.json()
@@ -398,9 +403,9 @@ class TestSessionOrchestration:
         
         assert data["total_sessions"] == 3
         assert data["active_sessions"] == 1
-        assert data["status_counts"]["ACTIVE"] == 1
-        assert data["status_counts"]["STOPPED"] == 1
-        assert data["status_counts"]["ERROR"] == 1
+        assert data["status_counts"]["active"] == 1
+        assert data["status_counts"]["stopped"] == 1
+        assert data["status_counts"]["error"] == 1
 
 
 class TestiPXEScriptGeneration:

@@ -177,8 +177,11 @@ async def get_optional_user(
         return None
 
 
-def get_client_ip(request: Request) -> str:
+def get_client_ip(request: Optional[Request]) -> str:
     """Get client IP address from request"""
+    if request is None:
+        return "127.0.0.1"  # Default for test/system calls
+    
     # Check for forwarded headers first (reverse proxy)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -192,8 +195,10 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def get_user_agent(request: Request) -> str:
+def get_user_agent(request: Optional[Request]) -> str:
     """Get user agent from request"""
+    if request is None:
+        return "system"  # Default for test/system calls
     return request.headers.get("User-Agent", "unknown")
 
 
@@ -248,8 +253,8 @@ async def _log_audit_entry(
         resource_name=resource_name,
         ip_address=get_client_ip(request),
         user_agent=get_user_agent(request),
-        endpoint=str(request.url.path),
-        http_method=request.method
+        endpoint=str(request.url.path) if request else "system",
+        http_method=request.method if request else "SYSTEM"
     )
     
     db.add(audit_log)

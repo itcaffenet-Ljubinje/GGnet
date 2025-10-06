@@ -236,7 +236,10 @@ async def start_session(
             iscsi_details=iscsi_details
         )
         
-    except (NotFoundError, ValidationError) as e:
+    except NotFoundError as e:
+        logger.warning(f"Session start failed: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
         logger.warning(f"Session start failed: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -301,13 +304,13 @@ async def stop_session(
         tftp_adapter = TFTPAdapter()
         await tftp_adapter.remove_boot_script(script_filename)
         
-        # 6. Update session status
-        session.status = SessionStatus.STOPPED
-        session.ended_at = datetime.utcnow()
+        # 6. Update target status to inactive
+        target.status = TargetStatus.INACTIVE
         await db.commit()
         
-        # 7. Delete target record
-        await db.delete(target)
+        # 7. Update session status
+        session.status = SessionStatus.STOPPED
+        session.ended_at = datetime.utcnow()
         await db.commit()
         
         # 8. Log audit event
@@ -393,6 +396,41 @@ async def list_sessions(
     )
 
 
+@router.get("/stats", response_model=dict)
+async def get_session_stats(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get session statistics
+    """
+    logger.info("Getting session statistics", user_id=current_user.id)
+    
+    # Get counts by status
+    status_counts = {}
+    for status in SessionStatus:
+        count_result = await db.execute(
+            select(func.count(Session.id)).where(Session.status == status)
+        )
+        status_counts[status.value] = count_result.scalar()
+    
+    # Get total sessions
+    total_result = await db.execute(select(func.count(Session.id)))
+    total_sessions = total_result.scalar()
+    
+    # Get active sessions
+    active_result = await db.execute(
+        select(func.count(Session.id)).where(Session.status == SessionStatus.ACTIVE)
+    )
+    active_sessions = active_result.scalar()
+    
+    return {
+        "total_sessions": total_sessions,
+        "active_sessions": active_sessions,
+        "status_counts": status_counts
+    }
+
+
 @router.get("/{session_id}", response_model=SessionResponse)
 async def get_session(
     session_id: int,
@@ -452,7 +490,7 @@ async def get_machine_boot_script(
         target = target_result.scalar_one()
         
         image_result = await db.execute(
-            select(Image).where(Image.id == session.image_id)
+            select(Image).where(Image.id == target.image_id)
         )
         image = image_result.scalar_one()
         
@@ -515,36 +553,3 @@ async def get_active_session_for_machine(
     return SessionResponse.model_validate(session)
 
 
-@router.get("/stats", response_model=dict)
-async def get_session_stats(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Get session statistics
-    """
-    logger.info("Getting session statistics", user_id=current_user.id)
-    
-    # Get counts by status
-    status_counts = {}
-    for status in SessionStatus:
-        count_result = await db.execute(
-            select(func.count(Session.id)).where(Session.status == status)
-        )
-        status_counts[status.value] = count_result.scalar()
-    
-    # Get total sessions
-    total_result = await db.execute(select(func.count(Session.id)))
-    total_sessions = total_result.scalar()
-    
-    # Get active sessions
-    active_result = await db.execute(
-        select(func.count(Session.id)).where(Session.status == SessionStatus.ACTIVE)
-    )
-    active_sessions = active_result.scalar()
-    
-    return {
-        "total_sessions": total_sessions,
-        "active_sessions": active_sessions,
-        "status_counts": status_counts
-    }
