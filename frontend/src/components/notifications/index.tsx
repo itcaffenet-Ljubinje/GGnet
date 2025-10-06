@@ -79,7 +79,7 @@ function NotificationContainer() {
   )
 }
 
-function NotificationItem({ notification, onRemove }: { notification: Notification; onRemove: () => void }) {
+function NotificationItem({ notification, onRemove }: { notification: NotificationData; onRemove: () => void }) {
   const getIcon = () => {
     switch (notification.type) {
       case 'success':

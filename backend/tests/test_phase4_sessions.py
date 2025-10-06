@@ -167,6 +167,7 @@ class TestSessionOrchestration:
             format=ImageFormat.VHDX,
             status=ImageStatus.PROCESSING,  # Not ready
             size_bytes=1024*1024*1024,
+            created_by=1
         )
         db_session.add(image)
         await db_session.commit()
@@ -258,12 +259,14 @@ class TestSessionOrchestration:
         )
         session2 = Session(
             id=2,
+            session_id="test-session-2",
             machine_id=2,
             target_id=2,
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.STOPPED,
             started_at=datetime.utcnow(),
             ended_at=datetime.utcnow(),
+            server_ip="192.168.1.10"
         )
         db_session.add_all([session1, session2])
         await db_session.commit()

@@ -51,15 +51,15 @@ interface Machine {
   description?: string;
 }
 
-// interface DiskImage { // Unused for now
-//   id: number;
-//   name: string;
-//   filename: string;
-//   format: 'VHDX' | 'RAW' | 'QCOW2';
-//   status: 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING';
-//   size_bytes: number;
-//   description?: string;
-// }
+interface DiskImage {
+  id: number;
+  name: string;
+  filename: string;
+  format: 'VHDX' | 'RAW' | 'QCOW2';
+  status: 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING';
+  size_bytes: number;
+  description?: string;
+}
 
 interface TargetCreateRequest {
   machine_id: number;
@@ -78,7 +78,7 @@ interface TargetUpdateRequest {
 
 const TargetManager: React.FC = () => {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [selectedImage, setSelectedImage] = useState<DiskImage | null>(null);
   const [description, setDescription] = useState('');
   const [lunId, setLunId] = useState(0);
   const [initiatorIqn, setInitiatorIqn] = useState('');

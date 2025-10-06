@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, X, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Upload, X, CheckCircle, AlertCircle, Clock, File as FileIcon } from 'lucide-react'
 import { Button } from './ui'
 import { useNotifications } from './notifications'
 import { apiHelpers } from '../lib/api'
@@ -155,7 +155,7 @@ export function FileUpload({
       case 'converting':
         return <Clock className="h-4 w-4 text-yellow-500 animate-pulse" />
       default:
-        return <File className="h-4 w-4 text-gray-500" />
+        return <FileIcon className="h-4 w-4 text-gray-500" />
     }
   }
 
