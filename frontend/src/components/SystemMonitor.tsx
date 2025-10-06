@@ -192,23 +192,23 @@ const SystemMonitor: React.FC = () => {
   //   return 'stable';
   // };
 
-  const getMetricIcon = (metric: string) => {
-    switch (metric) {
-      case 'cpu_usage':
-        return <Cpu className="w-4 h-4" />;
-      case 'memory_usage':
-        return <MemoryStick className="w-4 h-4" />;
-      case 'disk_usage':
-        return <HardDrive className="w-4 h-4" />;
-      case 'network_in':
-      case 'network_out':
-        return <Wifi className="w-4 h-4" />;
-      case 'active_sessions':
-        return <Activity className="w-4 h-4" />;
-      default:
-        return <Server className="w-4 h-4" />;
-    }
-  };
+  // const getMetricIcon = (metric: string) => { // Unused for now
+  //   switch (metric) {
+  //     case 'cpu_usage':
+  //       return <Cpu className="w-4 h-4" />;
+  //     case 'memory_usage':
+  //       return <MemoryStick className="w-4 h-4" />;
+  //     case 'disk_usage':
+  //       return <HardDrive className="w-4 h-4" />;
+  //     case 'network_in':
+  //     case 'network_out':
+  //       return <Wifi className="w-4 h-4" />;
+  //     case 'active_sessions':
+  //       return <Activity className="w-4 h-4" />;
+  //     default:
+  //       return <Server className="w-4 h-4" />;
+  //   }
+  // };
 
   if (metricsLoading || servicesLoading || storageLoading || networkLoading || healthLoading) {
     return (

@@ -29,7 +29,7 @@ import { ProgressBar } from './ui/ProgressBar';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
-interface ImageData {
+interface DiskImage {
   id: number;
   name: string;
   filename: string;
@@ -69,7 +69,7 @@ interface ConversionJob {
 
 const ImageManager: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<ImageUploadProgress[]>([]);
-  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
+  const [selectedImage, setSelectedImage] = useState<DiskImage | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
 

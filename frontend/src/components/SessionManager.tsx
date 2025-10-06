@@ -23,7 +23,7 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 // import { ProgressBar } from './ui/ProgressBar'; // Unused for now
-import { useAuthStore } from '../stores/authStore';
+// import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
 interface Session {
@@ -50,7 +50,7 @@ interface Machine {
   description?: string;
 }
 
-interface ImageData {
+interface DiskImage {
   id: number;
   name: string;
   filename: string;
@@ -90,7 +90,7 @@ interface SessionStartResponse {
 
 const SessionManager: React.FC = () => {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
+  const [selectedImage, setSelectedImage] = useState<DiskImage | null>(null);
   const [sessionType, setSessionType] = useState<'DISKLESS_BOOT' | 'MAINTENANCE' | 'TESTING'>('DISKLESS_BOOT');
   const [description, setDescription] = useState('');
   const [isStarting, setIsStarting] = useState(false);

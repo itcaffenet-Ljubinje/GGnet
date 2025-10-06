@@ -22,7 +22,7 @@ import { toast } from 'react-hot-toast';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
-import { useAuthStore } from '../stores/authStore';
+// import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
 interface Target {
@@ -51,7 +51,7 @@ interface Machine {
   description?: string;
 }
 
-interface ImageData {
+interface DiskImage {
   id: number;
   name: string;
   filename: string;
@@ -111,7 +111,7 @@ const TargetManager: React.FC = () => {
   const createTargetMutation = useMutation({
     mutationFn: (data: TargetCreateRequest) => 
       api.post('/api/v1/targets/', data).then(res => res.data as Target),
-    onSuccess: (_data) => {
+    onSuccess: () => {
       toast.success(`iSCSI target created successfully for ${selectedMachine?.name}`);
       queryClient.invalidateQueries({ queryKey: ['targets'] });
       queryClient.invalidateQueries({ queryKey: ['machines'] });

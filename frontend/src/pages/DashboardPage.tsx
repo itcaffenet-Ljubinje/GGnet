@@ -322,7 +322,7 @@ export default function DashboardPage() {
     refetchInterval: refreshInterval,
   })
 
-  const { data: storageData } = useQuery({
+  const { data: _storageData } = useQuery({
     queryKey: ['storage'],
     queryFn: () => apiHelpers.getStorageInfo(),
     refetchInterval: refreshInterval,
