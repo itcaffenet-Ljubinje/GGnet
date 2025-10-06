@@ -312,17 +312,17 @@ function SystemStatus({ status, details }: SystemStatusProps) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const [refreshInterval, setRefreshInterval] = useState(30000) // 30 seconds
+  const [refreshInterval] = useState(30000) // 30 seconds
   // Notifications are handled by NotificationProvider
 
   // Fetch dashboard data
-  const { data: healthData, isLoading: healthLoading } = useQuery({
+  const { data: healthData } = useQuery({
     queryKey: ['health', 'detailed'],
     queryFn: () => apiHelpers.getDetailedHealth(),
     refetchInterval: refreshInterval,
   })
 
-  const { data: storageData, isLoading: storageLoading } = useQuery({
+  const { data: storageData } = useQuery({
     queryKey: ['storage'],
     queryFn: () => apiHelpers.getStorageInfo(),
     refetchInterval: refreshInterval,

@@ -5,9 +5,6 @@ import {
   Plus, 
   Settings, 
   CheckCircle, 
-  AlertCircle, 
-  XCircle,
-  Info,
   Trash2,
   Edit,
   Shield,
@@ -229,8 +226,8 @@ const mockStripes: Stripe[] = [
 ]
 
 export default function ArrayConfigurationPage() {
-  const [arrayStats, setArrayStats] = useState<ArrayStats>(mockArrayStats)
-  const [disks, setDisks] = useState<Disk[]>(mockDisks)
+  const [arrayStats] = useState<ArrayStats>(mockArrayStats)
+  const [disks] = useState<Disk[]>(mockDisks)
   const [stripes, setStripes] = useState<Stripe[]>(mockStripes)
   const [showAddStripe, setShowAddStripe] = useState(false)
   const [showReservedSettings, setShowReservedSettings] = useState(false)

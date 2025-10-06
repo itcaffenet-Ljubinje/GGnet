@@ -8,7 +8,6 @@ import {
   HardDrive,
   Cpu,
   MemoryStick,
-  Wifi,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -210,7 +209,7 @@ function formatUptime(seconds: number): string {
 }
 
 export default function MonitoringPage() {
-  const [refreshInterval, setRefreshInterval] = useState(60000) // 60 seconds - reduced frequency
+  const [refreshInterval] = useState(60000) // 60 seconds - reduced frequency
   const [chartData, setChartData] = useState<{
     cpu: Array<{ time: string; value: number }>
     memory: Array<{ time: string; value: number }>
@@ -266,12 +265,12 @@ export default function MonitoringPage() {
   useEffect(() => {
     if (metrics) {
       const now = new Date().toLocaleTimeString()
-      const newData = {
-        time: now,
-        value: metrics.system.cpu_percent,
-        sent: metrics.system.network_io.bytes_sent,
-        received: metrics.system.network_io.bytes_recv
-      }
+      // const newData = { // Unused for now
+      //   time: now,
+      //   value: metrics.system.cpu_percent,
+      //   sent: metrics.system.network_io.bytes_sent,
+      //   received: metrics.system.network_io.bytes_recv
+      // }
 
       setChartData(prev => ({
         cpu: [...prev.cpu.slice(-19), { time: now, value: metrics.system.cpu_percent }],

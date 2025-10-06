@@ -10,14 +10,12 @@ import {
   Trash2, 
   RefreshCw, 
   HardDrive, 
-  Monitor, 
   Settings,
   AlertCircle,
   CheckCircle,
   XCircle,
   Loader2,
   Copy,
-  ExternalLink
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -113,7 +111,7 @@ const TargetManager: React.FC = () => {
   const createTargetMutation = useMutation({
     mutationFn: (data: TargetCreateRequest) => 
       api.post('/api/v1/targets/', data).then(res => res.data as Target),
-    onSuccess: (data) => {
+    onSuccess: (_data) => {
       toast.success(`iSCSI target created successfully for ${selectedMachine?.name}`);
       queryClient.invalidateQueries({ queryKey: ['targets'] });
       queryClient.invalidateQueries({ queryKey: ['machines'] });

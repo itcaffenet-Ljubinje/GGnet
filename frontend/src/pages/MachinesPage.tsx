@@ -9,10 +9,7 @@ import {
   Power, 
   PowerOff, 
   Search, 
-  Filter,
   RefreshCw,
-  Eye,
-  Settings
 } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 import { useNotifications } from '../components/notifications'

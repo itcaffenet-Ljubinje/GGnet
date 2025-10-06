@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Edit, Trash2, Eye, Plus, Search, Filter } from 'lucide-react'
+import { Plus, Search, Filter } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../ui'
 
 export interface Column<T> {

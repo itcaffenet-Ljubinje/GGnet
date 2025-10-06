@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+// import { persist } from 'zustand/middleware' // Unused for now
 import { api } from '../lib/api'
 
 export interface User {
