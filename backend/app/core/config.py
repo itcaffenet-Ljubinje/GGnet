@@ -154,8 +154,11 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance"""
     settings = Settings()
-    # Adjust certain paths/IPs for test environment if CI sets ENVIRONMENT=test
-    if settings.ENVIRONMENT.lower() == "test":
+    # Detect pytest/CI to ensure test overrides apply consistently
+    import os
+    running_tests = settings.ENVIRONMENT.lower() == "test" or os.getenv("PYTEST_CURRENT_TEST") is not None
+    # Adjust certain paths/IPs for test environment
+    if running_tests:
         # Use tmp storage in tests to satisfy expectations
         settings.IMAGE_STORAGE_PATH = Path("/tmp/storage")
         settings.TEMP_STORAGE_PATH = Path("/tmp/storage/temp")

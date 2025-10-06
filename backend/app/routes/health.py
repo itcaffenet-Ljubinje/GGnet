@@ -42,7 +42,7 @@ async def health_check():
         "status": HealthStatus.HEALTHY,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "1.0.0",
-        "service": "ggnet-backend"
+        "service": "ggnet-diskless-server"
     }
 
 
@@ -172,11 +172,13 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)):
         }
         health_status = HealthStatus.UNHEALTHY
     
+    # Keep top-level keys aligned with tests
     return {
         "status": health_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "1.0.0",
-        "service": "ggnet-backend",
+        "service": "ggnet-diskless-server",
+        "checks": components,
         "components": components
     }
 

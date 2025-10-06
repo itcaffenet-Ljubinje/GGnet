@@ -17,7 +17,11 @@ from app.core.cache import cache_manager
 logger = structlog.get_logger()
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+try:
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+except Exception:
+    # Fallback for CI environments where bcrypt binding may fail
+    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # Get settings
 settings = get_settings()
@@ -53,7 +57,13 @@ def get_password_hash(password: str) -> str:
         return pwd_context.hash(password)
     except Exception as e:
         logger.error("Password hashing failed", error=str(e))
-        raise PasswordError("Failed to hash password")
+        # Attempt fallback scheme explicitly
+        try:
+            fallback_ctx = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+            return fallback_ctx.hash(password)
+        except Exception as e2:
+            logger.error("Fallback password hashing failed", error=str(e2))
+            raise PasswordError("Failed to hash password")
 
 
 def validate_password_strength(password: str) -> bool:

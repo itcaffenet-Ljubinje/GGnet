@@ -12,7 +12,7 @@ from app.models.machine import Machine, MachineStatus
 from app.models.image import Image, ImageStatus, ImageFormat
 from app.models.target import Target, TargetStatus
 from app.models.session import Session, SessionStatus, SessionType
-from app.models.user import User
+from app.models.user import User, UserRole
 
 
 class TestSessionOrchestration:
