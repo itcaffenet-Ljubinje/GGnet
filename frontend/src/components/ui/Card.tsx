@@ -1,4 +1,4 @@
-import React from 'react'
+// React is available globally
 import { clsx } from 'clsx'
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {

@@ -1,4 +1,4 @@
-import React from 'react'
+// React is available globally
 import { clsx } from 'clsx'
 import { CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react'
 

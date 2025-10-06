@@ -1,4 +1,4 @@
-import React from 'react'
+// React is available globally
 import { clsx } from 'clsx'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {

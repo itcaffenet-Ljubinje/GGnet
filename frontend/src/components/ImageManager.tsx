@@ -3,7 +3,7 @@
  * Advanced image management with conversion, validation, and storage optimization
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Upload, 
