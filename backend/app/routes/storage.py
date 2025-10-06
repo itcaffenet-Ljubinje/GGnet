@@ -5,6 +5,7 @@ Storage management endpoints
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 import os
 import structlog
@@ -15,6 +16,7 @@ from app.core.database import get_db
 from app.core.config import get_settings
 from app.core.dependencies import get_current_user, require_operator
 from app.models.user import User
+from app.models.image import Image
 from app.core.exceptions import StorageError
 
 router = APIRouter()

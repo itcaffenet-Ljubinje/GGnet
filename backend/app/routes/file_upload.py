@@ -9,6 +9,7 @@ from typing import List, Optional
 from pathlib import Path
 from fastapi import APIRouter, Depends, Request, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel, ConfigDict
 import structlog
 import subprocess

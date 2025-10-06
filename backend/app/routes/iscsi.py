@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 from pathlib import Path
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from pydantic import BaseModel, ConfigDict
 import structlog
 import json
@@ -19,7 +20,7 @@ from app.core.dependencies import get_current_user, require_operator, log_user_a
 from app.models.user import User
 from app.models.target import Target, TargetStatus
 from app.models.machine import Machine
-from app.models.image import Image
+from app.models.image import Image, ImageStatus
 from app.models.audit import AuditAction
 from app.core.exceptions import ValidationError, NotFoundError
 
