@@ -26,10 +26,10 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 import { ProgressBar } from './ui/ProgressBar';
-import { useAuthStore } from '../stores/authStore';
+// import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
-interface Image {
+interface ImageData {
   id: number;
   name: string;
   filename: string;
@@ -69,7 +69,7 @@ interface ConversionJob {
 
 const ImageManager: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<ImageUploadProgress[]>([]);
-  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
 

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 
-export interface Notification {
+export interface NotificationData {
   id: string
   type: 'success' | 'error' | 'warning' | 'info'
   title?: string
@@ -10,8 +10,8 @@ export interface Notification {
 }
 
 interface NotificationContextType {
-  notifications: Notification[]
-  addNotification: (notification: Omit<Notification, 'id'>) => void
+  notifications: NotificationData[]
+  addNotification: (notification: Omit<NotificationData, 'id'>) => void
   removeNotification: (id: string) => void
   clearNotifications: () => void
 }
@@ -20,9 +20,9 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   console.log('NotificationProvider rendering')
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<NotificationData[]>([])
 
-  const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+  const addNotification = useCallback((notification: Omit<NotificationData, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9)
     const newNotification = {
       ...notification,

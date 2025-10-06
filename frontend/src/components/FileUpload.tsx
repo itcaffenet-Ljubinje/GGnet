@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, X, File, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Upload, X, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { Button } from './ui'
 import { useNotifications } from './notifications'
 import { apiHelpers } from '../lib/api'

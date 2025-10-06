@@ -53,7 +53,7 @@ interface Machine {
   description?: string;
 }
 
-interface Image {
+interface ImageData {
   id: number;
   name: string;
   filename: string;
@@ -87,7 +87,7 @@ const TargetManager: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore(); // Unused for now
   const queryClient = useQueryClient();
 
   // Fetch targets

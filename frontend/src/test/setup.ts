@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+// vi is available globally
 
 // Mock window.matchMedia
-;(window as any).matchMedia = vi.fn().mockImplementation((query: string) => ({
+(window as any).matchMedia = vi.fn().mockImplementation((query: string) => ({
   matches: false,
   media: query,
   onchange: null,

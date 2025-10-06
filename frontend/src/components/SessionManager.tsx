@@ -50,7 +50,7 @@ interface Machine {
   description?: string;
 }
 
-interface Image {
+interface ImageData {
   id: number;
   name: string;
   filename: string;
@@ -90,12 +90,12 @@ interface SessionStartResponse {
 
 const SessionManager: React.FC = () => {
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [sessionType, setSessionType] = useState<'DISKLESS_BOOT' | 'MAINTENANCE' | 'TESTING'>('DISKLESS_BOOT');
   const [description, setDescription] = useState('');
   const [isStarting, setIsStarting] = useState(false);
 
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore(); // Unused for now
   const queryClient = useQueryClient();
 
   // Fetch sessions
