@@ -9,7 +9,6 @@ import {
   Target,
   Activity,
   Settings,
-  LogOut,
   User,
   Bell,
   ChevronDown,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { clsx } from 'clsx'
-import { Button, Input } from './ui'
+import { Button } from './ui'
 import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates'
 
 interface LayoutProps {

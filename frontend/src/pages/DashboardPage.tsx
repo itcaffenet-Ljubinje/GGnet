@@ -1,4 +1,4 @@
-import { useState, Suspense, lazy } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
@@ -12,8 +12,6 @@ import {
   TrendingDown,
   Server,
   Database,
-  Cpu,
-  MemoryStick,
   Users,
   Zap,
   Wifi,

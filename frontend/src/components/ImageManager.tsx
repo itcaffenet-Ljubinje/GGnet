@@ -7,11 +7,9 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Upload, 
-  Download, 
   Trash2, 
   RefreshCw, 
   HardDrive, 
-  Settings,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -19,8 +17,7 @@ import {
   FileText,
   Zap,
   Eye,
-  Copy,
-  ExternalLink
+  Copy
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-hot-toast';
@@ -76,7 +73,7 @@ const ImageManager: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
 
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore(); // Unused for now
   const queryClient = useQueryClient();
 
   // Fetch images
@@ -87,7 +84,7 @@ const ImageManager: React.FC = () => {
   });
 
   // Fetch conversion jobs
-  const { data: conversionJobsData, isLoading: jobsLoading } = useQuery({
+  const { data: conversionJobsData } = useQuery({
     queryKey: ['conversion-jobs'],
     queryFn: () => api.get('/images/conversion-jobs').then(res => res.data),
     refetchInterval: 2000, // Refresh every 2 seconds for job progress
