@@ -7,11 +7,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Activity, 
-  Server, 
-  HardDrive, 
   Cpu, 
   MemoryStick, 
-  Wifi, 
   AlertCircle,
   CheckCircle,
   Clock,

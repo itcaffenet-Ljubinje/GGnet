@@ -51,15 +51,15 @@ interface Machine {
   description?: string;
 }
 
-interface DiskImage {
-  id: number;
-  name: string;
-  filename: string;
-  format: 'VHDX' | 'RAW' | 'QCOW2';
-  status: 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING';
-  size_bytes: number;
-  description?: string;
-}
+// interface DiskImage { // Unused for now
+//   id: number;
+//   name: string;
+//   filename: string;
+//   format: 'VHDX' | 'RAW' | 'QCOW2';
+//   status: 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING';
+//   size_bytes: number;
+//   description?: string;
+// }
 
 interface TargetCreateRequest {
   machine_id: number;
