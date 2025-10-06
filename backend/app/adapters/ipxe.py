@@ -325,3 +325,10 @@ LABEL linux
     
     logger.info(f"Generated PXE config entry for machine {machine.id}")
     return pxe_config
+
+
+# Convenience function expected by imports/tests
+def generate_boot_script_for_session(machine: Machine, target: Target, image: Image) -> str:
+    """Generate a boot script for a machine/target/image trio."""
+    generator = iPXEScriptGenerator()
+    return generator.generate_machine_boot_script(machine, target, image)

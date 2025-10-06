@@ -33,6 +33,21 @@ vi.mock('./components/notifications', () => ({
   NotificationProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="notifications">{children}</div>,
 }))
 
+// Mock recharts-heavy components
+vi.mock('./components/SystemMonitor', () => ({
+  default: () => <div data-testid="system-monitor">System Monitor</div>,
+}))
+
+// Mock recharts directly to avoid Vite resolving it
+vi.mock('recharts', () => ({
+  BarChart: () => null,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
+}))
+
 vi.mock('./pages/LoginPage', () => ({
   default: () => <div data-testid="login-page">Login Page</div>,
 }))
