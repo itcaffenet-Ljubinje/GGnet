@@ -352,3 +352,11 @@ async def update_machine_in_dhcp(machine: Machine) -> bool:
     """
     adapter = DHCPAdapter()
     return await adapter.update_machine_in_dhcp(machine)
+
+
+def generate_dhcp_config_entry(machine: Machine) -> str:
+    """
+    Generate DHCP host entry text for a machine (convenience export for tests).
+    """
+    adapter = DHCPAdapter()
+    return adapter._generate_host_entry(machine)  # type: ignore[attr-defined]

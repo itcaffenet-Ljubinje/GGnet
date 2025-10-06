@@ -108,7 +108,7 @@ class TargetCLIAdapter:
                 
                 return stdout.decode(), stderr.decode(), result.returncode
                 
-        except asyncio.TimeoutExpired:
+        except TimeoutError:
             logger.error(f"targetcli command timed out after {timeout} seconds")
             raise TargetCLIError(f"Command timed out after {timeout} seconds")
         except Exception as e:
