@@ -14,15 +14,9 @@ import '@testing-library/jest-dom'
 }))
 
 // Mock ResizeObserver
-(global as any).ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+const resizeObserverMock = vi.fn().mockImplementation(() => ({ observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() }))
+;(global as any).ResizeObserver = resizeObserverMock
 
 // Mock IntersectionObserver
-(global as any).IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+const intersectionObserverMock = vi.fn().mockImplementation(() => ({ observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() }))
+;(global as any).IntersectionObserver = intersectionObserverMock
