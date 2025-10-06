@@ -335,14 +335,14 @@ const SystemMonitor: React.FC = () => {
             <div className="flex space-x-2">
               <Button
                 onClick={() => setSelectedMetric('cpu_usage')}
-                variant={selectedMetric === 'cpu_usage' ? 'default' : 'outline'}
+                variant={selectedMetric === 'cpu_usage' ? 'primary' : 'outline'}
                 size="sm"
               >
                 CPU
               </Button>
               <Button
                 onClick={() => setSelectedMetric('memory_usage')}
-                variant={selectedMetric === 'memory_usage' ? 'default' : 'outline'}
+                variant={selectedMetric === 'memory_usage' ? 'primary' : 'outline'}
                 size="sm"
               >
                 Memory
@@ -389,7 +389,7 @@ const SystemMonitor: React.FC = () => {
                 <YAxis />
                 <Tooltip 
                   labelFormatter={(value) => new Date(value).toLocaleString()}
-                  formatter={(value, name) => [formatBytes(value), name]}
+                  formatter={(value: any, name: any) => [formatBytes(Number(value)), name]}
                 />
                 <Line 
                   type="monotone" 
@@ -422,7 +422,7 @@ const SystemMonitor: React.FC = () => {
                   {getStatusIcon(service.status)}
                   <span className="font-medium text-gray-900">{service.name}</span>
                 </div>
-                <StatusBadge status={service.status} />
+                <StatusBadge status={service.status} text={service.status} />
               </div>
               <div className="space-y-1 text-sm text-gray-600">
                 <p>Uptime: {formatUptime(service.uptime)}</p>
@@ -496,7 +496,7 @@ const SystemMonitor: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       {getStatusIcon(iface.status)}
-                      <StatusBadge status={iface.status} className="ml-2" />
+                      <StatusBadge status={iface.status} text={iface.status} className="ml-2" />
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -526,11 +526,11 @@ const SystemMonitor: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">System Issues</h3>
               <div className="space-y-3">
-                {health.issues.map((issue, index) => (
+                {health.issues.map((issue: any, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-900">{issue.component}</span>
-                      <StatusBadge status={issue.severity} />
+                      <StatusBadge status={issue.severity} text={issue.severity} />
                     </div>
                     <p className="text-sm text-gray-600">{issue.message}</p>
                     <p className="text-xs text-gray-500 mt-1">
@@ -547,7 +547,7 @@ const SystemMonitor: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommendations</h3>
               <div className="space-y-2">
-                {health.recommendations.map((recommendation, index) => (
+                {health.recommendations.map((recommendation: any, index: number) => (
                   <div key={index} className="flex items-start space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-gray-600">{recommendation}</p>

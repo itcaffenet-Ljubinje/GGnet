@@ -279,15 +279,15 @@ const TargetManager: React.FC = () => {
               <select
                 value={selectedMachine?.id || ''}
                 onChange={(e) => {
-                  const machine = machines.find(m => m.id === parseInt(e.target.value));
+                  const machine = machines.find((m: any) => m.id === parseInt(e.target.value));
                   setSelectedMachine(machine || null);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Choose a machine...</option>
                 {machines
-                  .filter(m => m.status === 'ACTIVE')
-                  .map(machine => (
+                  .filter((m: any) => m.status === 'ACTIVE')
+                  .map((machine: any) => (
                     <option key={machine.id} value={machine.id}>
                       {machine.name} ({machine.mac_address}) - {machine.ip_address}
                     </option>
@@ -303,15 +303,15 @@ const TargetManager: React.FC = () => {
               <select
                 value={selectedImage?.id || ''}
                 onChange={(e) => {
-                  const image = images.find(i => i.id === parseInt(e.target.value));
+                  const image = images.find((i: any) => i.id === parseInt(e.target.value));
                   setSelectedImage(image || null);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Choose an image...</option>
                 {images
-                  .filter(i => i.status === 'READY')
-                  .map(image => (
+                  .filter((i: any) => i.status === 'READY')
+                  .map((image: any) => (
                     <option key={image.id} value={image.id}>
                       {image.name} ({image.format}) - {formatFileSize(image.size_bytes)}
                     </option>
@@ -403,9 +403,9 @@ const TargetManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {targets.map((target) => {
-              const machine = machines.find(m => m.id === target.machine_id);
-              const image = images.find(i => i.id === target.image_id);
+            {targets.map((target: any) => {
+              const machine = machines.find((m: any) => m.id === target.machine_id);
+              const image = images.find((i: any) => i.id === target.image_id);
               
               return (
                 <div key={target.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
@@ -421,7 +421,7 @@ const TargetManager: React.FC = () => {
                         </div>
                         <div className="flex items-center">
                           {getStatusIcon(target.status)}
-                          <StatusBadge status={target.status} className="ml-2" />
+                          <StatusBadge status={target.status} text={target.status} className="ml-2" />
                         </div>
                       </div>
 

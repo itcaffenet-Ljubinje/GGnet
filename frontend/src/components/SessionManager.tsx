@@ -290,15 +290,15 @@ const SessionManager: React.FC = () => {
             <select
               value={selectedMachine?.id || ''}
               onChange={(e) => {
-                const machine = machines.find(m => m.id === parseInt(e.target.value));
+                const machine = machines.find((m: any) => m.id === parseInt(e.target.value));
                 setSelectedMachine(machine || null);
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose a machine...</option>
               {machines
-                .filter(m => m.status === 'ACTIVE')
-                .map(machine => (
+                .filter((m: any) => m.status === 'ACTIVE')
+                .map((machine: any) => (
                   <option key={machine.id} value={machine.id}>
                     {machine.name} ({machine.mac_address}) - {machine.ip_address}
                   </option>
@@ -314,15 +314,15 @@ const SessionManager: React.FC = () => {
             <select
               value={selectedImage?.id || ''}
               onChange={(e) => {
-                const image = images.find(i => i.id === parseInt(e.target.value));
+                const image = images.find((i: any) => i.id === parseInt(e.target.value));
                 setSelectedImage(image || null);
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose an image...</option>
               {images
-                .filter(i => i.status === 'READY')
-                .map(image => (
+                .filter((i: any) => i.status === 'READY')
+                .map((image: any) => (
                   <option key={image.id} value={image.id}>
                     {image.name} ({image.format}) - {(image.size_bytes / 1024 / 1024 / 1024).toFixed(1)}GB
                   </option>
@@ -428,9 +428,9 @@ const SessionManager: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sessions.map((session) => {
-                  const machine = machines.find(m => m.id === session.machine_id);
-                  const image = images.find(i => i.id === session.image_id);
+                {sessions.map((session: any) => {
+                  const machine = machines.find((m: any) => m.id === session.machine_id);
+                  const image = images.find((i: any) => i.id === session.image_id);
                   
                   return (
                     <tr key={session.id} className="hover:bg-gray-50">
@@ -458,7 +458,7 @@ const SessionManager: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {getStatusIcon(session.status)}
-                          <StatusBadge status={session.status} className="ml-2" />
+                          <StatusBadge status={session.status} text={session.status} className="ml-2" />
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

@@ -3,7 +3,7 @@
 export type BackendStatus = 
   | 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING' | 'PENDING' | 'COMPLETED' | 'FAILED'
   | 'RUNNING' | 'STOPPED' | 'WARNING' | 'SUCCESS' | 'IDLE' | 'BOOTING' | 'IN_PROGRESS'
-  | 'UP' | 'DOWN'
+  | 'UP' | 'DOWN' | 'INACTIVE'
 
 export type FrontendStatus = 'active' | 'inactive' | 'error' | 'warning' | 'info' | 'success'
 

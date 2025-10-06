@@ -54,7 +54,7 @@ export const useRealTimeUpdates = () => {
         const token = parsed.state?.accessToken
         if (token) {
           // Use proxy in development, direct connection in production
-          const baseUrl = import.meta.env.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
+          const baseUrl = (import.meta as any).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
           return `${baseUrl}?token=${encodeURIComponent(token)}`
         }
       }
@@ -62,7 +62,7 @@ export const useRealTimeUpdates = () => {
       // Ignore parsing errors
     }
     // Use proxy in development, direct connection in production
-    const baseUrl = import.meta.env.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
+    const baseUrl = (import.meta as any).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
     return baseUrl
   }, [])
 

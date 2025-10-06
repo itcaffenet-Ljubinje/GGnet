@@ -301,7 +301,7 @@ const NetworkBootMonitor: React.FC = () => {
                 </div>
               </div>
               <div className="text-right">
-                <StatusBadge status={service.status} />
+                <StatusBadge status={service.status} text={service.status} />
                 {service.uptime && (
                   <p className="text-xs text-gray-500 mt-1">Uptime: {service.uptime}</p>
                 )}
@@ -363,7 +363,7 @@ const NetworkBootMonitor: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {getBootStatusIcon(machine.boot_status)}
-                        <StatusBadge status={machine.boot_status} className="ml-2" />
+                        <StatusBadge status={machine.boot_status} text={machine.boot_status} className="ml-2" />
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -411,7 +411,7 @@ const NetworkBootMonitor: React.FC = () => {
                 <div className="text-right">
                   <div className="flex items-center space-x-2">
                     {getEventStatusIcon(event.status)}
-                    <StatusBadge status={event.status} />
+                    <StatusBadge status={event.status} text={event.status} />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {formatDateTime(event.timestamp)}

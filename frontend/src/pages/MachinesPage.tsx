@@ -69,7 +69,7 @@ export default function MachinesPage() {
   })
 
   // Calculate stats
-  const stats: MachineStats = machines.reduce((acc, machine) => {
+  const stats: MachineStats = machines.reduce((acc: any, machine: any) => {
     acc.total++
     if (machine.status === 'active') acc.active++
     if (machine.is_online) acc.online++
@@ -137,11 +137,11 @@ export default function MachinesPage() {
     if (selectedMachines.length === machines.length) {
       setSelectedMachines([])
     } else {
-      setSelectedMachines(machines.map(m => m.id))
+      setSelectedMachines(machines.map((m: any) => m.id))
     }
   }
 
-  const handleEdit = (machine: Machine) => {
+  const handleEdit = (machine: any) => {
     setEditingMachine(machine)
     setShowEditModal(true)
   }
@@ -389,7 +389,7 @@ export default function MachinesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {machines.map((machine) => (
+                  {machines.map((machine: any) => (
                     <tr key={machine.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input

@@ -322,7 +322,7 @@ const ImageManager: React.FC = () => {
                     <span className="text-sm font-medium text-gray-900">
                       {item.file.name}
                     </span>
-                    <StatusBadge status={item.status} />
+                    <StatusBadge status={item.status} text={item.status} />
                   </div>
                   <ProgressBar 
                     progress={item.progress} 
@@ -349,7 +349,7 @@ const ImageManager: React.FC = () => {
                   <span className="font-medium text-gray-900">
                     Image #{job.image_id} Conversion
                   </span>
-                  <StatusBadge status={job.status} />
+                  <StatusBadge status={job.status} text={job.status} />
                 </div>
                 <ProgressBar progress={job.progress} />
                 {job.error_message && (
@@ -373,7 +373,7 @@ const ImageManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {images.map((image) => (
+            {images.map((image: any) => (
               <div key={image.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -389,7 +389,7 @@ const ImageManager: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         {getStatusIcon(image.status)}
-                        <StatusBadge status={image.status} />
+                        <StatusBadge status={image.status} text={image.status} />
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${getImageTypeColor(image.image_type)}`}>
                           {image.image_type}
                         </span>
@@ -561,7 +561,7 @@ const ImageManager: React.FC = () => {
                   <p className="text-sm font-medium text-gray-700">Status</p>
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(selectedImage.status)}
-                    <StatusBadge status={selectedImage.status} />
+                    <StatusBadge status={selectedImage.status} text={selectedImage.status} />
                   </div>
                 </div>
                 <div>
