@@ -1,0 +1,51 @@
+#!ipxe
+# Generic GGnet diskless boot script
+# This script is used as a fallback for unknown machines
+
+# Set console output
+console --x 1024 --y 768
+
+# Set timeout
+set timeout 10000
+
+# Display boot message
+echo Welcome to GGnet Diskless System
+echo ================================
+echo
+
+# Configure network
+dhcp
+
+# Get machine information
+echo Machine MAC: ${net0/mac}
+echo Machine IP: ${net0/ip}
+echo Server IP: ${next-server}
+echo
+
+# Try to get machine-specific boot script
+echo Attempting to load machine-specific boot script...
+echo Trying: tftp://${next-server}/machines/${net0/mac:hexhyp}.ipxe
+chain tftp://${next-server}/machines/${net0/mac:hexhyp}.ipxe ||
+echo Trying: tftp://${next-server}/machines/${net0/mac}.ipxe
+chain tftp://${next-server}/machines/${net0/mac}.ipxe ||
+echo
+
+# Fallback to PXE boot
+echo Machine-specific script not found
+echo Falling back to PXE boot...
+sleep 3
+chain tftp://${next-server}/pxelinux.0 ||
+echo
+
+# Final fallback - local boot
+echo All network boot methods failed
+echo Attempting local boot...
+sleep 5
+sanboot --no-describe --drive 0x80 ||
+echo
+
+# Ultimate fallback
+echo All boot methods failed
+echo Please check network configuration and try again
+sleep 10
+reboot

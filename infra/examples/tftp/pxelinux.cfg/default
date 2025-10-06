@@ -1,0 +1,29 @@
+# PXE Linux Configuration for GGnet
+# This file should be placed at /var/lib/tftpboot/pxelinux.cfg/default
+# 
+# This is a fallback configuration for machines that don't support iPXE
+# or when iPXE boot fails
+
+DEFAULT linux
+PROMPT 0
+TIMEOUT 50
+
+LABEL linux
+    KERNEL vmlinuz
+    APPEND initrd=initrd.img root=/dev/ram0 rw quiet
+    IPAPPEND 2
+
+LABEL local
+    MENU LABEL Boot from local hard drive
+    LOCALBOOT 0x80
+
+LABEL memtest
+    KERNEL memtest86+
+
+LABEL reboot
+    MENU LABEL Reboot
+    KERNEL reboot.c32
+
+LABEL poweroff
+    MENU LABEL Power Off
+    KERNEL poweroff.c32
