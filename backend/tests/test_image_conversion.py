@@ -410,5 +410,5 @@ class TestImageUploadWithConversion:
                 data = response.json()
                 assert data["name"] == "Test VHDX"
                 assert data["format"] == "vhdx"
-                # Status should be PROCESSING for VHDX files
-                assert data["status"] == "processing"
+                # Status should be UPLOADING initially, then PROCESSING in background
+                assert data["status"] == "uploading"

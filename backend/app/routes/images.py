@@ -3,7 +3,7 @@ Image management endpoints
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, BackgroundTasks, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel, ConfigDict
@@ -48,7 +48,7 @@ class ImageResponse(BaseModel):
     checksum_md5: Optional[str]
     checksum_sha256: Optional[str]
     created_at: datetime
-    created_by_username: str
+    created_by_username: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -162,7 +162,7 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
             logger.error("Failed to update image error status", error=str(db_error))
 
 
-@router.post("/upload", response_model=ImageResponse)
+@router.post("/upload", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
 @invalidate_cache(pattern="images:*")
 async def upload_image(
     request: Request,

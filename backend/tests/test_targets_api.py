@@ -95,7 +95,7 @@ class TestTargetsAPI:
             }
             
             response = await client.post(
-                "/api/v1/targets",
+                "/api/v1/targets/",
                 json={
                     "machine_id": test_machine.id,
                     "image_id": test_image.id,
@@ -230,7 +230,7 @@ class TestTargetsAPI:
     ):
         """Test target creation with targetcli error"""
         with patch('app.api.targets.create_target_for_machine') as mock_create_target:
-            from app.adapters.targetcli import TargetCLIError
+            from app.core.exceptions import TargetCLIError
             mock_create_target.side_effect = TargetCLIError("targetcli command failed")
             
             response = await client.post(
@@ -453,7 +453,7 @@ class TestTargetsAPI:
             mock_adapter = AsyncMock()
             mock_adapter_class.return_value = mock_adapter
             
-            from app.adapters.targetcli import TargetCLIError
+            from app.core.exceptions import TargetCLIError
             mock_adapter.delete_target.side_effect = TargetCLIError("targetcli error")
             
             response = await client.delete(
