@@ -20,39 +20,73 @@ class Base(DeclarativeBase):
     metadata = metadata
 
 
-# Database engines
-settings = get_settings()
+# Database engines - lazy initialization
+_settings = None
+_sync_engine = None
+_async_engine = None
 
-# Synchronous engine for migrations
-sync_engine = create_engine(
-    settings.database_url_sync,
-    echo=settings.DEBUG,
-    pool_pre_ping=True,
-)
+def get_settings():
+    """Get settings instance"""
+    global _settings
+    if _settings is None:
+        from app.core.config import get_settings as _get_settings
+        _settings = _get_settings()
+    return _settings
 
-# Asynchronous engine for application
-async_engine = create_async_engine(
-    settings.database_url_async,
-    echo=settings.DEBUG,
-    pool_pre_ping=True,
-)
+def get_sync_engine():
+    """Get synchronous engine for migrations"""
+    global _sync_engine
+    if _sync_engine is None:
+        settings = get_settings()
+        _sync_engine = create_engine(
+            settings.database_url_sync,
+            echo=settings.DEBUG,
+            pool_pre_ping=True,
+        )
+    return _sync_engine
 
-# Session factories
-AsyncSessionLocal = async_sessionmaker(
-    async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+def get_async_engine():
+    """Get asynchronous engine for application"""
+    global _async_engine
+    if _async_engine is None:
+        settings = get_settings()
+        _async_engine = create_async_engine(
+            settings.database_url_async,
+            echo=settings.DEBUG,
+            pool_pre_ping=True,
+        )
+    return _async_engine
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=sync_engine
-)
+# Session factories - lazy initialization
+_AsyncSessionLocal = None
+_SessionLocal = None
+
+def get_async_session_local():
+    """Get async session factory"""
+    global _AsyncSessionLocal
+    if _AsyncSessionLocal is None:
+        _AsyncSessionLocal = async_sessionmaker(
+            get_async_engine(),
+            class_=AsyncSession,
+            expire_on_commit=False
+        )
+    return _AsyncSessionLocal
+
+def get_session_local():
+    """Get sync session factory"""
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=get_sync_engine()
+        )
+    return _SessionLocal
 
 
 async def get_db() -> AsyncSession:
     """Dependency to get database session"""
+    AsyncSessionLocal = get_async_session_local()
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -66,6 +100,7 @@ async def get_db() -> AsyncSession:
 async def init_db():
     """Initialize database tables"""
     try:
+        async_engine = get_async_engine()
         async with async_engine.begin() as conn:
             # Import all models to ensure they are registered
             from app.models import user, image, machine, target, session, audit
@@ -81,7 +116,10 @@ async def init_db():
 
 async def close_db():
     """Close database connections"""
-    await async_engine.dispose()
-    sync_engine.dispose()
+    global _async_engine, _sync_engine
+    if _async_engine is not None:
+        await _async_engine.dispose()
+    if _sync_engine is not None:
+        _sync_engine.dispose()
     logger.info("Database connections closed")
 

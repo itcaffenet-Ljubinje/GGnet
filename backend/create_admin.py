@@ -4,7 +4,7 @@ Script to create default admin user for GGnet Diskless Server
 """
 
 import asyncio
-from app.core.database import async_engine
+from app.core.database import get_async_engine
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 async def create_admin_user():
     """Create default admin user if it doesn't exist"""
+    async_engine = get_async_engine()
     async with AsyncSession(async_engine) as session:
         try:
             # Check if admin user exists

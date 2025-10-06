@@ -17,7 +17,13 @@ from app.core.security import get_password_hash, create_access_token
 # Import all models to ensure they are registered
 from app.models import user, image, machine, target, session, audit
 
-DATABASE_URL_TEST = "sqlite+aiosqlite:///./test.db"
+import os
+DATABASE_URL_TEST = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+# Convert PostgreSQL URL to async version if needed
+if DATABASE_URL_TEST.startswith("postgresql://"):
+    DATABASE_URL_TEST = DATABASE_URL_TEST.replace("postgresql://", "postgresql+asyncpg://")
+elif DATABASE_URL_TEST.startswith("sqlite://"):
+    DATABASE_URL_TEST = DATABASE_URL_TEST.replace("sqlite://", "sqlite+aiosqlite://")
 
 # Create async engine and session factory
 engine_test = create_async_engine(DATABASE_URL_TEST, future=True, echo=False)

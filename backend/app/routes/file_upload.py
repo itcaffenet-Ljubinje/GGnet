@@ -170,7 +170,8 @@ async def convert_image(image_id: int, task_id: str):
             conversion_tasks[task_id].message = "Converting image format..."
         
         # Get image from database
-        from app.core.database import async_engine
+        from app.core.database import get_async_engine
+        async_engine = get_async_engine()
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy import select
         
@@ -243,7 +244,8 @@ async def convert_image(image_id: int, task_id: str):
         
         # Update image status
         try:
-            from app.core.database import async_engine
+            from app.core.database import get_async_engine
+            async_engine = get_async_engine()
             from sqlalchemy.ext.asyncio import AsyncSession
             from sqlalchemy import select
             
@@ -355,7 +357,8 @@ async def get_disk_usage(
         total, used, free = shutil.disk_usage(UPLOAD_DIR)
         
         # Get image file sizes
-        from app.core.database import async_engine
+        from app.core.database import get_async_engine
+        async_engine = get_async_engine()
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy import select, func
         

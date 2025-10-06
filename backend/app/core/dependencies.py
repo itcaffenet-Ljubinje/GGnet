@@ -217,7 +217,8 @@ async def log_user_activity(
     
     # Get database session if not provided
     if db is None:
-        from app.core.database import async_engine
+        from app.core.database import get_async_engine
+        async_engine = get_async_engine()
         async with AsyncSession(async_engine) as session:
             await _log_audit_entry(
                 action, message, request, user, severity, 

@@ -4,7 +4,7 @@ Script to debug login process step by step
 """
 
 import asyncio
-from app.core.database import async_engine
+from app.core.database import get_async_engine
 from app.models.user import User
 from app.core.security import verify_password
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 async def debug_login():
     """Debug login process step by step"""
+    async_engine = get_async_engine()
     async with AsyncSession(async_engine) as session:
         try:
             username = "admin"
