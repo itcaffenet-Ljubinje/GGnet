@@ -77,7 +77,7 @@ class TestSessionOrchestration:
         headers = {"Authorization": f"Bearer {admin_token}"}
         
         # Mock targetcli operations
-        with patch("app.adapters.targetcli.create_target_for_machine") as mock_create_target:
+        with patch("app.api.sessions.create_target_for_machine") as mock_create_target:
             mock_create_target.return_value = {
                 "target_id": "target-001",
                 "iqn": "iqn.2025.ggnet:target-001",
@@ -88,18 +88,18 @@ class TestSessionOrchestration:
             }
             
             # Mock iPXE script generation
-            with patch("app.adapters.ipxe.iPXEScriptGenerator") as mock_ipxe:
+            with patch("app.api.sessions.iPXEScriptGenerator") as mock_ipxe:
                 mock_generator = MagicMock()
                 mock_generator.generate_machine_boot_script.return_value = "#!ipxe\necho Booting...\nsanboot iscsi:192.168.1.10::0:iqn.2025.ggnet:target-001"
                 mock_generator.get_machine_script_filename.return_value = "machines/00-11-22-33-44-55.ipxe"
                 mock_ipxe.return_value = mock_generator
                 
                 # Mock TFTP operations
-                with patch("app.adapters.tftp.save_boot_script_to_tftp") as mock_tftp:
+                with patch("app.api.sessions.save_boot_script_to_tftp") as mock_tftp:
                     mock_tftp.return_value = "/var/lib/tftpboot/machines/00-11-22-33-44-55.ipxe"
                     
                     # Mock DHCP operations
-                    with patch("app.adapters.dhcp.add_machine_to_dhcp") as mock_dhcp:
+                    with patch("app.api.sessions.add_machine_to_dhcp") as mock_dhcp:
                         mock_dhcp.return_value = True
                         
                         # Make request
@@ -158,7 +158,7 @@ class TestSessionOrchestration:
         assert "Machine with ID 999 not found" in response.json()["detail"]
     
     @pytest.mark.asyncio
-    async def test_start_session_image_not_ready(self, client, admin_user, test_machine, db_session):
+    async def test_start_session_image_not_ready(self, client: AsyncClient, admin_user, admin_token, test_machine, db_session):
         """Test session start with image not in READY status"""
         
         # Create image with PROCESSING status
@@ -175,23 +175,23 @@ class TestSessionOrchestration:
         db_session.add(image)
         await db_session.commit()
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            with patch("app.core.dependencies.require_operator", return_value=admin_user):
-                
-                response = client.post(
-                    "/api/v1/sessions/start",
-                    json={
-                        "machine_id": 1,
-                        "image_id": 1,
-                        "session_type": "DISKLESS_BOOT"
-                    }
-                )
-                
-                assert response.status_code == 400
-                assert "Image must be in READY status" in response.json()["detail"]
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        response = await client.post(
+            "/api/v1/sessions/start",
+            json={
+                "machine_id": 1,
+                "image_id": 1,
+                "session_type": "diskless_boot"
+            },
+            headers=headers
+        )
+        
+        assert response.status_code == 400
+        assert "Image must be in READY status" in response.json()["detail"]
     
     @pytest.mark.asyncio
-    async def test_stop_session_success(self, client, admin_user, test_machine, test_image, db_session):
+    async def test_stop_session_success(self, client: AsyncClient, admin_user, admin_token, test_machine, test_image, db_session):
         """Test successful session stop"""
         
         # Create active session
@@ -223,30 +223,29 @@ class TestSessionOrchestration:
         db_session.add(target)
         await db_session.commit()
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            with patch("app.core.dependencies.require_operator", return_value=admin_user):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        # Mock cleanup operations
+        with patch("app.adapters.targetcli.delete_target_for_machine") as mock_delete_target:
+            mock_delete_target.return_value = True
+            
+            with patch("app.adapters.dhcp.remove_machine_from_dhcp") as mock_remove_dhcp:
+                mock_remove_dhcp.return_value = True
                 
-                # Mock cleanup operations
-                with patch("app.adapters.targetcli.delete_target_for_machine") as mock_delete_target:
-                    mock_delete_target.return_value = True
+                with patch("app.adapters.tftp.TFTPAdapter.remove_boot_script") as mock_remove_script:
+                    mock_remove_script.return_value = True
                     
-                    with patch("app.adapters.dhcp.remove_machine_from_dhcp") as mock_remove_dhcp:
-                        mock_remove_dhcp.return_value = True
-                        
-                        with patch("app.adapters.tftp.TFTPAdapter.remove_boot_script") as mock_remove_script:
-                            mock_remove_script.return_value = True
-                            
-                            response = client.post("/api/v1/sessions/1/stop")
-                            
-                            assert response.status_code == 200
-                            data = response.json()
-                            
-                            assert data["message"] == "Session stopped successfully"
-                            assert data["session_id"] == 1
-                            assert data["machine_id"] == 1
+                    response = await client.post("/api/v1/sessions/1/stop", headers=headers)
+                    
+                    assert response.status_code == 200
+                    data = response.json()
+                    
+                    assert data["message"] == "Session stopped successfully"
+                    assert data["session_id"] == 1
+                    assert data["machine_id"] == 1
     
     @pytest.mark.asyncio
-    async def test_list_sessions(self, client, admin_user, db_session):
+    async def test_list_sessions(self, client: AsyncClient, admin_user, admin_token, db_session):
         """Test listing sessions"""
         
         # Create test sessions
@@ -274,23 +273,23 @@ class TestSessionOrchestration:
         db_session.add_all([session1, session2])
         await db_session.commit()
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            
-            response = client.get("/api/v1/sessions/")
-            
-            assert response.status_code == 200
-            data = response.json()
-            
-            assert "sessions" in data
-            assert "total" in data
-            assert "page" in data
-            assert "per_page" in data
-            
-            assert len(data["sessions"]) == 2
-            assert data["total"] == 2
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        response = await client.get("/api/v1/sessions/", headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "sessions" in data
+        assert "total" in data
+        assert "page" in data
+        assert "per_page" in data
+        
+        assert len(data["sessions"]) == 2
+        assert data["total"] == 2
     
     @pytest.mark.asyncio
-    async def test_get_machine_boot_script(self, client, admin_user, test_machine, test_image, db_session):
+    async def test_get_machine_boot_script(self, client: AsyncClient, admin_user, admin_token, test_machine, test_image, db_session):
         """Test getting boot script for a machine"""
         
         # Create active session
@@ -322,30 +321,30 @@ class TestSessionOrchestration:
         db_session.add(target)
         await db_session.commit()
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        # Mock iPXE script generation
+        with patch("app.adapters.ipxe.iPXEScriptGenerator") as mock_ipxe:
+            mock_generator = MagicMock()
+            mock_generator.generate_machine_boot_script.return_value = "#!ipxe\necho Booting...\nsanboot iscsi:192.168.1.10::0:iqn.2025.ggnet:target-001"
+            mock_generator.get_machine_script_filename.return_value = "machines/00-11-22-33-44-55.ipxe"
+            mock_ipxe.return_value = mock_generator
             
-            # Mock iPXE script generation
-            with patch("app.adapters.ipxe.iPXEScriptGenerator") as mock_ipxe:
-                mock_generator = MagicMock()
-                mock_generator.generate_machine_boot_script.return_value = "#!ipxe\necho Booting...\nsanboot iscsi:192.168.1.10::0:iqn.2025.ggnet:target-001"
-                mock_generator.get_machine_script_filename.return_value = "machines/00-11-22-33-44-55.ipxe"
-                mock_ipxe.return_value = mock_generator
-                
-                response = client.get("/api/v1/sessions/machine/1/boot-script")
-                
-                assert response.status_code == 200
-                data = response.json()
-                
-                assert data["machine_id"] == 1
-                assert "script_content" in data
-                assert "script_url" in data
-                assert "iscsi_details" in data
-                
-                assert "#!ipxe" in data["script_content"]
-                assert "sanboot iscsi:" in data["script_content"]
+            response = await client.get("/api/v1/sessions/machine/1/boot-script", headers=headers)
+            
+            assert response.status_code == 200
+            data = response.json()
+            
+            assert data["machine_id"] == 1
+            assert "script_content" in data
+            assert "script_url" in data
+            assert "iscsi_details" in data
+            
+            assert "#!ipxe" in data["script_content"]
+            assert "sanboot iscsi:" in data["script_content"]
     
     @pytest.mark.asyncio
-    async def test_get_session_stats(self, client, admin_user, db_session):
+    async def test_get_session_stats(self, client: AsyncClient, admin_user, admin_token, db_session):
         """Test getting session statistics"""
         
         # Create test sessions with different statuses
@@ -357,22 +356,22 @@ class TestSessionOrchestration:
         db_session.add_all(sessions)
         await db_session.commit()
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            
-            response = client.get("/api/v1/sessions/stats")
-            
-            assert response.status_code == 200
-            data = response.json()
-            
-            assert "total_sessions" in data
-            assert "active_sessions" in data
-            assert "status_counts" in data
-            
-            assert data["total_sessions"] == 3
-            assert data["active_sessions"] == 1
-            assert data["status_counts"]["ACTIVE"] == 1
-            assert data["status_counts"]["STOPPED"] == 1
-            assert data["status_counts"]["ERROR"] == 1
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        response = await client.get("/api/v1/sessions/stats", headers=headers)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "total_sessions" in data
+        assert "active_sessions" in data
+        assert "status_counts" in data
+        
+        assert data["total_sessions"] == 3
+        assert data["active_sessions"] == 1
+        assert data["status_counts"]["ACTIVE"] == 1
+        assert data["status_counts"]["STOPPED"] == 1
+        assert data["status_counts"]["ERROR"] == 1
 
 
 class TestiPXEScriptGeneration:
