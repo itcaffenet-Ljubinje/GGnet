@@ -1,136 +1,229 @@
 """
-Health check endpoints
+Health check and monitoring endpoints
 """
 
-from fastapi import APIRouter, Depends
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-import structlog
-from datetime import datetime
 import psutil
-import os
+import structlog
 
 from app.core.database import get_db
+from app.core.cache import cache_manager
 from app.core.config import get_settings
 
 router = APIRouter()
 logger = structlog.get_logger()
+settings = get_settings()
 
 
-@router.get("")
+class HealthStatus:
+    """Health status constants"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+
+
+class HealthResponse:
+    """Health check response model"""
+    def __init__(self, status: str, timestamp: datetime, version: str, **kwargs):
+        self.status = status
+        self.timestamp = timestamp
+        self.version = version
+        self.details = kwargs
+
+
+@router.get("/", response_model=Dict[str, Any])
 async def health_check():
-    """Basic health check"""
+    """Basic health check endpoint"""
     return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "ggnet-diskless-server",
-        "version": "1.0.0"
+        "status": HealthStatus.HEALTHY,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "1.0.0",
+        "service": "ggnet-backend"
     }
 
 
-@router.get("/detailed")
+@router.get("/detailed", response_model=Dict[str, Any])
 async def detailed_health_check(db: AsyncSession = Depends(get_db)):
-    """Detailed health check with system information"""
-    settings = get_settings()
+    """Detailed health check with component status"""
+    health_status = HealthStatus.HEALTHY
+    components = {}
     
-    # Database health
-    db_healthy = True
-    db_error = None
+    # Database health check
     try:
-        await db.execute(text("SELECT 1"))
+        result = await db.execute(text("SELECT 1"))
+        result.scalar()
+        components["database"] = {
+            "status": HealthStatus.HEALTHY,
+            "response_time_ms": 0,  # Could measure actual response time
+            "details": "Database connection successful"
+        }
     except Exception as e:
-        db_healthy = False
-        db_error = str(e)
-        logger.error("Database health check failed", error=str(e))
+        components["database"] = {
+            "status": HealthStatus.UNHEALTHY,
+            "error": str(e),
+            "details": "Database connection failed"
+        }
+        health_status = HealthStatus.UNHEALTHY
     
-    # System resources
+    # Redis health check
+    try:
+        await cache_manager.set("health_check", "ok", expire=10)
+        result = await cache_manager.get("health_check")
+        if result == "ok":
+            components["redis"] = {
+                "status": HealthStatus.HEALTHY,
+                "details": "Redis connection successful"
+            }
+        else:
+            components["redis"] = {
+                "status": HealthStatus.DEGRADED,
+                "details": "Redis connection inconsistent"
+            }
+            if health_status == HealthStatus.HEALTHY:
+                health_status = HealthStatus.DEGRADED
+    except Exception as e:
+        components["redis"] = {
+            "status": HealthStatus.UNHEALTHY,
+            "error": str(e),
+            "details": "Redis connection failed"
+        }
+        health_status = HealthStatus.UNHEALTHY
+    
+    # System resources check
     try:
         cpu_percent = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
-    except Exception as e:
-        logger.error("System metrics collection failed", error=str(e))
-        cpu_percent = None
-        memory = None
-        disk = None
-    
-    # Check critical directories
-    directories_status = {}
-    critical_dirs = [settings.UPLOAD_DIR, settings.IMAGES_DIR]
-    
-    for dir_path in critical_dirs:
-        try:
-            exists = dir_path.exists()
-            writable = os.access(dir_path, os.W_OK) if exists else False
-            directories_status[str(dir_path)] = {
-                "exists": exists,
-                "writable": writable,
-                "status": "healthy" if exists and writable else "error"
-            }
-        except Exception as e:
-            directories_status[str(dir_path)] = {
-                "exists": False,
-                "writable": False,
-                "status": "error",
-                "error": str(e)
-            }
-    
-    # Overall health status
-    overall_healthy = (
-        db_healthy and
-        all(d["status"] == "healthy" for d in directories_status.values())
-    )
-    
-    health_data = {
-        "status": "healthy" if overall_healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "ggnet-diskless-server",
-        "version": "1.0.0",
-        "checks": {
-            "database": {
-                "status": "healthy" if db_healthy else "error",
-                "error": db_error
-            },
-            "directories": directories_status,
-            "system": {
-                "cpu_percent": cpu_percent,
-                "memory": {
-                    "total_mb": round(memory.total / 1024 / 1024) if memory else None,
-                    "available_mb": round(memory.available / 1024 / 1024) if memory else None,
-                    "percent_used": memory.percent if memory else None
-                } if memory else None,
-                "disk": {
-                    "total_gb": round(disk.total / 1024 / 1024 / 1024) if disk else None,
-                    "free_gb": round(disk.free / 1024 / 1024 / 1024) if disk else None,
-                    "percent_used": round((disk.used / disk.total) * 100) if disk else None
-                } if disk else None
-            }
+        
+        system_healthy = (
+            cpu_percent < 90 and
+            memory.percent < 90 and
+            disk.percent < 90
+        )
+        
+        components["system"] = {
+            "status": HealthStatus.HEALTHY if system_healthy else HealthStatus.DEGRADED,
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory.percent,
+            "disk_percent": disk.percent,
+            "details": "System resources within normal limits" if system_healthy else "System resources under stress"
         }
-    }
+        
+        if not system_healthy and health_status == HealthStatus.HEALTHY:
+            health_status = HealthStatus.DEGRADED
+            
+    except Exception as e:
+        components["system"] = {
+            "status": HealthStatus.UNHEALTHY,
+            "error": str(e),
+            "details": "System resource check failed"
+        }
+        health_status = HealthStatus.UNHEALTHY
     
-    return health_data
-
-
-@router.get("/ready")
-async def readiness_check(db: AsyncSession = Depends(get_db)):
-    """Kubernetes readiness probe"""
+    # File system check
     try:
-        # Check database connection
+        import os
+        from pathlib import Path
+        
+        # Check if storage directories exist and are writable
+        storage_paths = [
+            settings.UPLOAD_DIR,
+            settings.IMAGES_DIR,
+            settings.IMAGE_STORAGE_PATH,
+            settings.TEMP_STORAGE_PATH
+        ]
+        
+        storage_healthy = True
+        storage_details = []
+        
+        for path in storage_paths:
+            try:
+                path_obj = Path(path)
+                if not path_obj.exists():
+                    path_obj.mkdir(parents=True, exist_ok=True)
+                
+                # Test write access
+                test_file = path_obj / ".health_check"
+                test_file.write_text("ok")
+                test_file.unlink()
+                
+                storage_details.append(f"{path}: OK")
+            except Exception as e:
+                storage_healthy = False
+                storage_details.append(f"{path}: ERROR - {str(e)}")
+        
+        components["storage"] = {
+            "status": HealthStatus.HEALTHY if storage_healthy else HealthStatus.UNHEALTHY,
+            "details": "; ".join(storage_details)
+        }
+        
+        if not storage_healthy:
+            health_status = HealthStatus.UNHEALTHY
+            
+    except Exception as e:
+        components["storage"] = {
+            "status": HealthStatus.UNHEALTHY,
+            "error": str(e),
+            "details": "Storage check failed"
+        }
+        health_status = HealthStatus.UNHEALTHY
+    
+    return {
+        "status": health_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "1.0.0",
+        "service": "ggnet-backend",
+        "components": components
+    }
+
+
+@router.get("/ready", response_model=Dict[str, Any])
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """Kubernetes readiness probe endpoint"""
+    try:
+        # Check database connectivity
         await db.execute(text("SELECT 1"))
         
-        # Check critical services (could add more checks here)
-        settings = get_settings()
-        if not settings.UPLOAD_DIR.exists():
-            return {"status": "not_ready", "reason": "upload_directory_missing"}
+        # Check Redis connectivity
+        await cache_manager.set("ready_check", "ok", expire=5)
+        result = await cache_manager.get("ready_check")
         
-        return {"status": "ready"}
+        if result != "ok":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service not ready"
+            )
+        
+        return {
+            "status": "ready",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
-        return {"status": "not_ready", "reason": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Service not ready: {str(e)}"
+        )
 
 
-@router.get("/live")
+@router.get("/live", response_model=Dict[str, Any])
 async def liveness_check():
-    """Kubernetes liveness probe"""
-    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+    """Kubernetes liveness probe endpoint"""
+    return {
+        "status": "alive",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
+
+@router.get("/startup", response_model=Dict[str, Any])
+async def startup_check():
+    """Kubernetes startup probe endpoint"""
+    return {
+        "status": "started",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }

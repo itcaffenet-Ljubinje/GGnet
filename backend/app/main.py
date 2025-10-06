@@ -13,10 +13,12 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics
 from app.api import targets, sessions as sessions_api
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
+from app.middleware.metrics import MetricsMiddleware
+from app.core.logging_config import setup_logging
 from app.websocket.manager import WebSocketManager
 
 # Configure structured logging
@@ -46,6 +48,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting GGnet Diskless Server")
     settings = get_settings()
+    
+    # Setup logging
+    setup_logging()
+    logger.info("Logging configured")
     
     # Initialize database
     await init_db()
@@ -94,6 +100,7 @@ def create_app() -> FastAPI:
     
     # Custom middleware
     app.add_middleware(LoggingMiddleware)
+    app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
     
     # Exception handlers
@@ -135,6 +142,7 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(health.router, prefix="/health", tags=["health"])
+    app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
