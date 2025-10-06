@@ -92,7 +92,7 @@ class TestTargetCLIAdapter:
             
             # Mock subprocess that times out
             mock_process = AsyncMock()
-            mock_process.communicate.side_effect = asyncio.TimeoutError()
+            mock_process.communicate.side_effect = TimeoutError()
             mock_subprocess.return_value = mock_process
             
             with pytest.raises(TargetCLIError, match="Command timed out"):
