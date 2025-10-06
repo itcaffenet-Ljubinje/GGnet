@@ -2,7 +2,8 @@ import React from 'react'
 import { clsx } from 'clsx'
 
 interface ProgressBarProps {
-  value: number
+  value?: number
+  progress?: number
   max?: number
   className?: string
   showLabel?: boolean
@@ -13,6 +14,7 @@ interface ProgressBarProps {
 
 export function ProgressBar({
   value,
+  progress,
   max = 100,
   className,
   showLabel = false,
@@ -20,7 +22,8 @@ export function ProgressBar({
   color = 'blue',
   size = 'md'
 }: ProgressBarProps) {
-  const percentage = Math.min((value / max) * 100, 100)
+  const actualValue = progress ?? value ?? 0
+  const percentage = Math.min((actualValue / max) * 100, 100)
 
   const colorClasses = {
     blue: 'bg-blue-600',

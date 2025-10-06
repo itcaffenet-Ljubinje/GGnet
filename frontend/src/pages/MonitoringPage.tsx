@@ -229,7 +229,7 @@ export default function MonitoringPage() {
     retry: 2,
     retryDelay: 500,
     staleTime: 30000, // Consider data fresh for 30 seconds
-    cacheTime: 300000, // Keep in cache for 5 minutes
+    gcTime: 300000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false, // Don't refetch on window focus
   })
   
@@ -240,7 +240,7 @@ export default function MonitoringPage() {
     retry: 2,
     retryDelay: 500,
     staleTime: 30000,
-    cacheTime: 300000,
+    gcTime: 300000,
     refetchOnWindowFocus: false,
   })
 
@@ -252,7 +252,7 @@ export default function MonitoringPage() {
     retry: 2,
     retryDelay: 500,
     staleTime: 30000,
-    cacheTime: 300000,
+    gcTime: 300000,
     refetchOnWindowFocus: false,
   })
 

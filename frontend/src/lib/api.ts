@@ -116,17 +116,18 @@ export const apiHelpers = {
   getImage: (id: number) =>
     api.get(`/images/${id}`).then(response => response.data),
   
-  uploadImage: (formData: FormData, onProgress?: (progress: number) => void) =>
+  uploadImage: (formData: FormData, options?: { onProgress?: (progress: number) => void; signal?: AbortSignal }) =>
     api.post('/images/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      signal: options?.signal,
       onUploadProgress: (progressEvent: any) => {
-        if (onProgress && progressEvent.total) {
+        if (options?.onProgress && progressEvent.total) {
           const progress = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           )
-          onProgress(progress)
+          options.onProgress(progress)
         }
       },
     }).then(response => response.data),

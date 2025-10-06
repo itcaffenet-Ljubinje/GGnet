@@ -82,7 +82,14 @@ export function FileUpload({
         f.id === fileItem.id ? { ...f, status: 'uploading' } : f
       ))
 
-      const response = await apiHelpers.uploadImage(formData, abortControllerRef.current?.signal)
+      const response = await apiHelpers.uploadImage(formData, { 
+        signal: abortControllerRef.current?.signal,
+        onProgress: (progress) => {
+          setFiles(prev => prev.map(f => 
+            f.id === fileItem.id ? { ...f, progress } : f
+          ))
+        }
+      })
       
       // Update file status to completed
       setFiles(prev => prev.map(f => 
