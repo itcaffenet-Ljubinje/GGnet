@@ -15,6 +15,7 @@ import structlog
 
 from app.core.dependencies import get_db, get_current_user, require_operator, log_user_activity
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.config import get_settings
 from app.models.user import User
 from app.models.session import Session, SessionStatus, SessionType
 from app.models.machine import Machine, MachineStatus
@@ -42,16 +43,16 @@ class SessionStartRequest(BaseModel):
 class SessionResponse(BaseModel):
     """Response model for session information"""
     id: int
+    session_id: str
     machine_id: int
     target_id: int
-    image_id: int
     session_type: SessionType
     status: SessionStatus
-    description: Optional[str]
+    user_notes: Optional[str]
     started_at: datetime
     ended_at: Optional[datetime]
-    duration_seconds: Optional[int]
-    created_by: int
+    initiated_by: Optional[str]
+    server_ip: str
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -181,14 +182,14 @@ async def start_session(
         
         # 9. Create session record
         session = Session(
+            session_id=f"session-{machine.id}-{int(datetime.utcnow().timestamp())}",
             machine_id=machine.id,
             target_id=target.id,
-            image_id=image.id,
             session_type=session_data.session_type,
             status=SessionStatus.ACTIVE,
-            description=session_data.description,
-            started_at=datetime.utcnow(),
-            created_by=current_user.id
+            server_ip=get_settings().ISCSI_PORTAL_IP,
+            user_notes=session_data.description,
+            initiated_by=current_user.username
         )
         
         db.add(session)
@@ -196,7 +197,6 @@ async def start_session(
         await db.refresh(session)
         
         # 10. Prepare response
-        from app.core.config import get_settings
         settings = get_settings()
         
         ipxe_script_url = f"http://{settings.ISCSI_PORTAL_IP}/tftp/{script_filename}"

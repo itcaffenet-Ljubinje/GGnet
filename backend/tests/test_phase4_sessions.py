@@ -128,8 +128,9 @@ class TestSessionOrchestration:
                         
                         # Verify session was created
                         assert data["session"]["machine_id"] == test_machine.id
-                        assert data["session"]["image_id"] == test_image.id
-                        assert data["session"]["status"] == "ACTIVE"
+                        assert data["session"]["target_id"] == 1
+                        assert data["session"]["status"] == "active"
+                        assert data["session"]["session_type"] == "diskless_boot"
                         
                         # Verify target info
                         assert data["target_info"]["iqn"] == "iqn.2025.ggnet:target-001"
@@ -347,11 +348,39 @@ class TestSessionOrchestration:
     async def test_get_session_stats(self, client: AsyncClient, admin_user, admin_token, db_session):
         """Test getting session statistics"""
         
+        # Create test image first
+        image = Image(
+            id=1,
+            name="test-image",
+            filename="test.vhdx",
+            file_path="/storage/images/test.vhdx",
+            format=ImageFormat.VHDX,
+            status=ImageStatus.READY,
+            size_bytes=1024*1024*1024,
+            created_by=1
+        )
+        db_session.add(image)
+        
+        # Create test machines and targets first
+        machines = [
+            Machine(id=1, name="machine-1", mac_address="00:11:22:33:44:55", ip_address="192.168.1.101", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+            Machine(id=2, name="machine-2", mac_address="00:11:22:33:44:56", ip_address="192.168.1.102", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+            Machine(id=3, name="machine-3", mac_address="00:11:22:33:44:57", ip_address="192.168.1.103", status=MachineStatus.ACTIVE, boot_mode="LEGACY", created_by=1),
+        ]
+        db_session.add_all(machines)
+        
+        targets = [
+            Target(id=1, target_id="target-1", iqn="iqn.2025.ggnet:target-1", machine_id=1, image_id=1, image_path="/storage/images/test1.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-1", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+            Target(id=2, target_id="target-2", iqn="iqn.2025.ggnet:target-2", machine_id=2, image_id=1, image_path="/storage/images/test2.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-2", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+            Target(id=3, target_id="target-3", iqn="iqn.2025.ggnet:target-3", machine_id=3, image_id=1, image_path="/storage/images/test3.vhdx", initiator_iqn="iqn.2025.ggnet:initiator-3", lun_id=0, status=TargetStatus.ACTIVE, created_by=1),
+        ]
+        db_session.add_all(targets)
+        
         # Create test sessions with different statuses
         sessions = [
-            Session(id=1, session_id="session-1", machine_id=1, target_id=1, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
-            Session(id=2, session_id="session-2", machine_id=2, target_id=2, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), server_ip="192.168.1.10"),
-            Session(id=3, session_id="session-3", machine_id=3, target_id=3, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(id=1, session_id="session-1", machine_id=1, target_id=1, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(id=2, session_id="session-2", machine_id=2, target_id=2, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(id=3, session_id="session-3", machine_id=3, target_id=3, session_type=SessionType.DISKLESS_BOOT, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
         ]
         db_session.add_all(sessions)
         await db_session.commit()
