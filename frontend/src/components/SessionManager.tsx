@@ -22,7 +22,7 @@ import { toast } from 'react-hot-toast';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
-import { ProgressBar } from './ui/ProgressBar';
+// import { ProgressBar } from './ui/ProgressBar'; // Unused for now
 import { useAuthStore } from '../stores/authStore';
 import { api } from '../lib/api';
 

@@ -24,7 +24,7 @@ import { toast } from 'react-hot-toast';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
-import { ProgressBar } from './ui/ProgressBar';
+// import { ProgressBar } from './ui/ProgressBar'; // Unused for now
 import { api } from '../lib/api';
 
 interface BootEvent {
@@ -46,15 +46,15 @@ interface NetworkService {
   uptime?: string;
 }
 
-interface BootStatistics {
-  total_boots: number;
-  successful_boots: number;
-  failed_boots: number;
-  success_rate: number;
-  average_boot_time: number;
-  last_24h_boots: number;
-  active_sessions: number;
-}
+// interface BootStatistics { // Unused for now
+//   total_boots: number;
+//   successful_boots: number;
+//   failed_boots: number;
+//   success_rate: number;
+//   average_boot_time: number;
+//   last_24h_boots: number;
+//   active_sessions: number;
+// }
 
 interface MachineBootStatus {
   machine_id: number;

@@ -12,17 +12,14 @@ import {
   Cpu, 
   MemoryStick, 
   Wifi, 
-  Database,
   AlertCircle,
   CheckCircle,
   Clock,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
   Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -30,17 +27,17 @@ import { StatusBadge } from './ui/StatusBadge';
 import { ProgressBar } from './ui/ProgressBar';
 import { api } from '../lib/api';
 
-interface SystemMetrics {
-  timestamp: string;
-  cpu_usage: number;
-  memory_usage: number;
-  disk_usage: number;
-  network_in: number;
-  network_out: number;
-  active_sessions: number;
-  total_requests: number;
-  error_rate: number;
-}
+// interface SystemMetrics { // Unused for now
+//   timestamp: string;
+//   cpu_usage: number;
+//   memory_usage: number;
+//   disk_usage: number;
+//   network_in: number;
+//   network_out: number;
+//   active_sessions: number;
+//   total_requests: number;
+//   error_rate: number;
+// }
 
 interface ServiceStatus {
   name: string;
@@ -71,17 +68,17 @@ interface NetworkInterface {
   packets_received: number;
 }
 
-interface SystemHealth {
-  overall_status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
-  health_score: number;
-  issues: Array<{
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    component: string;
-    message: string;
-    timestamp: string;
-  }>;
-  recommendations: string[];
-}
+// interface SystemHealth { // Unused for now
+//   overall_status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+//   health_score: number;
+//   issues: Array<{
+//     severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+//     component: string;
+//     message: string;
+//     timestamp: string;
+//   }>;
+//   recommendations: string[];
+// }
 
 const SystemMonitor: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -186,14 +183,14 @@ const SystemMonitor: React.FC = () => {
     return latest[selectedMetric] || 0;
   };
 
-  const getMetricTrend = () => {
-    if (metrics.length < 2) return 'stable';
-    const latest = metrics[metrics.length - 1][selectedMetric];
-    const previous = metrics[metrics.length - 2][selectedMetric];
-    if (latest > previous) return 'up';
-    if (latest < previous) return 'down';
-    return 'stable';
-  };
+  // const getMetricTrend = () => { // Unused for now
+  //   if (metrics.length < 2) return 'stable';
+  //   const latest = metrics[metrics.length - 1][selectedMetric];
+  //   const previous = metrics[metrics.length - 2][selectedMetric];
+  //   if (latest > previous) return 'up';
+  //   if (latest < previous) return 'down';
+  //   return 'stable';
+  // };
 
   const getMetricIcon = (metric: string) => {
     switch (metric) {
