@@ -135,6 +135,7 @@ class Settings(BaseSettings):
     def database_url_sync(self) -> str:
         """Get synchronous database URL"""
         if self.DATABASE_URL.startswith("postgresql://"):
+            # Use psycopg2-binary for better compatibility
             return self.DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
         return self.DATABASE_URL
     

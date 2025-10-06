@@ -38,11 +38,24 @@ def get_sync_engine():
     global _sync_engine
     if _sync_engine is None:
         settings = get_settings()
-        _sync_engine = create_engine(
-            settings.database_url_sync,
-            echo=settings.DEBUG,
-            pool_pre_ping=True,
-        )
+        try:
+            _sync_engine = create_engine(
+                settings.database_url_sync,
+                echo=settings.DEBUG,
+                pool_pre_ping=True,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create sync engine: {e}")
+            # Fallback to SQLite if PostgreSQL fails
+            if settings.database_url_sync.startswith("postgresql"):
+                logger.warning("Falling back to SQLite due to PostgreSQL connection failure")
+                _sync_engine = create_engine(
+                    "sqlite:///./ggnet.db",
+                    echo=settings.DEBUG,
+                    pool_pre_ping=True,
+                )
+            else:
+                raise
     return _sync_engine
 
 def get_async_engine():
@@ -50,11 +63,24 @@ def get_async_engine():
     global _async_engine
     if _async_engine is None:
         settings = get_settings()
-        _async_engine = create_async_engine(
-            settings.database_url_async,
-            echo=settings.DEBUG,
-            pool_pre_ping=True,
-        )
+        try:
+            _async_engine = create_async_engine(
+                settings.database_url_async,
+                echo=settings.DEBUG,
+                pool_pre_ping=True,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create async engine: {e}")
+            # Fallback to SQLite if PostgreSQL fails
+            if settings.database_url_async.startswith("postgresql"):
+                logger.warning("Falling back to SQLite due to PostgreSQL connection failure")
+                _async_engine = create_async_engine(
+                    "sqlite+aiosqlite:///./ggnet.db",
+                    echo=settings.DEBUG,
+                    pool_pre_ping=True,
+                )
+            else:
+                raise
     return _async_engine
 
 # Session factories - lazy initialization

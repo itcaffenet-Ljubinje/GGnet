@@ -43,12 +43,11 @@ class CacheManager:
             try:
                 self.redis_client = redis.from_url(
                     settings.REDIS_URL,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True,
-                    health_check_interval=30
+                    socket_connect_timeout=2,  # Shorter timeout
+                    socket_timeout=2,          # Shorter timeout
+                    retry_on_timeout=False,    # Disable retry to fail fast
+                    health_check_interval=0    # Disable health check
                 )
-                # Test connection (will be tested on first use)
                 logger.info("Redis cache initialized")
             except Exception as e:
                 logger.warning(f"Failed to initialize Redis cache: {e}")
@@ -60,12 +59,9 @@ class CacheManager:
         # Try Redis first
         if self.redis_client:
             try:
-                # Test connection on first use
-                await self._test_redis_connection()
-                if self.redis_client:
-                    value = await self.redis_client.get(key)
-                    if value:
-                        return pickle.loads(value)
+                value = await self.redis_client.get(key)
+                if value:
+                    return pickle.loads(value)
             except Exception as e:
                 logger.warning(f"Redis get failed for key {key}: {e}")
                 self.redis_client = None
@@ -106,10 +102,7 @@ class CacheManager:
         # Set in Redis
         if self.redis_client:
             try:
-                # Test connection on first use
-                await self._test_redis_connection()
-                if self.redis_client:
-                    await self.redis_client.setex(key, ttl, pickle.dumps(value))
+                await self.redis_client.setex(key, ttl, pickle.dumps(value))
             except Exception as e:
                 logger.warning(f"Redis set failed for key {key}: {e}")
                 self.redis_client = None
@@ -280,15 +273,6 @@ class CacheManager:
         
         return stats
     
-    async def _test_redis_connection(self):
-        """Test Redis connection and disable if failed"""
-        try:
-            if self.redis_client:
-                await self.redis_client.ping()
-                logger.info("Redis connection test successful")
-        except Exception as e:
-            logger.warning(f"Redis connection test failed: {e}")
-            self.redis_client = None
 
 
 # Global cache manager instance
