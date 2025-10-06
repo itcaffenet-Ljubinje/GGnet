@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import { CheckCircle, AlertCircle, XCircle, Info } from 'lucide-react'
 
 interface StatusBadgeProps {
-  status: 'success' | 'warning' | 'error' | 'info' | 'active' | 'inactive'
+  status: 'success' | 'warning' | 'error' | 'info' | 'active' | 'inactive' | string
   text: string
   className?: string
   showIcon?: boolean

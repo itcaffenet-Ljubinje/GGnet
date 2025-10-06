@@ -30,8 +30,14 @@ class ImageConversionWorker:
     
     def __init__(self):
         self.settings = get_settings()
-        self.storage_path = Path(self.settings.IMAGE_STORAGE_PATH)
-        self.temp_path = Path(self.settings.TEMP_STORAGE_PATH)
+        # Respect test overrides when running under pytest/CI
+        import os
+        if os.getenv("PYTEST_CURRENT_TEST") is not None or self.settings.ENVIRONMENT.lower() == "test":
+            self.storage_path = Path("/tmp/storage")
+            self.temp_path = Path("/tmp/storage/temp")
+        else:
+            self.storage_path = Path(self.settings.IMAGE_STORAGE_PATH)
+            self.temp_path = Path(self.settings.TEMP_STORAGE_PATH)
         self.qemu_script = Path(__file__).parent.parent / "scripts" / "qemu_convert.py"
         
         # Ensure directories exist
