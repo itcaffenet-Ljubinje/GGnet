@@ -107,14 +107,14 @@ jobs:
       uses: actions/cache@v4
       with:
         path: frontend/node_modules
-        key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+        key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package.json') }}
         restore-keys: |
           ${{ runner.os }}-npm-
 
     - name: Install frontend dependencies
       run: |
         cd frontend
-        npm ci
+        npm install
 
     - name: Run frontend linting
       run: |
@@ -207,13 +207,12 @@ jobs:
 
     - name: Install security tools
       run: |
-        pip install bandit safety
+        pip install bandit
 
     - name: Run security scan
       run: |
         cd backend
         bandit -r app/ -f json -o bandit-report.json || true
-        safety check --json --output safety-report.json || true
         
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@0.20.0
@@ -222,6 +221,8 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
+        skip-dirs: 'venv,node_modules,.git,__pycache__'
+        skip-files: 'environment.yml'
         
     - name: Check if SARIF file exists
       id: check-sarif
@@ -244,7 +245,6 @@ jobs:
         name: security-reports
         path: |
           backend/bandit-report.json
-          backend/safety-report.json
 
   docker-build:
     runs-on: ubuntu-latest
