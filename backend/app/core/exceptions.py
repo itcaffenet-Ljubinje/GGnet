@@ -164,3 +164,27 @@ class TargetCLIError(GGnetException):
             error_code="targetcli_error",
             **kwargs
         )
+
+
+class DHCPError(GGnetException):
+    """DHCP related errors"""
+
+    def __init__(self, detail: str = "DHCP operation failed", **kwargs):
+        super().__init__(
+            detail=detail,
+            status_code=500,
+            error_code="dhcp_error",
+            **kwargs
+        )
+
+
+class TFTPError(GGnetException):
+    """TFTP related errors"""
+
+    def __init__(self, detail: str = "TFTP operation failed", **kwargs):
+        super().__init__(
+            detail=detail,
+            status_code=500,
+            error_code="tftp_error",
+            **kwargs
+        )
