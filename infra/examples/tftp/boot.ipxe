@@ -1,4 +1,17 @@
 #!ipxe
+dhcp
+set base-url http://192.168.1.10/boot
+
+echo GGnet iPXE boot starting...
+
+# Example: chain to backend-generated script
+chain http://192.168.1.10/api/v1/ipxe/script?mac=${net0/mac}
+
+# Fallback example to iSCSI
+isset ${iscsi-target} || set iscsi-target 192.168.1.10:::1:iqn.2025.ggnet:target-1
+sanboot iscsi:${iscsi-target}
+
+#!ipxe
 # Generic GGnet diskless boot script
 # This script is used as a fallback for unknown machines
 

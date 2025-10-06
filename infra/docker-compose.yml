@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ggnet
+      POSTGRES_PASSWORD: ggnet
+      POSTGRES_DB: ggnet
+    volumes:
+      - ggnet-db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ../backend
+    environment:
+      DATABASE_URL: postgresql://ggnet:ggnet@db:5432/ggnet
+      REDIS_URL: redis://redis:6379/0
+      IMAGE_STORAGE_PATH: /data/images
+      TEMP_STORAGE_PATH: /data/temp
+    volumes:
+      - backend-data:/app
+      - images:/data/images
+      - temp:/data/temp
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  ggnet-db:
+  backend-data:
+  images:
+  temp:
+
+

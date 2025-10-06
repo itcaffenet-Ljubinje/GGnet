@@ -1,0 +1,19 @@
+[Unit]
+Description=GGnet Backend API
+After=network.target redis-server.service
+
+[Service]
+User=ggnet
+Group=ggnet
+WorkingDirectory=/opt/ggnet/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ggnet/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
+

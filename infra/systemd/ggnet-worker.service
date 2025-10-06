@@ -1,0 +1,18 @@
+[Unit]
+Description=GGnet Image Conversion Worker
+After=network.target redis-server.service ggnet-backend.service
+
+[Service]
+User=ggnet
+Group=ggnet
+WorkingDirectory=/opt/ggnet/backend
+ExecStart=/opt/ggnet/venv/bin/python -m worker.convert
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
+
