@@ -113,7 +113,7 @@ const ImageManager: React.FC = () => {
       toast.success(`Image "${data.name}" uploaded successfully`);
       queryClient.invalidateQueries({ queryKey: ['images'] });
     },
-    onError: (error: any, variables) => {
+    onError: (error: Error, variables) => {
       const file = variables.get('file') as File;
       setUploadProgress(prev => prev.map(item => 
         item.file === file ? { 
@@ -133,8 +133,8 @@ const ImageManager: React.FC = () => {
       toast.success(`Image ${id} deleted successfully`);
       queryClient.invalidateQueries({ queryKey: ['images'] });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to delete image: ${error.response?.data?.detail || error.message}`);
+    onError: (error: Error) => {
+      toast.error(`Failed to delete image: ${(error as { response?: { data?: { detail?: string } } }).response?.data?.detail || error.message}`);
     },
   });
 
@@ -146,8 +146,8 @@ const ImageManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['images'] });
       queryClient.invalidateQueries({ queryKey: ['conversion-jobs'] });
     },
-    onError: (error: any) => {
-      toast.error(`Failed to trigger conversion: ${error.response?.data?.detail || error.message}`);
+    onError: (error: Error) => {
+      toast.error(`Failed to trigger conversion: ${(error as { response?: { data?: { detail?: string } } }).response?.data?.detail || error.message}`);
     },
   });
 
@@ -370,7 +370,7 @@ const ImageManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {images.map((image: any) => (
+            {images.map((image: { id: number; name: string; size: number; status: string; created_at: string; format: string }) => (
               <div key={image.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

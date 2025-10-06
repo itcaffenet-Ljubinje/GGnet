@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import App from './App'
 
 // Mock the auth store
@@ -53,12 +53,12 @@ vi.mock('./pages/LoginPage', () => ({
 
 describe('App', () => {
   it('renders without crashing', () => {
-    render(<App />)
-    expect(screen.getByTestId('error-boundary')).toBeInTheDocument()
+    const { container } = render(<App />)
+    expect(container.querySelector('[data-testid="error-boundary"]')).toBeInTheDocument()
   })
 
   it('shows login page when not authenticated', () => {
-    render(<App />)
-    expect(screen.getByTestId('login-page')).toBeInTheDocument()
+    const { container } = render(<App />)
+    expect(container.querySelector('[data-testid="login-page"]')).toBeInTheDocument()
   })
 })

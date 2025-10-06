@@ -38,7 +38,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         removeNotification(id)
       }, newNotification.duration)
     }
-  }, [])
+  }, [removeNotification])
 
   const removeNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(notification => notification.id !== id))

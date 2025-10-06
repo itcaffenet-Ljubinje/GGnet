@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 
 interface RealTimeUpdate {
   type: 'image_uploaded' | 'image_processed' | 'session_started' | 'session_ended' | 'machine_connected' | 'machine_disconnected'
-  data: any
+  data: Record<string, unknown>
   timestamp: string
 }
 
@@ -54,7 +54,7 @@ export const useRealTimeUpdates = () => {
         const token = parsed.state?.accessToken
         if (token) {
           // Use proxy in development, direct connection in production
-          const baseUrl = (import.meta as any).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
+          const baseUrl = (import.meta as { env?: { DEV?: boolean } }).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
           return `${baseUrl}?token=${encodeURIComponent(token)}`
         }
       }
@@ -62,7 +62,7 @@ export const useRealTimeUpdates = () => {
       // Ignore parsing errors
     }
     // Use proxy in development, direct connection in production
-    const baseUrl = (import.meta as any).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
+    const baseUrl = (import.meta as { env?: { DEV?: boolean } }).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
     return baseUrl
   }, [])
 
@@ -83,7 +83,7 @@ export const useRealTimeUpdates = () => {
     }
   })
 
-  const sendUpdate = useCallback((type: string, data: any) => {
+  const sendUpdate = useCallback((type: string, data: Record<string, unknown>) => {
     const message = {
       type,
       data,

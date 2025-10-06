@@ -11,11 +11,11 @@ interface UploadFile {
   progress: number
   status: 'uploading' | 'completed' | 'error' | 'converting'
   error?: string
-  response?: any
+  response?: { id: number; name: string; size: number; status: string }
 }
 
 interface FileUploadProps {
-  onUploadComplete?: (files: any[]) => void
+  onUploadComplete?: (files: UploadFile[]) => void
   maxFiles?: number
   acceptedTypes?: string[]
   maxSize?: number
@@ -42,7 +42,7 @@ export function FileUpload({
 
     setFiles(prev => [...prev, ...newFiles])
     uploadFiles(newFiles)
-  }, [])
+  }, [uploadFiles])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -54,7 +54,7 @@ export function FileUpload({
     maxSize
   })
 
-  const uploadFiles = async (filesToUpload: UploadFile[]) => {
+  const uploadFiles = useCallback(async (filesToUpload: UploadFile[]) => {
     setIsUploading(true)
     abortControllerRef.current = new AbortController()
 
@@ -67,9 +67,9 @@ export function FileUpload({
     } finally {
       setIsUploading(false)
     }
-  }
+  }, [uploadSingleFile, addNotification, onUploadComplete])
 
-  const uploadSingleFile = async (fileItem: UploadFile) => {
+  const uploadSingleFile = useCallback(async (fileItem: UploadFile) => {
     const formData = new FormData()
     formData.append('file', fileItem.file)
     formData.append('name', fileItem.file.name.replace(/\.[^/.]+$/, ''))
@@ -107,11 +107,11 @@ export function FileUpload({
         onUploadComplete([response])
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Update file status to error
       setFiles(prev => prev.map(f => 
         f.id === fileItem.id 
-          ? { ...f, status: 'error', error: error.message } 
+          ? { ...f, status: 'error', error: error instanceof Error ? error.message : 'Unknown error' } 
           : f
       ))
 
@@ -120,7 +120,7 @@ export function FileUpload({
         message: `Failed to upload ${fileItem.file.name}: ${error.message}`
       })
     }
-  }
+  }, [])
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId))

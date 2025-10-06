@@ -8,7 +8,15 @@ import { useNotifications } from './notifications'
 interface MachineModalProps {
   isOpen: boolean
   onClose: () => void
-  machine?: any
+  machine?: {
+    id?: number
+    name: string
+    hostname: string
+    ip_address: string
+    mac_address: string
+    asset_tag?: string
+    description?: string
+  }
   mode: 'create' | 'edit'
 }
 
@@ -34,7 +42,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
   const queryClient = useQueryClient()
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiHelpers.createMachine(data),
+    mutationFn: (data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string }) => apiHelpers.createMachine(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] })
       addNotification({
@@ -43,7 +51,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
       })
       onClose()
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       addNotification({
         type: 'error',
         message: `Failed to create machine: ${error.message}`
@@ -52,7 +60,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => apiHelpers.updateMachine(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string } }) => apiHelpers.updateMachine(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] })
       addNotification({
@@ -61,7 +69,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
       })
       onClose()
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       addNotification({
         type: 'error',
         message: `Failed to update machine: ${error.message}`
@@ -86,7 +94,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    setFormData((prev: any) => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))

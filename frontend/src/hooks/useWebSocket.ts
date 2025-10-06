@@ -7,7 +7,7 @@ interface WebSocketOptions {
   onOpen?: () => void
   onClose?: () => void
   onError?: (error: Event) => void
-  onMessage?: (data: any) => void
+  onMessage?: (data: Record<string, unknown>) => void
 }
 
 interface WebSocketState {
@@ -125,7 +125,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     reconnectAttemptsRef.current = 0
   }, [])
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message))
       return true
@@ -139,7 +139,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     return () => {
       disconnect()
     }
-  }, []) // Empty dependency array - only run once on mount
+  }, [connect, disconnect]) // Include connect and disconnect dependencies
 
   return {
     ...state,
