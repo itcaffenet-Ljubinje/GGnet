@@ -368,9 +368,13 @@ class TestImageUploadWithConversion:
             mock_open.return_value.__aenter__.return_value = mock_file
             
             # Mock database operations
-            with patch('app.routes.images.get_db') as mock_get_db:
+            with patch('app.routes.images.get_db') as mock_get_db, \
+                 patch('app.routes.images.log_user_activity') as mock_log, \
+                 patch('app.routes.images.process_image_background') as mock_process:
                 mock_db = AsyncMock()
                 mock_get_db.return_value.__aenter__.return_value = mock_db
+                mock_log.return_value = None
+                mock_process.return_value = None
                 
                 # Mock image creation
                 mock_image = Image(

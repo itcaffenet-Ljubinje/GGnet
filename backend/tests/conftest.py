@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker  # pyright: ignore[reportMissingImports]
 from unittest.mock import AsyncMock, patch
 from app.main import app
 from app.core.database import Base, get_db
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash, create_access_token
 
 # Import all models to ensure they are registered
@@ -102,8 +102,11 @@ async def admin_user(db_session):
     """Create an admin user."""
     user = User(
         username="admin",
+        email="admin@ggnet.local",
         hashed_password=get_password_hash("admin123"),
-        role=UserRole.ADMIN
+        role=UserRole.ADMIN,
+        is_active=True,
+        status=UserStatus.ACTIVE
     )
     db_session.add(user)
     await db_session.commit()
@@ -115,8 +118,11 @@ async def viewer_user(db_session):
     """Create a viewer user."""
     user = User(
         username="viewer",
+        email="viewer@ggnet.local",
         hashed_password=get_password_hash("viewer123"),
-        role=UserRole.VIEWER
+        role=UserRole.VIEWER,
+        is_active=True,
+        status=UserStatus.ACTIVE
     )
     db_session.add(user)
     await db_session.commit()

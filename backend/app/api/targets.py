@@ -13,7 +13,7 @@ from sqlalchemy import select, func
 
 import structlog
 
-from app.core.dependencies import get_db, get_current_user, require_operator, log_user_activity
+from app.core.dependencies import get_db, get_current_user, require_admin, log_user_activity
 from app.core.exceptions import NotFoundError, ValidationError, TargetCLIError
 from app.models.user import User
 from app.models.target import Target, TargetStatus
@@ -75,7 +75,7 @@ class TargetListResponse(BaseModel):
 async def create_target(
     request: Request,
     target_data: TargetCreateRequest,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -294,7 +294,7 @@ async def get_target_status(
 async def delete_target(
     target_id: int,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -378,7 +378,7 @@ async def get_target_by_machine(
 async def restart_target(
     target_id: int,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """

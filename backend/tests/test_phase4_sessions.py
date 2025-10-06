@@ -45,7 +45,7 @@ class TestSessionOrchestration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(machine)
         db_session.commit()
@@ -61,7 +61,7 @@ class TestSessionOrchestration:
             format=ImageFormat.VHDX,
             status=ImageStatus.READY,
             size_bytes=1024*1024*1024,  # 1GB
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(image)
         db_session.commit()
@@ -166,7 +166,7 @@ class TestSessionOrchestration:
             format=ImageFormat.VHDX,
             status=ImageStatus.PROCESSING,  # Not ready
             size_bytes=1024*1024*1024,
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(image)
         db_session.commit()
@@ -195,11 +195,11 @@ class TestSessionOrchestration:
             id=1,
             machine_id=1,
             target_id=1,
-            image_id=1,
+            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(session)
         
@@ -209,12 +209,12 @@ class TestSessionOrchestration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            image_id=1,
+            session_id="test-session-1",
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(target)
         db_session.commit()
@@ -250,22 +250,22 @@ class TestSessionOrchestration:
             id=1,
             machine_id=1,
             target_id=1,
-            image_id=1,
+            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
-            created_by=1
+            server_ip="192.168.1.10"
         )
         session2 = Session(
             id=2,
             machine_id=2,
             target_id=2,
-            image_id=1,
+            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.STOPPED,
             started_at=datetime.utcnow(),
             ended_at=datetime.utcnow(),
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add_all([session1, session2])
         db_session.commit()
@@ -294,11 +294,11 @@ class TestSessionOrchestration:
             id=1,
             machine_id=1,
             target_id=1,
-            image_id=1,
+            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(session)
         
@@ -308,12 +308,12 @@ class TestSessionOrchestration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            image_id=1,
+            session_id="test-session-1",
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            created_by=1
+            server_ip="192.168.1.10"
         )
         db_session.add(target)
         db_session.commit()
@@ -389,7 +389,7 @@ class TestiPXEScriptGeneration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            created_by=1
+            server_ip="192.168.1.10"
         )
         
         target = Target(
@@ -397,12 +397,12 @@ class TestiPXEScriptGeneration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            image_id=1,
+            session_id="test-session-1",
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            created_by=1
+            server_ip="192.168.1.10"
         )
         
         image = Image(
@@ -413,7 +413,7 @@ class TestiPXEScriptGeneration:
             format=ImageFormat.VHDX,
             status=ImageStatus.READY,
             size_bytes=1024*1024*1024,
-            created_by=1
+            server_ip="192.168.1.10"
         )
         
         # Generate script
@@ -452,7 +452,7 @@ class TestiPXEScriptGeneration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            created_by=1
+            server_ip="192.168.1.10"
         )
         
         generator = iPXEScriptGenerator()
@@ -502,7 +502,7 @@ class TestDHCPConfiguration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            created_by=1
+            server_ip="192.168.1.10"
         )
         
         config_entry = generate_dhcp_config_entry(machine)

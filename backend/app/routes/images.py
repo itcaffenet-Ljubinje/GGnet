@@ -21,7 +21,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.config import get_settings
-from app.core.dependencies import get_current_user, require_operator, log_user_activity
+from app.core.dependencies import get_current_user, require_admin, log_user_activity
 from app.core.cache import cached, invalidate_cache, CacheStrategy
 from app.models.user import User
 from app.models.image import Image, ImageFormat, ImageStatus, ImageType
@@ -171,7 +171,7 @@ async def upload_image(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     image_type: ImageType = Form(ImageType.SYSTEM),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Upload a new disk image"""
@@ -337,7 +337,7 @@ async def update_image(
     image_id: int,
     image_update: ImageUpdate,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Update image metadata"""
@@ -409,7 +409,7 @@ async def update_image(
 async def delete_image(
     image_id: int,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete an image"""
@@ -470,7 +470,7 @@ async def delete_image(
 async def trigger_conversion(
     image_id: int,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Manually trigger image conversion"""
