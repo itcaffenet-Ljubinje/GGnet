@@ -1,0 +1,50 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 5%
+    patch:
+      default:
+        target: 60%
+        threshold: 5%
+
+comment:
+  layout: "header,diff,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+
+github_checks:
+  annotations: true
+
+ignore:
+  - "backend/venv/"
+  - "frontend/node_modules/"
+  - "backend/tests/"
+  - "frontend/src/test/"
+  - "*.pyc"
+  - "*.pyo"
+  - "*.pyd"
+  - "__pycache__"
+  - ".git"
+  - ".coverage"
+  - "coverage.xml"
+  - "htmlcov/"
+  - ".pytest_cache/"
+  - ".mypy_cache/"
+  - ".tox/"
+  - "dist/"
+  - "build/"
+  - "*.egg-info/"
+
+flags:
+  backend:
+    paths:
+      - backend/app/
+    carryforward: true
+  frontend:
+    paths:
+      - frontend/src/
+    carryforward: true
