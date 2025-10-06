@@ -9,6 +9,8 @@ import ImagesPage from './pages/ImagesPage'
 import MachinesPage from './pages/MachinesPage'
 import TargetsPage from './pages/TargetsPage'
 import SessionsPage from './pages/SessionsPage'
+import NetworkBootPage from './pages/NetworkBootPage'
+import SystemMonitorPage from './pages/SystemMonitorPage'
 import ArrayConfigurationPage from './pages/ArrayConfigurationPage'
 import MonitoringPage from './pages/MonitoringPage'
 import SettingsPage from './pages/SettingsPage'
@@ -33,6 +35,8 @@ function App() {
               <Route path="/machines" element={<MachinesPage />} />
               <Route path="/targets" element={<TargetsPage />} />
               <Route path="/sessions" element={<SessionsPage />} />
+              <Route path="/network-boot" element={<NetworkBootPage />} />
+              <Route path="/system-monitor" element={<SystemMonitorPage />} />
               <Route path="/storage" element={<ArrayConfigurationPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/settings" element={<SettingsPage />} />

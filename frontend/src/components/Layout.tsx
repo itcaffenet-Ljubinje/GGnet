@@ -30,8 +30,10 @@ const navigation = [
   { name: 'Machines', href: '/machines', icon: Monitor },
   { name: 'Images', href: '/images', icon: HardDrive },
   { name: 'Sessions', href: '/sessions', icon: Activity },
+  { name: 'Targets', href: '/targets', icon: Target },
+  { name: 'Network Boot', href: '/network-boot', icon: Activity },
+  { name: 'System Monitor', href: '/system-monitor', icon: BarChart3 },
   { name: 'Storage', href: '/storage', icon: Database },
-  { name: 'Monitoring', href: '/monitoring', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
