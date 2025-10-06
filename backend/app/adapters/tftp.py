@@ -328,3 +328,39 @@ async def remove_boot_script_from_tftp(filename: str) -> bool:
     """
     adapter = TFTPAdapter()
     return await adapter.remove_boot_script(filename)
+
+
+# Convenience functions for external imports
+async def get_tftp_status() -> Dict:
+    """
+    Get TFTP server status and configuration info
+    """
+    adapter = TFTPAdapter()
+    return await adapter.get_tftp_status()
+
+
+async def initialize_tftp_server() -> bool:
+    """
+    Initialize TFTP server directories and configuration
+    """
+    logger.info("Initializing TFTP server")
+    
+    try:
+        adapter = TFTPAdapter()
+        
+        # Create directories
+        adapter.tftp_root.mkdir(parents=True, exist_ok=True)
+        adapter.machines_dir.mkdir(parents=True, exist_ok=True)
+        adapter.boot_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set permissions
+        os.chmod(adapter.tftp_root, 0o755)
+        os.chmod(adapter.machines_dir, 0o755)
+        os.chmod(adapter.boot_dir, 0o755)
+        
+        logger.info("TFTP server initialized successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize TFTP server: {e}")
+        return False
