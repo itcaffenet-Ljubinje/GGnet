@@ -13,7 +13,8 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, targets, storage, health, monitoring, file_upload, iscsi
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi
+from app.api import targets
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
 from app.websocket.manager import WebSocketManager
@@ -137,7 +138,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/targets", tags=["targets"])
+    app.include_router(targets.router, prefix="/api/v1", tags=["targets"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
     app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])

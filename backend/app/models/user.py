@@ -76,6 +76,7 @@ class User(Base):
     # Relationships
     created_images = relationship("Image", back_populates="created_by_user", foreign_keys="Image.created_by")
     created_machines = relationship("Machine", back_populates="created_by_user", foreign_keys="Machine.created_by")
+    created_targets = relationship("Target", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="user")
     
     def __repr__(self) -> str:

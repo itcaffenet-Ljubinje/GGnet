@@ -153,3 +153,14 @@ class ConfigurationError(GGnetException):
             **kwargs
         )
 
+
+class TargetCLIError(GGnetException):
+    """targetcli related errors"""
+    
+    def __init__(self, detail: str = "targetcli operation failed", **kwargs):
+        super().__init__(
+            detail=detail,
+            status_code=500,
+            error_code="targetcli_error",
+            **kwargs
+        )

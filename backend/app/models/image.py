@@ -113,8 +113,7 @@ class Image(Base):
     converted_from = relationship("Image", remote_side=[id], backref="conversions")
     
     # Targets using this image
-    targets = relationship("Target", back_populates="system_image", foreign_keys="Target.system_image_id")
-    extra_disk_targets = relationship("Target", back_populates="extra_disk_image", foreign_keys="Target.extra_disk_image_id")
+    targets = relationship("Target", back_populates="image")
     
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, name='{self.name}', format='{self.format}', status='{self.status}')>"
