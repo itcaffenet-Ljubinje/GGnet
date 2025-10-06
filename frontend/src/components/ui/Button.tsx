@@ -1,4 +1,4 @@
-// React is available globally
+import React from 'react'
 import { clsx } from 'clsx'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

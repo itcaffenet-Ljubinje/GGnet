@@ -3,6 +3,7 @@ Tests for Phase 4: Session Orchestration and PXE/iPXE
 """
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
@@ -22,8 +23,8 @@ class TestSessionOrchestration:
     def client(self):
         return TestClient(app)
     
-    @pytest.fixture
-    def admin_user(self, db_session):
+    @pytest_asyncio.fixture
+    async def admin_user(self, db_session):
         user = User(
             id=1,
             username="admin",
@@ -33,11 +34,11 @@ class TestSessionOrchestration:
             role=UserRole.ADMIN
         )
         db_session.add(user)
-        db_session.commit()
+        await db_session.commit()
         return user
     
-    @pytest.fixture
-    def test_machine(self, db_session):
+    @pytest_asyncio.fixture
+    async def test_machine(self, db_session):
         machine = Machine(
             id=1,
             name="test-workstation",
@@ -45,14 +46,14 @@ class TestSessionOrchestration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            server_ip="192.168.1.10"
+            created_by=1
         )
         db_session.add(machine)
-        db_session.commit()
+        await db_session.commit()
         return machine
     
-    @pytest.fixture
-    def test_image(self, db_session):
+    @pytest_asyncio.fixture
+    async def test_image(self, db_session):
         image = Image(
             id=1,
             name="test-image",
@@ -61,10 +62,10 @@ class TestSessionOrchestration:
             format=ImageFormat.VHDX,
             status=ImageStatus.READY,
             size_bytes=1024*1024*1024,  # 1GB
-            server_ip="192.168.1.10"
+            created_by=1
         )
         db_session.add(image)
-        db_session.commit()
+        await db_session.commit()
         return image
     
     @pytest.mark.asyncio
@@ -166,10 +167,9 @@ class TestSessionOrchestration:
             format=ImageFormat.VHDX,
             status=ImageStatus.PROCESSING,  # Not ready
             size_bytes=1024*1024*1024,
-            server_ip="192.168.1.10"
         )
         db_session.add(image)
-        db_session.commit()
+        await db_session.commit()
         
         with patch("app.core.dependencies.get_current_user", return_value=admin_user):
             with patch("app.core.dependencies.require_operator", return_value=admin_user):
@@ -193,9 +193,9 @@ class TestSessionOrchestration:
         # Create active session
         session = Session(
             id=1,
+            session_id="test-session-1",
             machine_id=1,
             target_id=1,
-            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
@@ -209,15 +209,15 @@ class TestSessionOrchestration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            session_id="test-session-1",
+            image_id=1,
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            server_ip="192.168.1.10"
+            created_by=1
         )
         db_session.add(target)
-        db_session.commit()
+        await db_session.commit()
         
         with patch("app.core.dependencies.get_current_user", return_value=admin_user):
             with patch("app.core.dependencies.require_operator", return_value=admin_user):
@@ -248,9 +248,9 @@ class TestSessionOrchestration:
         # Create test sessions
         session1 = Session(
             id=1,
+            session_id="test-session-1",
             machine_id=1,
             target_id=1,
-            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
@@ -260,15 +260,13 @@ class TestSessionOrchestration:
             id=2,
             machine_id=2,
             target_id=2,
-            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.STOPPED,
             started_at=datetime.utcnow(),
             ended_at=datetime.utcnow(),
-            server_ip="192.168.1.10"
         )
         db_session.add_all([session1, session2])
-        db_session.commit()
+        await db_session.commit()
         
         with patch("app.core.dependencies.get_current_user", return_value=admin_user):
             
@@ -292,9 +290,9 @@ class TestSessionOrchestration:
         # Create active session
         session = Session(
             id=1,
+            session_id="test-session-1",
             machine_id=1,
             target_id=1,
-            session_id="test-session-1",
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
@@ -308,15 +306,15 @@ class TestSessionOrchestration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            session_id="test-session-1",
+            image_id=1,
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            server_ip="192.168.1.10"
+            created_by=1
         )
         db_session.add(target)
-        db_session.commit()
+        await db_session.commit()
         
         with patch("app.core.dependencies.get_current_user", return_value=admin_user):
             
@@ -351,7 +349,7 @@ class TestSessionOrchestration:
             Session(id=3, session_id="session-3", machine_id=3, target_id=3, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
         ]
         db_session.add_all(sessions)
-        db_session.commit()
+        await db_session.commit()
         
         with patch("app.core.dependencies.get_current_user", return_value=admin_user):
             
@@ -389,7 +387,7 @@ class TestiPXEScriptGeneration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            server_ip="192.168.1.10"
+            created_by=1
         )
         
         target = Target(
@@ -397,12 +395,12 @@ class TestiPXEScriptGeneration:
             target_id="target-001",
             iqn="iqn.2025.ggnet:target-001",
             machine_id=1,
-            session_id="test-session-1",
+            image_id=1,
             image_path="/storage/images/test.vhdx",
             initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
             lun_id=0,
             status=TargetStatus.ACTIVE,
-            server_ip="192.168.1.10"
+            created_by=1
         )
         
         image = Image(
@@ -413,7 +411,6 @@ class TestiPXEScriptGeneration:
             format=ImageFormat.VHDX,
             status=ImageStatus.READY,
             size_bytes=1024*1024*1024,
-            server_ip="192.168.1.10"
         )
         
         # Generate script
@@ -452,7 +449,7 @@ class TestiPXEScriptGeneration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            server_ip="192.168.1.10"
+            created_by=1
         )
         
         generator = iPXEScriptGenerator()
@@ -502,7 +499,7 @@ class TestDHCPConfiguration:
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
             boot_mode="bios",
-            server_ip="192.168.1.10"
+            created_by=1
         )
         
         config_entry = generate_dhcp_config_entry(machine)
