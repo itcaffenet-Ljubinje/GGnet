@@ -4,7 +4,7 @@ Tests for Phase 4: Session Orchestration and PXE/iPXE
 
 import pytest
 import pytest_asyncio
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
 
@@ -19,23 +19,6 @@ from app.models.user import User, UserRole
 class TestSessionOrchestration:
     """Test session orchestration functionality"""
     
-    @pytest.fixture
-    def client(self):
-        return TestClient(app)
-    
-    @pytest_asyncio.fixture
-    async def admin_user(self, db_session):
-        user = User(
-            id=1,
-            username="admin",
-            email="admin@ggnet.local",
-            hashed_password="$2b$12$test_hash",
-            is_active=True,
-            role=UserRole.ADMIN
-        )
-        db_session.add(user)
-        await db_session.commit()
-        return user
     
     @pytest_asyncio.fixture
     async def test_machine(self, db_session):
@@ -45,7 +28,7 @@ class TestSessionOrchestration:
             mac_address="00:11:22:33:44:55",
             ip_address="192.168.1.101",
             status=MachineStatus.ACTIVE,
-            boot_mode="bios",
+            boot_mode="LEGACY",
             created_by=1
         )
         db_session.add(machine)
@@ -68,91 +51,111 @@ class TestSessionOrchestration:
         await db_session.commit()
         return image
     
-    @pytest.mark.asyncio
-    async def test_start_session_success(self, client, admin_user, test_machine, test_image):
-        """Test successful session start"""
-        
-        # Mock the authentication
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            with patch("app.core.dependencies.require_operator", return_value=admin_user):
-                
-                # Mock targetcli operations
-                with patch("app.adapters.targetcli.create_target_for_machine") as mock_create_target:
-                    mock_create_target.return_value = {
-                        "target_id": "target-001",
-                        "iqn": "iqn.2025.ggnet:target-001",
-                        "initiator_iqn": "iqn.2025.ggnet:initiator-001122334455",
-                        "portal_ip": "192.168.1.10",
-                        "portal_port": 3260,
-                        "lun_id": 0
-                    }
-                    
-                    # Mock iPXE script generation
-                    with patch("app.adapters.ipxe.iPXEScriptGenerator") as mock_ipxe:
-                        mock_generator = MagicMock()
-                        mock_generator.generate_machine_boot_script.return_value = "#!ipxe\necho Booting...\nsanboot iscsi:192.168.1.10::0:iqn.2025.ggnet:target-001"
-                        mock_generator.get_machine_script_filename.return_value = "machines/00-11-22-33-44-55.ipxe"
-                        mock_ipxe.return_value = mock_generator
-                        
-                        # Mock TFTP operations
-                        with patch("app.adapters.tftp.save_boot_script_to_tftp") as mock_tftp:
-                            mock_tftp.return_value = "/var/lib/tftpboot/machines/00-11-22-33-44-55.ipxe"
-                            
-                            # Mock DHCP operations
-                            with patch("app.adapters.dhcp.add_machine_to_dhcp") as mock_dhcp:
-                                mock_dhcp.return_value = True
-                                
-                                # Make request
-                                response = client.post(
-                                    "/api/v1/sessions/start",
-                                    json={
-                                        "machine_id": 1,
-                                        "image_id": 1,
-                                        "session_type": "DISKLESS_BOOT",
-                                        "description": "Test session"
-                                    }
-                                )
-                                
-                                # Verify response
-                                assert response.status_code == 201
-                                data = response.json()
-                                
-                                assert "session" in data
-                                assert "target_info" in data
-                                assert "boot_script" in data
-                                assert "ipxe_script_url" in data
-                                assert "iscsi_details" in data
-                                
-                                # Verify session was created
-                                assert data["session"]["machine_id"] == 1
-                                assert data["session"]["image_id"] == 1
-                                assert data["session"]["status"] == "ACTIVE"
-                                
-                                # Verify target info
-                                assert data["target_info"]["iqn"] == "iqn.2025.ggnet:target-001"
-                                
-                                # Verify boot script
-                                assert "#!ipxe" in data["boot_script"]
-                                assert "sanboot iscsi:" in data["boot_script"]
+    @pytest_asyncio.fixture
+    async def test_target(self, db_session, test_machine, test_image):
+        target = Target(
+            id=1,
+            target_id="target-001",
+            machine_id=test_machine.id,
+            image_id=test_image.id,
+            iqn="iqn.2025.ggnet:target-001",
+            image_path="/storage/images/test.vhdx",
+            initiator_iqn="iqn.2025.ggnet:initiator-001122334455",
+            lun_id=0,
+            status=TargetStatus.ACTIVE,
+            created_by=1
+        )
+        db_session.add(target)
+        await db_session.commit()
+        return target
     
     @pytest.mark.asyncio
-    async def test_start_session_machine_not_found(self, client, admin_user):
+    async def test_start_session_success(self, client: AsyncClient, admin_user, admin_token, test_machine, test_image):
+        """Test successful session start"""
+        
+        # Use proper authentication headers
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        # Mock targetcli operations
+        with patch("app.adapters.targetcli.create_target_for_machine") as mock_create_target:
+            mock_create_target.return_value = {
+                "target_id": "target-001",
+                "iqn": "iqn.2025.ggnet:target-001",
+                "initiator_iqn": "iqn.2025.ggnet:initiator-001122334455",
+                "portal_ip": "192.168.1.10",
+                "portal_port": 3260,
+                "lun_id": 0
+            }
+            
+            # Mock iPXE script generation
+            with patch("app.adapters.ipxe.iPXEScriptGenerator") as mock_ipxe:
+                mock_generator = MagicMock()
+                mock_generator.generate_machine_boot_script.return_value = "#!ipxe\necho Booting...\nsanboot iscsi:192.168.1.10::0:iqn.2025.ggnet:target-001"
+                mock_generator.get_machine_script_filename.return_value = "machines/00-11-22-33-44-55.ipxe"
+                mock_ipxe.return_value = mock_generator
+                
+                # Mock TFTP operations
+                with patch("app.adapters.tftp.save_boot_script_to_tftp") as mock_tftp:
+                    mock_tftp.return_value = "/var/lib/tftpboot/machines/00-11-22-33-44-55.ipxe"
+                    
+                    # Mock DHCP operations
+                    with patch("app.adapters.dhcp.add_machine_to_dhcp") as mock_dhcp:
+                        mock_dhcp.return_value = True
+                        
+                        # Make request
+                        response = await client.post(
+                            "/api/v1/sessions/start",
+                            json={
+                                "machine_id": test_machine.id,
+                                "image_id": test_image.id,
+                                "session_type": "diskless_boot",
+                                "description": "Test session"
+                            },
+                            headers=headers
+                        )
+                        
+                        # Verify response
+                        print(f"Response status: {response.status_code}")
+                        print(f"Response body: {response.text}")
+                        assert response.status_code == 201
+                        data = response.json()
+                        
+                        assert "session" in data
+                        assert "target_info" in data
+                        assert "boot_script" in data
+                        assert "ipxe_script_url" in data
+                        assert "iscsi_details" in data
+                        
+                        # Verify session was created
+                        assert data["session"]["machine_id"] == test_machine.id
+                        assert data["session"]["image_id"] == test_image.id
+                        assert data["session"]["status"] == "ACTIVE"
+                        
+                        # Verify target info
+                        assert data["target_info"]["iqn"] == "iqn.2025.ggnet:target-001"
+                        
+                        # Verify boot script
+                        assert "#!ipxe" in data["boot_script"]
+                        assert "sanboot iscsi:" in data["boot_script"]
+    
+    @pytest.mark.asyncio
+    async def test_start_session_machine_not_found(self, client: AsyncClient, admin_user, admin_token):
         """Test session start with non-existent machine"""
         
-        with patch("app.core.dependencies.get_current_user", return_value=admin_user):
-            with patch("app.core.dependencies.require_operator", return_value=admin_user):
-                
-                response = client.post(
-                    "/api/v1/sessions/start",
-                    json={
-                        "machine_id": 999,
-                        "image_id": 1,
-                        "session_type": "DISKLESS_BOOT"
-                    }
-                )
-                
-                assert response.status_code == 400
-                assert "Machine with ID 999 not found" in response.json()["detail"]
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        
+        response = await client.post(
+            "/api/v1/sessions/start",
+            json={
+                "machine_id": 999,
+                "image_id": 1,
+                "session_type": "diskless_boot"
+            },
+            headers=headers
+        )
+        
+        assert response.status_code == 404
+        assert "Machine with ID 999 not found" in response.json()["detail"]
     
     @pytest.mark.asyncio
     async def test_start_session_image_not_ready(self, client, admin_user, test_machine, db_session):
