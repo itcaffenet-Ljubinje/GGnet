@@ -3,7 +3,7 @@
  * Page for managing iSCSI targets
  */
 
-import React from 'react';
+// React is available globally;
 import TargetManager from '../components/TargetManager';
 
 const TargetsPage: React.FC = () => {

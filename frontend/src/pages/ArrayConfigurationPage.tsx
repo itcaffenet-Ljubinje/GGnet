@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, ProgressBar, StatusBadge, Button } from '../components/ui'
 import { 
   HardDrive, 

@@ -3,7 +3,7 @@
  * Manages iSCSI targets with real-time status and configuration
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Plus, 

@@ -3,7 +3,7 @@
  * Page for system monitoring and performance metrics
  */
 
-import React from 'react';
+// React is available globally;
 import SystemMonitor from '../components/SystemMonitor';
 
 const SystemMonitorPage: React.FC = () => {

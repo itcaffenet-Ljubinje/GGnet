@@ -3,7 +3,7 @@
  * Real-time system monitoring with performance metrics and health checks
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Activity, 
