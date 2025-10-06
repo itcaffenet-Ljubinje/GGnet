@@ -6,10 +6,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import structlog
 import os
 import hashlib
+from datetime import datetime
 try:
     import magic
 except ImportError:
@@ -21,8 +22,10 @@ import uuid
 from app.core.database import get_db
 from app.core.config import get_settings
 from app.core.dependencies import get_current_user, require_operator, log_user_activity
+from app.core.cache import cached, invalidate_cache, CacheStrategy
 from app.models.user import User
 from app.models.image import Image, ImageFormat, ImageStatus, ImageType
+from app.models.target import Target
 from app.models.audit import AuditAction, AuditSeverity
 from app.core.exceptions import ValidationError, StorageError, NotFoundError
 
@@ -44,11 +47,10 @@ class ImageResponse(BaseModel):
     image_type: ImageType
     checksum_md5: Optional[str]
     checksum_sha256: Optional[str]
-    created_at: str
+    created_at: datetime
     created_by_username: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ImageCreate(BaseModel):
@@ -154,6 +156,7 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
 
 
 @router.post("/upload", response_model=ImageResponse)
+@invalidate_cache(pattern="images:*")
 async def upload_image(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -236,7 +239,7 @@ async def upload_image(
         )
         
         # Return response with created_by_username
-        response_data = ImageResponse.from_orm(image)
+        response_data = ImageResponse.model_validate(image)
         response_data.created_by_username = current_user.username
         
         return response_data
@@ -251,6 +254,7 @@ async def upload_image(
 
 
 @router.get("", response_model=List[ImageResponse])
+@cached(ttl=300, key_prefix="images")
 async def list_images(
     skip: int = 0,
     limit: int = 100,
@@ -288,7 +292,7 @@ async def list_images(
         creator_result = await db.execute(select(User).where(User.id == image.created_by))
         creator = creator_result.scalar_one_or_none()
         
-        response_data = ImageResponse.from_orm(image)
+        response_data = ImageResponse.model_validate(image)
         response_data.created_by_username = creator.username if creator else "Unknown"
         response_images.append(response_data)
     
@@ -296,6 +300,7 @@ async def list_images(
 
 
 @router.get("/{image_id}", response_model=ImageResponse)
+@cached(ttl=600, key_prefix="image")
 async def get_image(
     image_id: int,
     current_user: User = Depends(get_current_user),
@@ -313,13 +318,14 @@ async def get_image(
     creator_result = await db.execute(select(User).where(User.id == image.created_by))
     creator = creator_result.scalar_one_or_none()
     
-    response_data = ImageResponse.from_orm(image)
+    response_data = ImageResponse.model_validate(image)
     response_data.created_by_username = creator.username if creator else "Unknown"
     
     return response_data
 
 
 @router.put("/{image_id}", response_model=ImageResponse)
+@invalidate_cache(key="image:{image_id}")
 async def update_image(
     image_id: int,
     image_update: ImageUpdate,
@@ -385,13 +391,14 @@ async def update_image(
     creator_result = await db.execute(select(User).where(User.id == image.created_by))
     creator = creator_result.scalar_one_or_none()
     
-    response_data = ImageResponse.from_orm(image)
+    response_data = ImageResponse.model_validate(image)
     response_data.created_by_username = creator.username if creator else "Unknown"
     
     return response_data
 
 
 @router.delete("/{image_id}")
+@invalidate_cache(pattern="images:*", key="image:{image_id}")
 async def delete_image(
     image_id: int,
     request: Request,
@@ -407,7 +414,20 @@ async def delete_image(
         raise NotFoundError(f"Image with ID {image_id} not found")
     
     # Check if image is being used by any targets
-    # TODO: Add check for active targets using this image
+    # Check for active targets using this image
+    active_targets_result = await db.execute(
+        select(Target).where(
+            Target.image_id == image_id,
+            Target.is_active == True
+        )
+    )
+    active_targets = active_targets_result.scalars().all()
+    
+    if active_targets:
+        target_names = [target.name for target in active_targets]
+        raise ValidationError(
+            f"Cannot delete image '{image.name}' - it is being used by active targets: {', '.join(target_names)}"
+        )
     
     # Delete file from disk
     file_path = Path(image.file_path)

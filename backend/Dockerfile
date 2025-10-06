@@ -1,17 +1,28 @@
 FROM python:3.11-slim
 
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+    build-essential \
+    curl \
+    git \
     libpq-dev \
     qemu-utils \
     targetcli-fb \
-    open-iscsi \
-    curl \
+    python3-rtslib-fb \
+    isc-dhcp-server \
+    tftpd-hpa \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Create application user
+RUN groupadd -r ggnet && useradd -r -g ggnet ggnet
+
+# Set work directory
 WORKDIR /app
 
 # Copy requirements first for better caching
@@ -24,19 +35,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/uploads /app/images /app/logs
+RUN mkdir -p /opt/ggnet/{images,targets,backstores,tftp,logs,cache} && \
+    chown -R ggnet:ggnet /opt/ggnet
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
+# Set permissions
+RUN chown -R ggnet:ggnet /app
+
+# Switch to non-root user
+USER ggnet
 
 # Expose port
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

@@ -158,11 +158,71 @@ async def cleanup_storage(
             "space_freed_bytes": 0
         }
         
-        # TODO: Implement actual cleanup logic
-        # - Remove temporary upload files older than X hours
-        # - Remove orphaned image files not referenced in database
-        # - Clean up old log files
-        # - Remove incomplete uploads
+        # Implement actual cleanup logic
+        import os
+        import time
+        from datetime import datetime, timedelta
+        
+        # Remove temporary upload files older than 24 hours
+        temp_upload_dir = settings.UPLOAD_DIR / "temp"
+        if temp_upload_dir.exists():
+            current_time = time.time()
+            for file_path in temp_upload_dir.iterdir():
+                if file_path.is_file():
+                    file_age = current_time - file_path.stat().st_mtime
+                    if file_age > 24 * 3600:  # 24 hours
+                        try:
+                            file_path.unlink()
+                            cleanup_stats["temp_files_removed"] += 1
+                            cleanup_stats["space_freed_bytes"] += file_path.stat().st_size
+                        except OSError:
+                            logger.warning(f"Failed to remove temp file: {file_path}")
+        
+        # Remove orphaned image files not referenced in database
+        images_dir = settings.IMAGES_DIR
+        if images_dir.exists():
+            # Get all image files from database
+            db_images_result = await db.execute(select(Image.filename))
+            db_filenames = {row[0] for row in db_images_result.fetchall()}
+            
+            # Check files in images directory
+            for file_path in images_dir.iterdir():
+                if file_path.is_file() and file_path.name not in db_filenames:
+                    try:
+                        file_size = file_path.stat().st_size
+                        file_path.unlink()
+                        cleanup_stats["orphaned_files_removed"] += 1
+                        cleanup_stats["space_freed_bytes"] += file_size
+                    except OSError:
+                        logger.warning(f"Failed to remove orphaned file: {file_path}")
+        
+        # Clean up old log files (older than 30 days)
+        logs_dir = Path("./logs")
+        if logs_dir.exists():
+            cutoff_date = datetime.now() - timedelta(days=30)
+            for file_path in logs_dir.iterdir():
+                if file_path.is_file() and file_path.suffix == ".log":
+                    file_time = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    if file_time < cutoff_date:
+                        try:
+                            file_size = file_path.stat().st_size
+                            file_path.unlink()
+                            cleanup_stats["temp_files_removed"] += 1
+                            cleanup_stats["space_freed_bytes"] += file_size
+                        except OSError:
+                            logger.warning(f"Failed to remove old log file: {file_path}")
+        
+        # Remove incomplete uploads (files with .tmp extension)
+        for directory in [settings.UPLOAD_DIR, settings.IMAGES_DIR]:
+            if directory.exists():
+                for file_path in directory.rglob("*.tmp"):
+                    try:
+                        file_size = file_path.stat().st_size
+                        file_path.unlink()
+                        cleanup_stats["temp_files_removed"] += 1
+                        cleanup_stats["space_freed_bytes"] += file_size
+                    except OSError:
+                        logger.warning(f"Failed to remove incomplete upload: {file_path}")
         
         logger.info(
             "Storage cleanup completed",

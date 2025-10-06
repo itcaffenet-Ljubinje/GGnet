@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, ConfigDict
 import os
 
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Increased to 60 minutes
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # Application
@@ -141,9 +141,7 @@ class Settings(BaseSettings):
             return self.DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
         return self.DATABASE_URL
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
 
 @lru_cache()

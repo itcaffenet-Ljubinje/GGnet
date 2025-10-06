@@ -3,14 +3,16 @@ Security utilities for authentication and authorization
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Optional, Union, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
 import secrets
 import structlog
+import asyncio
 
 from app.core.config import get_settings
+from app.core.cache import cache_manager
 
 logger = structlog.get_logger()
 
@@ -68,7 +70,7 @@ def validate_password_strength(password: str) -> bool:
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token"""
+    """Create JWT access token with Redis session storage"""
     to_encode = data.copy()
     
     if expires_delta:
@@ -76,7 +78,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire, "type": "access"})
+    # Add token metadata
+    token_id = secrets.token_urlsafe(32)
+    to_encode.update({
+        "exp": expire, 
+        "type": "access",
+        "jti": token_id,  # JWT ID for tracking
+        "iat": datetime.utcnow(),  # Issued at
+        "iss": "ggnet"  # Issuer
+    })
     
     try:
         encoded_jwt = jwt.encode(
@@ -84,6 +94,34 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
             settings.SECRET_KEY, 
             algorithm=settings.JWT_ALGORITHM
         )
+        
+        # Store token in Redis for session management
+        session_data = {
+            "user_id": data.get("sub"),
+            "username": data.get("username"),
+            "token_type": "access",
+            "created_at": datetime.utcnow().isoformat(),
+            "expires_at": expire.isoformat(),
+            "is_active": True
+        }
+        
+        # Cache token session (async operation)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're in an async context, create a task
+                asyncio.create_task(
+                    cache_manager.set(f"session:{token_id}", session_data, ttl=int(expires_delta.total_seconds()) if expires_delta else settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+                )
+            else:
+                # If we're not in an async context, run it directly
+                loop.run_until_complete(
+                    cache_manager.set(f"session:{token_id}", session_data, ttl=int(expires_delta.total_seconds()) if expires_delta else settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+                )
+        except Exception as cache_error:
+            logger.warning("Failed to cache token session", error=str(cache_error))
+        
+        logger.info("Access token created", user_id=data.get("sub"), token_id=token_id, expires_at=expire)
         return encoded_jwt
     except Exception as e:
         logger.error("Failed to create access token", error=str(e))
@@ -91,7 +129,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT refresh token"""
+    """Create JWT refresh token with Redis session storage"""
     to_encode = data.copy()
     
     if expires_delta:
@@ -99,7 +137,15 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     else:
         expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     
-    to_encode.update({"exp": expire, "type": "refresh"})
+    # Add token metadata
+    token_id = secrets.token_urlsafe(32)
+    to_encode.update({
+        "exp": expire, 
+        "type": "refresh",
+        "jti": token_id,  # JWT ID for tracking
+        "iat": datetime.utcnow(),  # Issued at
+        "iss": "ggnet"  # Issuer
+    })
     
     try:
         encoded_jwt = jwt.encode(
@@ -107,14 +153,43 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
             settings.SECRET_KEY, 
             algorithm=settings.JWT_ALGORITHM
         )
+        
+        # Store refresh token in Redis
+        refresh_data = {
+            "user_id": data.get("sub"),
+            "username": data.get("username"),
+            "token_type": "refresh",
+            "created_at": datetime.utcnow().isoformat(),
+            "expires_at": expire.isoformat(),
+            "is_active": True,
+            "access_tokens": []  # Track associated access tokens
+        }
+        
+        # Cache refresh token session
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're in an async context, create a task
+                asyncio.create_task(
+                    cache_manager.set(f"refresh:{token_id}", refresh_data, ttl=int(expires_delta.total_seconds()) if expires_delta else settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60)
+                )
+            else:
+                # If we're not in an async context, run it directly
+                loop.run_until_complete(
+                    cache_manager.set(f"refresh:{token_id}", refresh_data, ttl=int(expires_delta.total_seconds()) if expires_delta else settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60)
+                )
+        except Exception as cache_error:
+            logger.warning("Failed to cache refresh token session", error=str(cache_error))
+        
+        logger.info("Refresh token created", user_id=data.get("sub"), token_id=token_id, expires_at=expire)
         return encoded_jwt
     except Exception as e:
         logger.error("Failed to create refresh token", error=str(e))
         raise TokenError("Failed to create refresh token")
 
 
-def verify_token(token: str, token_type: str = "access") -> dict:
-    """Verify and decode JWT token"""
+async def verify_token(token: str, token_type: str = "access") -> dict:
+    """Verify and decode JWT token with Redis session validation"""
     try:
         payload = jwt.decode(
             token, 
@@ -134,6 +209,22 @@ def verify_token(token: str, token_type: str = "access") -> dict:
         if datetime.utcnow() > datetime.fromtimestamp(exp):
             raise TokenError("Token has expired")
         
+        # Validate session in Redis
+        token_id = payload.get("jti")
+        if token_id:
+            cache_key = f"session:{token_id}" if token_type == "access" else f"refresh:{token_id}"
+            session_data = await cache_manager.get(cache_key)
+            
+            if not session_data:
+                raise TokenError("Session not found or expired")
+            
+            if not session_data.get("is_active", False):
+                raise TokenError("Session is inactive")
+            
+            # Update last access time
+            session_data["last_access"] = datetime.utcnow().isoformat()
+            await cache_manager.set(cache_key, session_data, ttl=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        
         return payload
         
     except JWTError as e:
@@ -147,6 +238,72 @@ def verify_token(token: str, token_type: str = "access") -> dict:
 def generate_session_id() -> str:
     """Generate a secure session ID"""
     return secrets.token_urlsafe(32)
+
+
+async def revoke_token(token: str, token_type: str = "access") -> bool:
+    """Revoke a JWT token by marking it as inactive in Redis"""
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        
+        token_id = payload.get("jti")
+        if not token_id:
+            return False
+        
+        cache_key = f"session:{token_id}" if token_type == "access" else f"refresh:{token_id}"
+        session_data = await cache_manager.get(cache_key)
+        
+        if session_data:
+            session_data["is_active"] = False
+            session_data["revoked_at"] = datetime.utcnow().isoformat()
+            await cache_manager.set(cache_key, session_data, ttl=24 * 60 * 60)  # Keep for 24 hours
+        
+        logger.info("Token revoked", token_id=token_id, token_type=token_type)
+        return True
+        
+    except Exception as e:
+        logger.error("Failed to revoke token", error=str(e))
+        return False
+
+
+async def revoke_user_sessions(user_id: str) -> int:
+    """Revoke all active sessions for a user"""
+    try:
+        # This would require scanning Redis keys, which is not ideal
+        # In production, you might want to maintain a user->sessions mapping
+        logger.info("Revoking all sessions for user", user_id=user_id)
+        return 0  # Placeholder implementation
+        
+    except Exception as e:
+        logger.error("Failed to revoke user sessions", error=str(e), user_id=user_id)
+        return 0
+
+
+async def get_active_sessions(user_id: str) -> list:
+    """Get all active sessions for a user"""
+    try:
+        # This would require scanning Redis keys or maintaining a user->sessions mapping
+        # Placeholder implementation
+        return []
+        
+    except Exception as e:
+        logger.error("Failed to get active sessions", error=str(e), user_id=user_id)
+        return []
+
+
+async def cleanup_expired_sessions() -> int:
+    """Clean up expired sessions from Redis"""
+    try:
+        # Redis TTL handles automatic cleanup, but this could be used for manual cleanup
+        # Placeholder implementation
+        return 0
+        
+    except Exception as e:
+        logger.error("Failed to cleanup expired sessions", error=str(e))
+        return 0
 
 
 def generate_api_key() -> str:

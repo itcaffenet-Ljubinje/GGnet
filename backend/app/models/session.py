@@ -97,6 +97,10 @@ class Session(Base):
     boot_config: Mapped[Optional[dict]] = mapped_column(JSON)
     environment_vars: Mapped[Optional[dict]] = mapped_column(JSON)
     
+    # iSCSI target information
+    target_iqn: Mapped[Optional[str]] = mapped_column(String(255))
+    target_portal: Mapped[Optional[str]] = mapped_column(String(255))
+    
     # User context
     initiated_by: Mapped[Optional[str]] = mapped_column(String(100))  # username or system
     user_notes: Mapped[Optional[str]] = mapped_column(Text)

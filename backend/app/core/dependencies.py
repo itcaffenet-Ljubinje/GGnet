@@ -3,6 +3,7 @@ FastAPI dependencies for authentication and authorization
 """
 
 from typing import Optional
+from datetime import datetime
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +26,7 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    """Get current authenticated user"""
+    """Get current authenticated user with token refresh support"""
     
     if not credentials:
         logger.warning("No credentials provided", ip=request.client.host)
@@ -33,7 +34,7 @@ async def get_current_user(
     
     try:
         # Verify token
-        payload = verify_token(credentials.credentials, "access")
+        payload = await verify_token(credentials.credentials, "access")
         user_id: int = payload.get("sub")
         
         if user_id is None:
@@ -51,7 +52,7 @@ async def get_current_user(
             logger.warning("Inactive user attempted access", user_id=user_id, ip=request.client.host)
             raise create_credentials_exception("Inactive user")
         
-        if user.is_locked:
+        if user.locked_until and user.locked_until > datetime.utcnow():
             logger.warning("Locked user attempted access", user_id=user_id, ip=request.client.host)
             raise create_credentials_exception("Account is locked")
         
@@ -61,7 +62,15 @@ async def get_current_user(
         
         return user
         
-    except HTTPException:
+    except HTTPException as e:
+        # Check if it's a token expiration error
+        if "expired" in str(e.detail).lower() or "invalid token" in str(e.detail).lower():
+            logger.warning("Token expired or invalid", ip=request.client.host)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired. Please refresh your token.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         raise
     except Exception as e:
         logger.error("Authentication failed", error=str(e), ip=request.client.host)
@@ -197,10 +206,37 @@ async def log_user_activity(
     resource_type: Optional[str] = None,
     resource_id: Optional[int] = None,
     resource_name: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = None
 ):
     """Log user activity for audit purposes"""
     
+    # Get database session if not provided
+    if db is None:
+        from app.core.database import async_engine
+        async with AsyncSession(async_engine) as session:
+            await _log_audit_entry(
+                action, message, request, user, severity, 
+                resource_type, resource_id, resource_name, session
+            )
+    else:
+        await _log_audit_entry(
+            action, message, request, user, severity, 
+            resource_type, resource_id, resource_name, db
+        )
+
+
+async def _log_audit_entry(
+    action: AuditAction,
+    message: str,
+    request: Request,
+    user: Optional[User],
+    severity: AuditSeverity,
+    resource_type: Optional[str],
+    resource_id: Optional[int],
+    resource_name: Optional[str],
+    db: AsyncSession
+):
+    """Helper function to log audit entry"""
     audit_log = AuditLog.create_log(
         action=action,
         message=message,

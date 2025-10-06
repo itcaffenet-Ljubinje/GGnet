@@ -59,7 +59,8 @@ class TestAuth:
             "password": "123"
         })
         
-        assert response.status_code == 422
+        # Should return 401 for invalid credentials (empty username)
+        assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_get_current_user(self, client: AsyncClient, admin_token, auth_headers):

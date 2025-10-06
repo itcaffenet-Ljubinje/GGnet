@@ -3,7 +3,7 @@ GGnet Diskless Server - Main FastAPI Application
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request  # pyright: ignore[reportMissingImports]
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.cors import CORSMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
@@ -13,9 +13,10 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, targets, storage, health
+from app.routes import auth, images, machines, sessions, targets, storage, health, monitoring, file_upload, iscsi
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
+from app.websocket.manager import WebSocketManager
 
 # Configure structured logging
 structlog.configure(
@@ -49,10 +50,17 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
+    # Initialize WebSocket manager
+    app.state.websocket_manager = WebSocketManager()
+    logger.info("WebSocket manager initialized")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down GGnet Diskless Server")
+    if hasattr(app.state, 'websocket_manager'):
+        await app.state.websocket_manager.disconnect_all()
+        logger.info("WebSocket connections closed")
 
 
 def create_app() -> FastAPI:
@@ -132,6 +140,53 @@ def create_app() -> FastAPI:
     app.include_router(targets.router, prefix="/targets", tags=["targets"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
+    app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
+    app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
+    app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
+    
+    # WebSocket endpoint
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time updates"""
+        await websocket.accept()
+        
+        connection_id = None
+        try:
+            # Get token from query parameters
+            token = websocket.query_params.get("token")
+            
+            # Connect to WebSocket manager
+            connection_id = await app.state.websocket_manager.connect(websocket, token)
+            
+            # Keep connection alive and handle messages
+            while True:
+                try:
+                    # Wait for messages from client
+                    data = await websocket.receive_text()
+                    
+                    # Process message through manager
+                    try:
+                        import json
+                        message = json.loads(data)
+                        await app.state.websocket_manager.handle_client_message(connection_id, message)
+                    except json.JSONDecodeError:
+                        logger.warning("Invalid JSON received", connection_id=connection_id, data=data)
+                        
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.error(f"WebSocket error: {e}")
+                    break
+                    
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {e}")
+        finally:
+            # Clean up connection
+            if connection_id:
+                try:
+                    await app.state.websocket_manager.disconnect(connection_id)
+                except Exception as e:
+                    logger.error(f"WebSocket cleanup error: {e}")
     
     return app
 

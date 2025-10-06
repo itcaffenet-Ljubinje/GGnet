@@ -54,10 +54,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # Rate limit rules: {path_pattern: (requests_per_minute, window_seconds)}
         self.rules = {
-            "/auth/login": (10, 300),  # 10 requests per 5 minutes
-            "/auth/refresh": (10, 60),  # 10 requests per minute
-            "/images/upload": (3, 60),  # 3 uploads per minute
-            "default": (100, 60)  # 100 requests per minute for other endpoints
+            "/auth/login": (20, 300),  # 20 requests per 5 minutes
+            "/auth/refresh": (30, 60),  # 30 requests per minute
+            "/images/upload": (5, 60),  # 5 uploads per minute
+            "default": (200, 60)  # 200 requests per minute for other endpoints
         }
     
     def get_client_key(self, request: Request) -> str:
@@ -85,8 +85,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return self.rules["default"]
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip rate limiting for health checks
-        if request.url.path.startswith("/health"):
+        # Skip rate limiting for health checks and static files
+        if (request.url.path.startswith("/health") or 
+            request.url.path.startswith("/docs") or 
+            request.url.path.startswith("/openapi.json") or
+            request.url.path.startswith("/static")):
             return await call_next(request)
         
         # Get client identifier and rate limit rule

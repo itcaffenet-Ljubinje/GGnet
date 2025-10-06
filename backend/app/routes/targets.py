@@ -6,8 +6,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import structlog
+from datetime import datetime
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_operator, log_user_activity
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.models.target import Target, TargetStatus, TargetType
 from app.models.machine import Machine
 from app.models.image import Image
+from app.models.session import Session, SessionStatus
 from app.models.audit import AuditAction
 from app.core.exceptions import ValidationError, NotFoundError
 
@@ -40,10 +42,9 @@ class TargetResponse(BaseModel):
     extra_disk_image_name: Optional[str]
     extra_disk_mountpoint: Optional[str]
     is_active: bool
-    created_at: str
+    created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TargetCreate(BaseModel):
@@ -138,7 +139,7 @@ async def create_target(
     )
     
     # Build response
-    response = TargetResponse.from_orm(target)
+    response = TargetResponse.model_validate(target)
     response.machine_name = machine.name
     response.system_image_name = system_image.name
     response.extra_disk_image_name = extra_disk_image.name if extra_disk_image else None
@@ -190,7 +191,7 @@ async def list_targets(
             extra_disk_result = await db.execute(select(Image).where(Image.id == target.extra_disk_image_id))
             extra_disk_image = extra_disk_result.scalar_one_or_none()
         
-        response = TargetResponse.from_orm(target)
+        response = TargetResponse.model_validate(target)
         response.machine_name = machine.name
         response.system_image_name = system_image.name
         response.extra_disk_image_name = extra_disk_image.name if extra_disk_image else None
@@ -226,7 +227,7 @@ async def get_target(
         extra_disk_result = await db.execute(select(Image).where(Image.id == target.extra_disk_image_id))
         extra_disk_image = extra_disk_result.scalar_one_or_none()
     
-    response = TargetResponse.from_orm(target)
+    response = TargetResponse.model_validate(target)
     response.machine_name = machine.name
     response.system_image_name = system_image.name
     response.extra_disk_image_name = extra_disk_image.name if extra_disk_image else None
@@ -250,7 +251,20 @@ async def delete_target(
         raise NotFoundError(f"Target with ID {target_id} not found")
     
     # Check if target has active sessions
-    # TODO: Add check for active sessions
+    # Check for active sessions
+    active_sessions_result = await db.execute(
+        select(Session).where(
+            Session.target_id == target_id,
+            Session.status.in_([SessionStatus.STARTING, SessionStatus.ACTIVE])
+        )
+    )
+    active_sessions = active_sessions_result.scalars().all()
+    
+    if active_sessions:
+        session_ids = [session.session_id for session in active_sessions]
+        raise ValidationError(
+            f"Cannot delete target '{target.name}' - it has active sessions: {', '.join(session_ids)}"
+        )
     
     # Set status to deleting (will be handled by background task)
     target.status = TargetStatus.DELETING

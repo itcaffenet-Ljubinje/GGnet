@@ -8,6 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # pyright: ignore[reportMissingImports]
 from sqlalchemy.orm import sessionmaker  # pyright: ignore[reportMissingImports]
+from unittest.mock import AsyncMock, patch
 from app.main import app
 from app.core.database import Base, get_db
 from app.models.user import User, UserRole
@@ -51,11 +52,46 @@ async def client(db_session):
     
     app.dependency_overrides[get_db] = override_get_db
     
-    async with AsyncClient(app=app, base_url="http://testserver") as ac:
-        yield ac
+    # Mock Redis cache manager for tests
+    with patch('app.core.security.cache_manager') as mock_cache:
+        # Enhanced mock with more realistic behavior
+        async def mock_get(key):
+            if "session:" in key or "refresh:" in key:
+                return {"user_id": "1", "username": "admin", "is_active": True}
+            return None
+        
+        mock_cache.get = mock_get
+        mock_cache.set = AsyncMock(return_value=True)
+        mock_cache.delete = AsyncMock(return_value=True)
+        mock_cache.increment = AsyncMock(return_value=1)
+        mock_cache.exists = AsyncMock(return_value=True)
+        mock_cache.expire = AsyncMock(return_value=True)
+        
+        async with AsyncClient(app=app, base_url="http://testserver") as ac:
+            yield ac
     
     # Clean up dependency override
     app.dependency_overrides.clear()
+
+# ------------------------
+# Redis test fixtures
+# ------------------------
+
+@pytest_asyncio.fixture(scope="function")
+async def redis_client():
+    """Provide a Redis client for integration tests"""
+    try:
+        from app.core.cache import cache_manager
+        # Test Redis connection
+        await cache_manager.set("test_connection", "ok", ttl=1)
+        result = await cache_manager.get("test_connection")
+        if result == "ok":
+            yield cache_manager
+        else:
+            pytest.skip("Redis not available")
+    except Exception:
+        pytest.skip("Redis not available")
+
 
 # ------------------------
 # User & token fixtures
