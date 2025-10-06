@@ -38,7 +38,7 @@ class TestHealth:
         
         checks = data["checks"]
         assert "database" in checks
-        assert "directories" in checks
+        assert "storage" in checks
         assert "system" in checks
     
     @pytest.mark.asyncio

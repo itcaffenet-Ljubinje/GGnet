@@ -146,7 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/api/v1", tags=["targets"])
+    app.include_router(targets.router, prefix="/api/v1/targets", tags=["targets"])
     app.include_router(sessions_api.router, prefix="/api/v1/sessions", tags=["sessions"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
     app.include_router(storage.router, prefix="/storage", tags=["storage"])

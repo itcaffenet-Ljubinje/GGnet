@@ -265,12 +265,12 @@ class TestImageConversionWorker:
         
         with patch('app.core.config.get_settings') as mock_settings:
             mock_settings.return_value.IMAGE_STORAGE_PATH = Path("/tmp/storage")
-            mock_settings.return_value.TEMP_STORAGE_PATH = Path("/tmp/temp")
+            mock_settings.return_value.TEMP_STORAGE_PATH = Path("/tmp/storage/temp")
             
             with patch('pathlib.Path.mkdir'):
                 worker = ImageConversionWorker()
                 assert str(worker.storage_path) == str(Path("/tmp/storage"))
-                assert str(worker.temp_path) == str(Path("/tmp/temp"))
+                assert str(worker.temp_path) == str(Path("/tmp/storage/temp"))
     
     @pytest.mark.asyncio
     async def test_convert_image_success(self, db_session):

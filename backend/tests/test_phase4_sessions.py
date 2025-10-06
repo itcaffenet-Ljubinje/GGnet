@@ -346,9 +346,9 @@ class TestSessionOrchestration:
         
         # Create test sessions with different statuses
         sessions = [
-            Session(id=1, machine_id=1, target_id=1, image_id=1, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), created_by=1),
-            Session(id=2, machine_id=2, target_id=2, image_id=1, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), created_by=1),
-            Session(id=3, machine_id=3, target_id=3, image_id=1, status=SessionStatus.ERROR, started_at=datetime.utcnow(), created_by=1),
+            Session(id=1, session_id="session-1", machine_id=1, target_id=1, status=SessionStatus.ACTIVE, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(id=2, session_id="session-2", machine_id=2, target_id=2, status=SessionStatus.STOPPED, started_at=datetime.utcnow(), ended_at=datetime.utcnow(), server_ip="192.168.1.10"),
+            Session(id=3, session_id="session-3", machine_id=3, target_id=3, status=SessionStatus.ERROR, started_at=datetime.utcnow(), server_ip="192.168.1.10"),
         ]
         db_session.add_all(sessions)
         db_session.commit()

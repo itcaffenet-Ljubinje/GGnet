@@ -211,7 +211,8 @@ async def login_for_access_token(
                 message=f"User logged in successfully",
                 request=request,
                 user=user,
-                resource_type="authentication"
+                resource_type="authentication",
+                db=db
             )
             logger.info("User activity logged successfully", user_id=user.id, username=user.username)
         except Exception as log_error:
