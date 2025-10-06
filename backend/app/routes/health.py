@@ -35,7 +35,7 @@ class HealthResponse:
         self.details = kwargs
 
 
-@router.get("/", response_model=Dict[str, Any])
+@router.get("", response_model=Dict[str, Any])
 async def health_check():
     """Basic health check endpoint"""
     return {
@@ -71,7 +71,7 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)):
     
     # Redis health check
     try:
-        await cache_manager.set("health_check", "ok", expire=10)
+        await cache_manager.set("health_check", "ok", ttl=10)
         result = await cache_manager.get("health_check")
         if result == "ok":
             components["redis"] = {
@@ -189,7 +189,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         await db.execute(text("SELECT 1"))
         
         # Check Redis connectivity
-        await cache_manager.set("ready_check", "ok", expire=5)
+        await cache_manager.set("ready_check", "ok", ttl=5)
         result = await cache_manager.get("ready_check")
         
         if result != "ok":

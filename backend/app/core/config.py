@@ -161,5 +161,7 @@ def get_settings() -> Settings:
         settings.TEMP_STORAGE_PATH = Path("/tmp/storage/temp")
         # Use a deterministic portal IP expected by tests
         settings.ISCSI_PORTAL_IP = "192.168.1.10"
+        # Also set the property to return the test path
+        settings._image_storage_path = Path("/tmp/storage")
     return settings
 

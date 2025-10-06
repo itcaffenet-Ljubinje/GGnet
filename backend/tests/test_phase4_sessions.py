@@ -30,8 +30,7 @@ class TestSessionOrchestration:
             email="admin@ggnet.local",
             hashed_password="$2b$12$test_hash",
             is_active=True,
-            is_operator=True,
-            is_admin=True
+            role=UserRole.ADMIN
         )
         db_session.add(user)
         db_session.commit()
