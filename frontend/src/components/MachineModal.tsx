@@ -8,8 +8,8 @@ import { useNotifications } from './notifications'
 interface Machine {
   id?: number;
   name: string;
-  hostname: string;
-  ip_address: string;
+  hostname?: string;
+  ip_address?: string;
   mac_address: string;
   asset_tag?: string;
   description?: string;
@@ -19,6 +19,12 @@ interface Machine {
   room?: string;
   auto_boot?: boolean;
   wake_on_lan?: boolean;
+  status?: string;
+  is_online?: boolean;
+  created_at?: string;
+  last_seen?: string;
+  last_boot?: string;
+  boot_count?: number;
 }
 
 interface MachineModalProps {
@@ -92,7 +98,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
     try {
       if (mode === 'create') {
         await createMutation.mutateAsync(formData)
-      } else {
+      } else if (machine?.id) {
         await updateMutation.mutateAsync({ id: machine.id, data: formData })
       }
     } finally {

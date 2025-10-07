@@ -178,7 +178,7 @@ function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
             <Filter className="h-4 w-4 text-gray-400" />
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as 'all' | 'active' | 'inactive' | 'error')}
+              onChange={(e) => setFilter(e.target.value as 'all' | 'success' | 'warning' | 'error' | 'info')}
               className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             >
               <option value="all">All</option>
