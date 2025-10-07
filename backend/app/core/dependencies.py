@@ -217,17 +217,19 @@ async def log_user_activity(
     
     # Get database session if not provided
     if db is None:
-        from app.core.database import get_async_engine
-        async_engine = get_async_engine()
-        async with AsyncSession(async_engine) as session:
-            await _log_audit_entry(
-                action, message, request, user, severity, 
-                resource_type, resource_id, resource_name, session
-            )
+        from app.core.database import get_async_engine, get_async_session_local
+        AsyncSessionLocal = get_async_session_local()
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                await _log_audit_entry(
+                    action, message, request, user, severity, 
+                    resource_type, resource_id, resource_name, session, should_commit=False
+                )
+                # Commit is handled by the context manager
     else:
         await _log_audit_entry(
             action, message, request, user, severity, 
-            resource_type, resource_id, resource_name, db
+            resource_type, resource_id, resource_name, db, should_commit=False
         )
 
 
@@ -240,26 +242,35 @@ async def _log_audit_entry(
     resource_type: Optional[str],
     resource_id: Optional[int],
     resource_name: Optional[str],
-    db: AsyncSession
+    db: AsyncSession,
+    should_commit: bool = False
 ):
     """Helper function to log audit entry"""
-    audit_log = AuditLog.create_log(
-        action=action,
-        message=message,
-        user_id=user.id if user else None,
-        username=user.username if user else None,
-        severity=severity,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        resource_name=resource_name,
-        ip_address=get_client_ip(request),
-        user_agent=get_user_agent(request),
-        endpoint=str(request.url.path) if request else "system",
-        http_method=request.method if request else "SYSTEM"
-    )
-    
-    db.add(audit_log)
-    await db.commit()
+    try:
+        audit_log = AuditLog.create_log(
+            action=action,
+            message=message,
+            user_id=user.id if user else None,
+            username=user.username if user else None,
+            severity=severity,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            resource_name=resource_name,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+            endpoint=str(request.url.path) if request else "system",
+            http_method=request.method if request else "SYSTEM"
+        )
+        
+        db.add(audit_log)
+        if should_commit:
+            await db.commit()
+        else:
+            await db.flush()  # Flush but don't commit
+    except Exception as e:
+        logger.error("Failed to log audit entry", error=str(e))
+        # Don't raise - logging should never break the main flow
+        pass
     
     logger.info(
         "User activity logged",
