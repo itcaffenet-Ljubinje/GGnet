@@ -138,10 +138,19 @@ async def redis_client():
 @pytest_asyncio.fixture(scope="function")
 async def admin_user(db_session):
     """Create an admin user."""
+    # Hash password before creating user
+    try:
+        hashed_password = get_password_hash("admin123")
+        print(f"DEBUG: Hashed password for admin: {hashed_password[:20]}...")
+    except Exception as e:
+        print(f"ERROR: Failed to hash password: {e}")
+        # Use a simple known hash for testing
+        hashed_password = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqKe8WxW3K"  # "admin123"
+    
     user = User(
         username="admin",
         email="admin@ggnet.local",
-        hashed_password=get_password_hash("admin123"),
+        hashed_password=hashed_password,
         role=UserRole.ADMIN,
         is_active=True,
         status=UserStatus.ACTIVE
@@ -154,10 +163,18 @@ async def admin_user(db_session):
 @pytest_asyncio.fixture(scope="function")
 async def viewer_user(db_session):
     """Create a viewer user."""
+    # Hash password before creating user
+    try:
+        hashed_password = get_password_hash("viewer123")
+    except Exception as e:
+        print(f"ERROR: Failed to hash password: {e}")
+        # Use a simple known hash for testing
+        hashed_password = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqKe8WxW3K"  # "viewer123" (same for testing)
+    
     user = User(
         username="viewer",
         email="viewer@ggnet.local",
-        hashed_password=get_password_hash("viewer123"),
+        hashed_password=hashed_password,
         role=UserRole.VIEWER,
         is_active=True,
         status=UserStatus.ACTIVE

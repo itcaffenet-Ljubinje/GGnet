@@ -53,6 +53,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
+    # Ensure password is not too long for bcrypt (max 72 bytes)
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
+    
     try:
         return pwd_context.hash(password)
     except Exception as e:
@@ -60,7 +64,9 @@ def get_password_hash(password: str) -> str:
         # Attempt fallback scheme explicitly
         try:
             fallback_ctx = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-            return fallback_ctx.hash(password)
+            hashed = fallback_ctx.hash(password)
+            logger.warning("Used fallback password hashing (pbkdf2_sha256)")
+            return hashed
         except Exception as e2:
             logger.error("Fallback password hashing failed", error=str(e2))
             raise PasswordError("Failed to hash password")
