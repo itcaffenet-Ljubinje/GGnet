@@ -100,7 +100,7 @@ const TargetManager: React.FC = () => {
   // Fetch targets
   const { data: targetsData, isLoading: targetsLoading, refetch: refetchTargets } = useQuery({
     queryKey: ['targets'],
-    queryFn: () => api.get('/api/v1/targets/').then(res => res.data),
+    queryFn: () => api.get('/api/v1/targets/').then(res => res.data.targets || []),
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
