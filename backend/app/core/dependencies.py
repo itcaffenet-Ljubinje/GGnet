@@ -215,22 +215,16 @@ async def log_user_activity(
 ):
     """Log user activity for audit purposes"""
     
-    # Get database session if not provided
-    if db is None:
-        from app.core.database import get_async_engine, get_async_session_local
-        AsyncSessionLocal = get_async_session_local()
-        async with AsyncSessionLocal() as session:
-            async with session.begin():
-                await _log_audit_entry(
-                    action, message, request, user, severity, 
-                    resource_type, resource_id, resource_name, session, should_commit=False
-                )
-                # Commit is handled by the context manager
-    else:
+    # Always use the provided session or skip logging if none
+    # Audit logging should not create its own session to avoid conflicts
+    if db is not None:
         await _log_audit_entry(
             action, message, request, user, severity, 
             resource_type, resource_id, resource_name, db, should_commit=False
         )
+    else:
+        # Log a warning but don't fail
+        logger.warning("Audit log skipped - no database session provided")
 
 
 async def _log_audit_entry(
