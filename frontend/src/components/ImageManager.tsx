@@ -29,6 +29,15 @@ import { ProgressBar } from './ui/ProgressBar';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
+// Type for Axios error responses
+interface AxiosErrorResponse extends Error {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
 interface DiskImage {
   id: number;
   name: string;
@@ -115,7 +124,7 @@ const ImageManager: React.FC = () => {
     },
     onError: (error: Error, variables) => {
       const file = variables.get('file') as File;
-      const errorMessage = (error as any).response?.data?.detail || error.message;
+      const errorMessage = (error as AxiosErrorResponse).response?.data?.detail || error.message;
       setUploadProgress(prev => prev.map(item => 
         item.file === file ? { 
           ...item, 
@@ -135,7 +144,7 @@ const ImageManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['images'] });
     },
     onError: (error: Error) => {
-      const errorMessage = (error as any).response?.data?.detail || error.message;
+      const errorMessage = (error as AxiosErrorResponse).response?.data?.detail || error.message;
       toast.error(`Failed to delete image: ${errorMessage}`);
     },
   });
@@ -149,7 +158,7 @@ const ImageManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['conversion-jobs'] });
     },
     onError: (error: Error) => {
-      const errorMessage = (error as any).response?.data?.detail || error.message;
+      const errorMessage = (error as AxiosErrorResponse).response?.data?.detail || error.message;
       toast.error(`Failed to trigger conversion: ${errorMessage}`);
     },
   });
@@ -373,7 +382,7 @@ const ImageManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {images.map((image: any) => (
+            {images.map((image: DiskImage) => (
               <div key={image.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

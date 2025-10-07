@@ -5,10 +5,26 @@ import { X, Save, Loader2 } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
 import { useNotifications } from './notifications'
 
+interface Machine {
+  id?: number;
+  name: string;
+  hostname: string;
+  ip_address: string;
+  mac_address: string;
+  asset_tag?: string;
+  description?: string;
+  boot_mode?: string;
+  secure_boot_enabled?: boolean;
+  location?: string;
+  room?: string;
+  auto_boot?: boolean;
+  wake_on_lan?: boolean;
+}
+
 interface MachineModalProps {
   isOpen: boolean
   onClose: () => void
-  machine?: any
+  machine?: Machine | null
   mode: 'create' | 'edit'
 }
 
