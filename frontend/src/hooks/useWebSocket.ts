@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface WebSocketOptions {
-  url: string
+  url: string | null
   reconnectInterval?: number
   maxReconnectAttempts?: number
   onOpen?: () => void
@@ -38,6 +38,20 @@ export const useWebSocket = (options: WebSocketOptions) => {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  
+  // Use refs for callbacks to prevent re-render loops
+  const onOpenRef = useRef(onOpen)
+  const onCloseRef = useRef(onClose)
+  const onErrorRef = useRef(onError)
+  const onMessageRef = useRef(onMessage)
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onOpenRef.current = onOpen
+    onCloseRef.current = onClose
+    onErrorRef.current = onError
+    onMessageRef.current = onMessage
+  }, [onOpen, onClose, onError, onMessage])
 
   const connect = useCallback(() => {
     // Don't connect if URL is null or empty
@@ -65,13 +79,13 @@ export const useWebSocket = (options: WebSocketOptions) => {
           reconnectAttempts: 0
         })
         reconnectAttemptsRef.current = 0
-        onOpen?.()
+        onOpenRef.current?.()
       }
 
       wsRef.current.onclose = (event) => {
         console.log('WebSocket disconnected', { code: event.code, reason: event.reason, wasClean: event.wasClean })
         setState(prev => ({ ...prev, isConnected: false, isConnecting: false }))
-        onClose?.()
+        onCloseRef.current?.()
 
         // Only attempt to reconnect if it wasn't a manual disconnect (code 1000)
         if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
@@ -90,13 +104,13 @@ export const useWebSocket = (options: WebSocketOptions) => {
       wsRef.current.onerror = (error) => {
         console.error('WebSocket error:', error)
         setState(prev => ({ ...prev, error: 'Connection error', isConnecting: false }))
-        onError?.(error)
+        onErrorRef.current?.(error)
       }
 
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          onMessage?.(data)
+          onMessageRef.current?.(data)
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error)
         }
@@ -109,7 +123,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
         isConnecting: false 
       }))
     }
-  }, [url, reconnectInterval, maxReconnectAttempts, onOpen, onClose, onError, onMessage])
+  }, [url, reconnectInterval, maxReconnectAttempts]) // Removed callback deps - using refs instead
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
