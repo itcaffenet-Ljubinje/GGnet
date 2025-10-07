@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { clsx } from 'clsx'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {

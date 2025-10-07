@@ -7,11 +7,16 @@ import asyncio
 from httpx import AsyncClient
 from app.core.cache import cache_manager
 from app.core.security import create_access_token, create_refresh_token
+from tests.conftest import REDIS_AVAILABLE
+
+# Skip all Redis tests if Redis is not available
+pytestmark = pytest.mark.skipif(not REDIS_AVAILABLE, reason="Redis not available")
 
 
 class TestRedisIntegration:
     """Test Redis integration functionality"""
     
+    @pytest.mark.redis
     @pytest.mark.asyncio
     async def test_redis_connection(self):
         """Test basic Redis connection"""

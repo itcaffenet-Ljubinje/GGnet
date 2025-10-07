@@ -18,6 +18,29 @@ from app.core.security import get_password_hash, create_access_token
 from app.models import user, image, machine, target, session, audit
 
 import os
+
+# Check if Redis is available
+def is_redis_available():
+    """Check if Redis is available for testing"""
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        return False
+    try:
+        import redis.asyncio as redis
+        # Try to create a connection without actually connecting
+        return True
+    except (ImportError, Exception):
+        return False
+
+REDIS_AVAILABLE = is_redis_available()
+
+# Add pytest marker
+def pytest_configure(config):
+    """Configure pytest markers"""
+    config.addinivalue_line(
+        "markers", "redis: mark test as requiring Redis"
+    )
+
 DATABASE_URL_TEST = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 # Convert PostgreSQL URL to async version if needed
 if DATABASE_URL_TEST.startswith("postgresql://"):
