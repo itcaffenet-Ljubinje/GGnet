@@ -48,12 +48,23 @@ if DATABASE_URL_TEST.startswith("postgresql://"):
 elif DATABASE_URL_TEST.startswith("sqlite://"):
     DATABASE_URL_TEST = DATABASE_URL_TEST.replace("sqlite://", "sqlite+aiosqlite://")
 
-# Create async engine and session factory
-engine_test = create_async_engine(DATABASE_URL_TEST, future=True, echo=False)
+# Create async engine and session factory with proper pool settings
+engine_test = create_async_engine(
+    DATABASE_URL_TEST, 
+    future=True, 
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    # Important: Use NullPool for testing to avoid connection reuse issues
+    poolclass=None if "sqlite" in DATABASE_URL_TEST else None
+)
 AsyncSessionLocal = sessionmaker(
     bind=engine_test,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False
 )
 
 @pytest_asyncio.fixture(scope="function")
@@ -65,8 +76,10 @@ async def db_session():
     
     # Provide session
     async with AsyncSessionLocal() as session:
-        yield session
-        await session.rollback()
+        async with session.begin():
+            yield session
+            # Rollback happens automatically if there's an exception
+            # Otherwise commit happens automatically
     
     # Clean up tables after test
     async with engine_test.begin() as conn:
