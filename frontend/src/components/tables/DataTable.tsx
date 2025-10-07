@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui'
 export interface Column<T> {
   key: keyof T
   label: string
-  render?: (value: any, item: T) => React.ReactNode
+  render?: (value: T[keyof T], item: T) => React.ReactNode
   sortable?: boolean
   width?: string
 }
@@ -29,7 +29,7 @@ interface DataTableProps<T> {
   emptyMessage?: string
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   actions = [],

@@ -22,21 +22,21 @@ export const useRealTimeUpdates = () => {
       case 'image_processed':
         queryClient.invalidateQueries({ queryKey: ['images'] })
         queryClient.invalidateQueries({ queryKey: ['storage'] })
-        toast.success(`Image ${(update.data as any).name} ${update.type === 'image_uploaded' ? 'uploaded' : 'processed'} successfully`)
+        toast.success(`Image ${(update.data as { name?: string }).name} ${update.type === 'image_uploaded' ? 'uploaded' : 'processed'} successfully`)
         break
 
       case 'session_started':
       case 'session_ended':
         queryClient.invalidateQueries({ queryKey: ['sessions'] })
         queryClient.invalidateQueries({ queryKey: ['machines'] })
-        toast.success(`Session ${update.type === 'session_started' ? 'started' : 'ended'} for machine ${(update.data as any).machine_name}`)
+        toast.success(`Session ${update.type === 'session_started' ? 'started' : 'ended'} for machine ${(update.data as { machine_name?: string }).machine_name}`)
         break
 
       case 'machine_connected':
       case 'machine_disconnected':
         queryClient.invalidateQueries({ queryKey: ['machines'] })
         queryClient.invalidateQueries({ queryKey: ['health', 'detailed'] })
-        toast.success(`Machine ${(update.data as any).name} ${update.type === 'machine_connected' ? 'connected' : 'disconnected'}`)
+        toast.success(`Machine ${(update.data as { name?: string }).name} ${update.type === 'machine_connected' ? 'connected' : 'disconnected'}`)
         break
 
       default:
