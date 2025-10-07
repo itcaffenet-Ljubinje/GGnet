@@ -1,6 +1,44 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosProgressEvent } from "axios";
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
+
+// API parameter types
+interface QueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sort?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+interface ImageData {
+  name?: string;
+  description?: string;
+  format?: string;
+  [key: string]: unknown;
+}
+
+interface MachineData {
+  name: string;
+  hostname: string;
+  ip_address: string;
+  mac_address: string;
+  asset_tag?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface TargetData {
+  machine_id: number;
+  image_id: number;
+  [key: string]: unknown;
+}
+
+interface SessionData {
+  machine_id: number;
+  image_id: number;
+  [key: string]: unknown;
+}
 
 // Create an AxiosInstance
 export const api: AxiosInstance = axios.create({
@@ -110,7 +148,7 @@ export const apiHelpers = {
     }),
 
   // Images
-  getImages: (params?: any) =>
+  getImages: (params?: QueryParams) =>
     api.get('/images', { params }).then(response => response.data),
   
   getImage: (id: number) =>
@@ -122,7 +160,7 @@ export const apiHelpers = {
         'Content-Type': 'multipart/form-data',
       },
       signal: options?.signal,
-      onUploadProgress: (progressEvent: any) => {
+      onUploadProgress: (progressEvent: AxiosProgressEvent) => {
         if (options?.onProgress && progressEvent.total) {
           const progress = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
@@ -132,52 +170,52 @@ export const apiHelpers = {
       },
     }).then(response => response.data),
   
-  updateImage: (id: number, data: any) =>
+  updateImage: (id: number, data: ImageData) =>
     api.put(`/images/${id}`, data).then(response => response.data),
   
   deleteImage: (id: number) =>
     api.delete(`/images/${id}`).then(response => response.data),
 
   // Machines
-  getMachines: (params?: any) =>
+  getMachines: (params?: QueryParams) =>
     api.get('/machines', { params }).then(response => response.data),
   
   getMachine: (id: number) =>
     api.get(`/machines/${id}`).then(response => response.data),
   
-  createMachine: (data: any) =>
+  createMachine: (data: MachineData) =>
     api.post('/machines', data).then(response => response.data),
   
-  updateMachine: (id: number, data: any) =>
+  updateMachine: (id: number, data: Partial<MachineData>) =>
     api.put(`/machines/${id}`, data).then(response => response.data),
   
   deleteMachine: (id: number) =>
     api.delete(`/machines/${id}`).then(response => response.data),
 
   // Targets
-  getTargets: (params?: any) =>
+  getTargets: (params?: QueryParams) =>
     api.get('/targets', { params }).then(response => response.data),
   
   getTarget: (id: number) =>
     api.get(`/targets/${id}`).then(response => response.data),
   
-  createTarget: (data: any) =>
+  createTarget: (data: TargetData) =>
     api.post('/targets', data).then(response => response.data),
   
-  updateTarget: (id: number, data: any) =>
+  updateTarget: (id: number, data: Partial<TargetData>) =>
     api.put(`/targets/${id}`, data).then(response => response.data),
   
   deleteTarget: (id: number) =>
     api.delete(`/targets/${id}`).then(response => response.data),
 
   // Sessions
-  getSessions: (params?: any) =>
+  getSessions: (params?: QueryParams) =>
     api.get('/sessions', { params }).then(response => response.data),
   
   getSessionStatus: (sessionId: string) =>
     api.get(`/sessions/${sessionId}/status`).then(response => response.data),
   
-  startSession: (data: any) =>
+  startSession: (data: SessionData) =>
     api.post('/sessions/start', data).then(response => response.data),
   
   stopSession: (sessionId: string) =>
@@ -221,7 +259,7 @@ export const apiHelpers = {
     api.post(`/sessions/${sessionId}/kill`).then(response => response.data),
 
   // iSCSI Target Management
-  createIscsiTarget: (data: any) =>
+  createIscsiTarget: (data: TargetData) =>
     api.post('/iscsi', data).then(response => response.data),
 
   getIscsiTargets: () =>
