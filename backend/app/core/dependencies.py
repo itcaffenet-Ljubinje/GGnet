@@ -228,17 +228,18 @@ async def log_user_activity(
             )
         else:
             # Create a new session and commit
-            from app.core.database import get_db
-            async for session in get_db():
-                try:
+            # Using async context manager directly instead of generator
+            from app.core.database import get_async_engine
+            from sqlalchemy.ext.asyncio import AsyncSession
+            
+            async_engine = get_async_engine()
+            async with AsyncSession(async_engine) as session:
+                async with session.begin():
                     await _log_audit_entry(
                         action, message, request, user, severity, 
-                        resource_type, resource_id, resource_name, session, should_commit=True
+                        resource_type, resource_id, resource_name, session, should_commit=False
                     )
-                    break
-                finally:
-                    # Session cleanup is handled by get_db context manager
-                    pass
+                    # Commit is handled by session.begin() context manager
     except Exception as e:
         # Don't let audit logging break the main flow
         logger.error("Failed to log user activity", error=str(e), action=action)
