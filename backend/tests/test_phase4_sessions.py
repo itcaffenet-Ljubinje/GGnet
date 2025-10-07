@@ -303,19 +303,25 @@ class TestSessionOrchestration:
         
         # Create test targets
         target1 = Target(
-            name="Test Target 1",
             iqn="iqn.2025-01.local.ggnet:target1",
             machine_id=machine1.id,
             image_id=image1.id,
+            image_path="/tmp/test1.vhdx",
+            initiator_iqn="iqn.2025-01.local.ggnet:initiator1",
+            lun_id=0,
             status=TargetStatus.ACTIVE,
+            description="Test Target 1",
             created_by=admin_user.id
         )
         target2 = Target(
-            name="Test Target 2",
             iqn="iqn.2025-01.local.ggnet:target2",
             machine_id=machine2.id,
             image_id=image2.id,
+            image_path="/tmp/test2.vhdx",
+            initiator_iqn="iqn.2025-01.local.ggnet:initiator2",
+            lun_id=0,
             status=TargetStatus.INACTIVE,
+            description="Test Target 2",
             created_by=admin_user.id
         )
         db_session.add_all([target1, target2])
