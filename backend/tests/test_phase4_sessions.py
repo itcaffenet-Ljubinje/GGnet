@@ -303,6 +303,7 @@ class TestSessionOrchestration:
         
         # Create test targets
         target1 = Target(
+            target_id="target-1",
             iqn="iqn.2025-01.local.ggnet:target1",
             machine_id=machine1.id,
             image_id=image1.id,
@@ -314,6 +315,7 @@ class TestSessionOrchestration:
             created_by=admin_user.id
         )
         target2 = Target(
+            target_id="target-2",
             iqn="iqn.2025-01.local.ggnet:target2",
             machine_id=machine2.id,
             image_id=image2.id,
