@@ -115,14 +115,15 @@ const ImageManager: React.FC = () => {
     },
     onError: (error: Error, variables) => {
       const file = variables.get('file') as File;
+      const errorMessage = (error as any).response?.data?.detail || error.message;
       setUploadProgress(prev => prev.map(item => 
         item.file === file ? { 
           ...item, 
           status: 'error', 
-          error: error.response?.data?.detail || error.message 
+          error: errorMessage 
         } : item
       ));
-      toast.error(`Failed to upload image: ${error.response?.data?.detail || error.message}`);
+      toast.error(`Failed to upload image: ${errorMessage}`);
     },
   });
 
@@ -134,7 +135,8 @@ const ImageManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['images'] });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete image: ${(error as { response?: { data?: { detail?: string } } }).response?.data?.detail || error.message}`);
+      const errorMessage = (error as any).response?.data?.detail || error.message;
+      toast.error(`Failed to delete image: ${errorMessage}`);
     },
   });
 
@@ -147,7 +149,8 @@ const ImageManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['conversion-jobs'] });
     },
     onError: (error: Error) => {
-      toast.error(`Failed to trigger conversion: ${(error as { response?: { data?: { detail?: string } } }).response?.data?.detail || error.message}`);
+      const errorMessage = (error as any).response?.data?.detail || error.message;
+      toast.error(`Failed to trigger conversion: ${errorMessage}`);
     },
   });
 
