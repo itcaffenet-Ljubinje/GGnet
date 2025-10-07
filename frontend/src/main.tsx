@@ -17,6 +17,9 @@ const queryClient = new QueryClient({
   },
 })
 
+// Add dark class to HTML element for proper dark mode
+document.documentElement.classList.add('dark')
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -26,9 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           v7_relativeSplatPath: true,
         }}
       >
-        <div className="dark">
-          <App />
-        </div>
+        <App />
         <Toaster
           position="top-right"
           toastOptions={{
