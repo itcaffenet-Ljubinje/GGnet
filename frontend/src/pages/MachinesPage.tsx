@@ -16,6 +16,15 @@ import { useNotifications } from '../components/notifications'
 import { clsx } from 'clsx'
 import MachineModal from '../components/MachineModal'
 
+// Type for Axios error responses
+interface AxiosErrorResponse extends Error {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
 interface Machine {
   id: number
   name: string
@@ -66,7 +75,7 @@ export default function MachinesPage() {
   })
 
   // Calculate stats
-  const stats: MachineStats = machines.reduce((acc: any, machine: any) => {
+  const stats: MachineStats = machines.reduce((acc: MachineStats, machine: Machine) => {
     acc.total++
     if (machine.status === 'active') acc.active++
     if (machine.is_online) acc.online++
@@ -84,7 +93,7 @@ export default function MachinesPage() {
         message: 'Machine deleted successfully'
       })
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       addNotification({
         type: 'error',
         message: `Failed to delete machine: ${error.message}`
@@ -103,7 +112,7 @@ export default function MachinesPage() {
         message: 'Machine status updated successfully'
       })
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       addNotification({
         type: 'error',
         message: `Failed to update machine status: ${error.message}`
@@ -134,11 +143,11 @@ export default function MachinesPage() {
     if (selectedMachines.length === machines.length) {
       setSelectedMachines([])
     } else {
-      setSelectedMachines(machines.map((m: any) => m.id))
+      setSelectedMachines(machines.map((m: Machine) => m.id))
     }
   }
 
-  const handleEdit = (machine: any) => {
+  const handleEdit = (machine: Machine) => {
     setEditingMachine(machine)
     setShowEditModal(true)
   }
@@ -386,7 +395,7 @@ export default function MachinesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {machines.map((machine: any) => (
+                  {machines.map((machine: Machine) => (
                     <tr key={machine.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input

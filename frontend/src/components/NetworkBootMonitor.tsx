@@ -35,7 +35,7 @@ interface BootEvent {
   event_type: 'DHCP_REQUEST' | 'TFTP_REQUEST' | 'IPXE_LOAD' | 'ISCSI_CONNECT' | 'BOOT_SUCCESS' | 'BOOT_FAILED';
   status: 'SUCCESS' | 'FAILED' | 'IN_PROGRESS';
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 interface NetworkService {

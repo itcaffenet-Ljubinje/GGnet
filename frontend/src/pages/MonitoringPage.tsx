@@ -97,7 +97,7 @@ interface ActiveSession {
 function StatCard({ title, value, icon: Icon, color = 'blue', subtitle, trend }: {
   title: string
   value: string | number
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple'
   subtitle?: string
   trend?: { value: number; isPositive: boolean }

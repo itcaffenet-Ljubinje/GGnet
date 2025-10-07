@@ -383,7 +383,7 @@ const SystemMonitor: React.FC = () => {
                 <YAxis />
                 <Tooltip 
                   labelFormatter={(value) => new Date(value).toLocaleString()}
-                  formatter={(value: any, name: any) => [formatBytes(Number(value)), name]}
+                  formatter={(value: number | string, name: string) => [formatBytes(Number(value)), name]}
                 />
                 <Line 
                   type="monotone" 
@@ -520,7 +520,7 @@ const SystemMonitor: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">System Issues</h3>
               <div className="space-y-3">
-                {health.issues.map((issue: any, index: number) => (
+                {health.issues.map((issue: { severity: string; message: string }, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-900">{issue.component}</span>
@@ -541,7 +541,7 @@ const SystemMonitor: React.FC = () => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommendations</h3>
               <div className="space-y-2">
-                {health.recommendations.map((recommendation: any, index: number) => (
+                {health.recommendations.map((recommendation: { priority: string; action: string; impact: string }, index: number) => (
                   <div key={index} className="flex items-start space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-gray-600">{recommendation}</p>
