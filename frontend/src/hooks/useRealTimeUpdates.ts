@@ -62,9 +62,8 @@ export const useRealTimeUpdates = () => {
     } catch (e) {
       // Ignore parsing errors
     }
-    // Use proxy in development, direct connection in production
-    const baseUrl = (import.meta as { env?: { DEV?: boolean } }).env?.DEV ? 'ws://localhost:3000/ws' : 'ws://localhost:8000/ws'
-    return baseUrl
+    // Don't connect if not authenticated
+    return null
   }, [])
 
   const { isConnected, isConnecting, error, sendMessage } = useWebSocket({

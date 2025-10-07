@@ -40,6 +40,12 @@ export const useWebSocket = (options: WebSocketOptions) => {
   const reconnectAttemptsRef = useRef(0)
 
   const connect = useCallback(() => {
+    // Don't connect if URL is null or empty
+    if (!url) {
+      console.log('WebSocket: No URL provided, skipping connection')
+      return
+    }
+    
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
       return
     }
