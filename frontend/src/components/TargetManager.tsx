@@ -25,6 +25,15 @@ import { StatusBadge } from './ui/StatusBadge';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
+// Type for Axios error responses
+interface AxiosErrorResponse extends Error {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
 interface Target {
   id: number;
   target_id: string;
@@ -119,7 +128,7 @@ const TargetManager: React.FC = () => {
       setShowCreateForm(false);
       resetForm();
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       toast.error(`Failed to create target: ${error.response?.data?.detail || error.message}`);
       setIsCreating(false);
     },
@@ -133,7 +142,7 @@ const TargetManager: React.FC = () => {
       toast.success(`Target ${data.target_id} updated successfully`);
       queryClient.invalidateQueries({ queryKey: ['targets'] });
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       toast.error(`Failed to update target: ${error.response?.data?.detail || error.message}`);
     },
   });
@@ -147,7 +156,7 @@ const TargetManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['targets'] });
       queryClient.invalidateQueries({ queryKey: ['machines'] });
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       toast.error(`Failed to delete target: ${error.response?.data?.detail || error.message}`);
     },
   });
@@ -401,9 +410,9 @@ const TargetManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {targets.map((target: any) => {
-              const machine = machines.find((m: any) => m.id === target.machine_id);
-              const image = images.find((i: any) => i.id === target.image_id);
+            {targets.map((target: Target) => {
+              const machine = machines.find((m: { id: number; name?: string }) => m.id === target.machine_id);
+              const image = images.find((i: { id: number; name?: string }) => i.id === target.image_id);
               
               return (
                 <div key={target.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">

@@ -26,6 +26,15 @@ import { StatusBadge } from './ui/StatusBadge';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
 
+// Type for Axios error responses
+interface AxiosErrorResponse extends Error {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
 interface Session {
   id: number;
   machine_id: number;
@@ -130,7 +139,7 @@ const SessionManager: React.FC = () => {
       // Show session details
       console.log('Session started:', data);
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       toast.error(`Failed to start session: ${error.response?.data?.detail || error.message}`);
       setIsStarting(false);
     },
@@ -145,7 +154,7 @@ const SessionManager: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       queryClient.invalidateQueries({ queryKey: ['machines'] });
     },
-    onError: (error: any) => {
+    onError: (error: AxiosErrorResponse) => {
       toast.error(`Failed to stop session: ${error.response?.data?.detail || error.message}`);
     },
   });
@@ -428,9 +437,9 @@ const SessionManager: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sessions.map((session: any) => {
-                  const machine = machines.find((m: any) => m.id === session.machine_id);
-                  const image = images.find((i: any) => i.id === session.image_id);
+                {sessions.map((session: Session) => {
+                  const machine = machines.find((m: { id: number; name?: string }) => m.id === session.machine_id);
+                  const image = images.find((i: { id: number; name?: string }) => i.id === session.image_id);
                   
                   return (
                     <tr key={session.id} className="hover:bg-gray-50">
