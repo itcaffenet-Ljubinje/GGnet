@@ -16,9 +16,15 @@ from app.core.cache import cache_manager
 
 logger = structlog.get_logger()
 
-# Password hashing
+# Password hashing - support both bcrypt and pbkdf2_sha256
+# This allows fallback in CI environments where bcrypt may have issues
 try:
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    # Try to use bcrypt first, but support pbkdf2_sha256 as fallback
+    pwd_context = CryptContext(
+        schemes=["bcrypt", "pbkdf2_sha256"], 
+        deprecated="auto",
+        bcrypt__default_rounds=12
+    )
 except Exception:
     # Fallback for CI environments where bcrypt binding may fail
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")

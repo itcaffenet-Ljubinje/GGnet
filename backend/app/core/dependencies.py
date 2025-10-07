@@ -35,10 +35,16 @@ async def get_current_user(
     try:
         # Verify token
         payload = await verify_token(credentials.credentials, "access")
-        user_id: int = payload.get("sub")
+        user_id_str = payload.get("sub")
         
-        if user_id is None:
+        if user_id_str is None:
             raise create_credentials_exception("Invalid token payload")
+        
+        # Convert user_id to integer (JWT stores it as string)
+        try:
+            user_id = int(user_id_str)
+        except (ValueError, TypeError):
+            raise create_credentials_exception("Invalid user ID in token")
         
         # Get user from database
         result = await db.execute(select(User).where(User.id == user_id))
