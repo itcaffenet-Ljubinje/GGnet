@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App.tsx'
 import './index.css'
 
-// Create a client
+// Configure React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
