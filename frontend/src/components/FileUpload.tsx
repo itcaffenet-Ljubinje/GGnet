@@ -78,9 +78,10 @@ export function FileUpload({
           : f
       ))
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addNotification({
         type: 'error',
-        message: `Failed to upload ${fileItem.file.name}: ${error.message}`
+        message: `Failed to upload ${fileItem.file.name}: ${errorMessage}`
       })
     }
   }, [addNotification, onUploadComplete])
