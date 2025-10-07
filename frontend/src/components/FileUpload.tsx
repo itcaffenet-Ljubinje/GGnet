@@ -32,43 +32,6 @@ export function FileUpload({
   const { addNotification } = useNotifications()
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newFiles: UploadFile[] = acceptedFiles.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      progress: 0,
-      status: 'uploading' as const
-    }))
-
-    setFiles(prev => [...prev, ...newFiles])
-    uploadFiles(newFiles)
-  }, [uploadFiles])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: acceptedTypes.reduce((acc, type) => {
-      acc[type] = []
-      return acc
-    }, {} as Record<string, string[]>),
-    maxFiles,
-    maxSize
-  })
-
-  const uploadFiles = useCallback(async (filesToUpload: UploadFile[]) => {
-    setIsUploading(true)
-    abortControllerRef.current = new AbortController()
-
-    try {
-      for (const fileItem of filesToUpload) {
-        await uploadSingleFile(fileItem)
-      }
-    } catch (error) {
-      console.error('Upload error:', error)
-    } finally {
-      setIsUploading(false)
-    }
-  }, [uploadSingleFile, addNotification, onUploadComplete])
-
   const uploadSingleFile = useCallback(async (fileItem: UploadFile) => {
     const formData = new FormData()
     formData.append('file', fileItem.file)
@@ -120,7 +83,44 @@ export function FileUpload({
         message: `Failed to upload ${fileItem.file.name}: ${error.message}`
       })
     }
-  }, [])
+  }, [addNotification, onUploadComplete])
+
+  const uploadFiles = useCallback(async (filesToUpload: UploadFile[]) => {
+    setIsUploading(true)
+    abortControllerRef.current = new AbortController()
+
+    try {
+      for (const fileItem of filesToUpload) {
+        await uploadSingleFile(fileItem)
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+    } finally {
+      setIsUploading(false)
+    }
+  }, [uploadSingleFile])
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const newFiles: UploadFile[] = acceptedFiles.map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      file,
+      progress: 0,
+      status: 'uploading' as const
+    }))
+
+    setFiles(prev => [...prev, ...newFiles])
+    uploadFiles(newFiles)
+  }, [uploadFiles])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: acceptedTypes.reduce((acc, type) => {
+      acc[type] = []
+      return acc
+    }, {} as Record<string, string[]>),
+    maxFiles,
+    maxSize
+  })
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId))

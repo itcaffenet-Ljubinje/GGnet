@@ -13,7 +13,7 @@ export const api: AxiosInstance = axios.create({
   
 // Request interceptor
 api.interceptors.request.use(
-  (config: { headers: { Authorization?: string } }) => {
+  (config) => {
     // Add authentication token
     const token = localStorage.getItem('auth-storage')
     if (token) {
@@ -44,10 +44,10 @@ api.interceptors.request.use(
 
 // Response interceptor
 api.interceptors.response.use(
-  (response: { data: unknown }) => {
+  (response) => {
     return response
   },
-  async (error: { response?: { status: number }; config: { _retry?: boolean } }) => {
+  async (error) => {
     const originalRequest = error.config
 
     // Handle 401 errors (unauthorized)

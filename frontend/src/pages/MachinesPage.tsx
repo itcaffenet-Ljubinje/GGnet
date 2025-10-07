@@ -484,7 +484,7 @@ export default function MachinesPage() {
       <MachineModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        machine={editingMachine}
+        machine={editingMachine || undefined}
         mode="edit"
       />
     </div>

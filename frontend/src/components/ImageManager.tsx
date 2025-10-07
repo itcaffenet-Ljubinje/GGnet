@@ -370,7 +370,7 @@ const ImageManager: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {images.map((image: { id: number; name: string; size: number; status: string; created_at: string; format: string }) => (
+            {images.map((image: any) => (
               <div key={image.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

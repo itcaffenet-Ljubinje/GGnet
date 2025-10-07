@@ -8,15 +8,7 @@ import { useNotifications } from './notifications'
 interface MachineModalProps {
   isOpen: boolean
   onClose: () => void
-  machine?: {
-    id?: number
-    name: string
-    hostname: string
-    ip_address: string
-    mac_address: string
-    asset_tag?: string
-    description?: string
-  }
+  machine?: any
   mode: 'create' | 'edit'
 }
 
