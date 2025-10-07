@@ -213,18 +213,35 @@ async def log_user_activity(
     resource_name: Optional[str] = None,
     db: AsyncSession = None
 ):
-    """Log user activity for audit purposes"""
+    """Log user activity for audit purposes
     
-    # Always use the provided session or skip logging if none
-    # Audit logging should not create its own session to avoid conflicts
-    if db is not None:
-        await _log_audit_entry(
-            action, message, request, user, severity, 
-            resource_type, resource_id, resource_name, db, should_commit=False
-        )
-    else:
-        # Log a warning but don't fail
-        logger.warning("Audit log skipped - no database session provided")
+    If db session is provided, it will be used (and not committed).
+    If db session is not provided, a new session will be created and committed.
+    """
+    
+    try:
+        if db is not None:
+            # Use existing session without committing
+            await _log_audit_entry(
+                action, message, request, user, severity, 
+                resource_type, resource_id, resource_name, db, should_commit=False
+            )
+        else:
+            # Create a new session and commit
+            from app.core.database import get_db
+            async for session in get_db():
+                try:
+                    await _log_audit_entry(
+                        action, message, request, user, severity, 
+                        resource_type, resource_id, resource_name, session, should_commit=True
+                    )
+                    break
+                finally:
+                    # Session cleanup is handled by get_db context manager
+                    pass
+    except Exception as e:
+        # Don't let audit logging break the main flow
+        logger.error("Failed to log user activity", error=str(e), action=action)
 
 
 async def _log_audit_entry(
@@ -259,10 +276,13 @@ async def _log_audit_entry(
         db.add(audit_log)
         if should_commit:
             await db.commit()
+            await db.refresh(audit_log)
         else:
-            await db.flush()  # Flush but don't commit
+            await db.flush()  # Flush but don't commit - parent will commit
     except Exception as e:
         logger.error("Failed to log audit entry", error=str(e))
+        if should_commit and db:
+            await db.rollback()
         # Don't raise - logging should never break the main flow
         pass
     
