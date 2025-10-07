@@ -283,7 +283,7 @@ class TestSessionOrchestration:
             hostname="test1.local",
             ip_address="192.168.1.100",
             mac_address="00:11:22:33:44:55",
-            status=MachineStatus.ONLINE,
+            status=MachineStatus.ACTIVE,
             boot_mode=BootMode.UEFI,
             created_by=admin_user.id
         )
@@ -292,8 +292,8 @@ class TestSessionOrchestration:
             hostname="test2.local",
             ip_address="192.168.1.101",
             mac_address="00:11:22:33:44:66",
-            status=MachineStatus.OFFLINE,
-            boot_mode=BootMode.BIOS,
+            status=MachineStatus.INACTIVE,
+            boot_mode=BootMode.LEGACY,
             created_by=admin_user.id
         )
         db_session.add_all([machine1, machine2])
