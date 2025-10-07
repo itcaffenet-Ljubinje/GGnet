@@ -273,7 +273,7 @@ class TestImageConversionWorker:
                 assert str(worker.temp_path) == str(Path("/tmp/storage/temp"))
     
     @pytest.mark.asyncio
-    async def test_convert_image_success(self, db_session):
+    async def test_convert_image_success(self, db_session, admin_user):
         """Test successful image conversion by worker"""
         from worker.convert import ImageConversionWorker
         
@@ -286,7 +286,7 @@ class TestImageConversionWorker:
             size_bytes=1024*1024*100,
             status=ImageStatus.PROCESSING,
             image_type=ImageType.SYSTEM,
-            created_by=1
+            created_by=admin_user.id
         )
         db_session.add(image)
         await db_session.commit()
@@ -315,7 +315,7 @@ class TestImageConversionWorker:
             assert result["output_size"] == 1024*1024*50
     
     @pytest.mark.asyncio
-    async def test_convert_image_file_not_found(self, db_session):
+    async def test_convert_image_file_not_found(self, db_session, admin_user):
         """Test image conversion when file not found"""
         from worker.convert import ImageConversionWorker
         
@@ -328,7 +328,7 @@ class TestImageConversionWorker:
             size_bytes=1024*1024*100,
             status=ImageStatus.PROCESSING,
             image_type=ImageType.SYSTEM,
-            created_by=1
+            created_by=admin_user.id
         )
         db_session.add(image)
         await db_session.commit()

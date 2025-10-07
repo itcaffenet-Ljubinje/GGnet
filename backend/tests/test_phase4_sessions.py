@@ -248,22 +248,95 @@ class TestSessionOrchestration:
     async def test_list_sessions(self, client: AsyncClient, admin_user, admin_token, db_session):
         """Test listing sessions"""
         
+        # Create test machines and targets first
+        from app.models.machine import Machine, MachineStatus, BootMode
+        from app.models.target import Target, TargetStatus
+        from app.models.image import Image, ImageFormat, ImageStatus, ImageType
+        
+        # Create test images
+        image1 = Image(
+            name="Test Image 1",
+            filename="test1.vhdx",
+            file_path="/tmp/test1.vhdx",
+            format=ImageFormat.VHDX,
+            size_bytes=1024*1024*100,
+            status=ImageStatus.READY,
+            image_type=ImageType.SYSTEM,
+            created_by=admin_user.id
+        )
+        image2 = Image(
+            name="Test Image 2",
+            filename="test2.vhdx",
+            file_path="/tmp/test2.vhdx",
+            format=ImageFormat.VHDX,
+            size_bytes=1024*1024*100,
+            status=ImageStatus.READY,
+            image_type=ImageType.SYSTEM,
+            created_by=admin_user.id
+        )
+        db_session.add_all([image1, image2])
+        await db_session.commit()
+        
+        # Create test machines
+        machine1 = Machine(
+            name="Test Machine 1",
+            hostname="test1.local",
+            ip_address="192.168.1.100",
+            mac_address="00:11:22:33:44:55",
+            status=MachineStatus.ONLINE,
+            boot_mode=BootMode.UEFI,
+            created_by=admin_user.id
+        )
+        machine2 = Machine(
+            name="Test Machine 2",
+            hostname="test2.local",
+            ip_address="192.168.1.101",
+            mac_address="00:11:22:33:44:66",
+            status=MachineStatus.OFFLINE,
+            boot_mode=BootMode.BIOS,
+            created_by=admin_user.id
+        )
+        db_session.add_all([machine1, machine2])
+        await db_session.commit()
+        await db_session.refresh(machine1)
+        await db_session.refresh(machine2)
+        
+        # Create test targets
+        target1 = Target(
+            name="Test Target 1",
+            iqn="iqn.2025-01.local.ggnet:target1",
+            machine_id=machine1.id,
+            image_id=image1.id,
+            status=TargetStatus.ACTIVE,
+            created_by=admin_user.id
+        )
+        target2 = Target(
+            name="Test Target 2",
+            iqn="iqn.2025-01.local.ggnet:target2",
+            machine_id=machine2.id,
+            image_id=image2.id,
+            status=TargetStatus.INACTIVE,
+            created_by=admin_user.id
+        )
+        db_session.add_all([target1, target2])
+        await db_session.commit()
+        await db_session.refresh(target1)
+        await db_session.refresh(target2)
+        
         # Create test sessions
         session1 = Session(
-            id=1,
             session_id="test-session-1",
-            machine_id=1,
-            target_id=1,
+            machine_id=machine1.id,
+            target_id=target1.id,
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.ACTIVE,
             started_at=datetime.utcnow(),
             server_ip="192.168.1.10"
         )
         session2 = Session(
-            id=2,
             session_id="test-session-2",
-            machine_id=2,
-            target_id=2,
+            machine_id=machine2.id,
+            target_id=target2.id,
             session_type=SessionType.DISKLESS_BOOT,
             status=SessionStatus.STOPPED,
             started_at=datetime.utcnow(),
