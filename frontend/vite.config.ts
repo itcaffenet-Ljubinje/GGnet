@@ -4,17 +4,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [
-    // Temporarily disabled React plugin to debug NS_BINDING_ABORTED
-    // react({
-    //   fastRefresh: false,
-    // })
-  ],
-  esbuild: {
-    // Use esbuild to transform JSX instead of React plugin
-    jsx: 'automatic',
-    jsxDev: true,
-  },
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

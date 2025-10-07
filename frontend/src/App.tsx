@@ -3,8 +3,7 @@ import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { NotificationProvider } from './components/notifications'
-// import LoginPage from './pages/LoginPage'  // Complex version with react-hook-form
-import LoginPage from './pages/LoginPage.simple'  // Simple version for debugging
+import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ImagesPage from './pages/ImagesPage'
 import MachinesPage from './pages/MachinesPage'
