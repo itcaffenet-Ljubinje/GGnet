@@ -107,13 +107,13 @@ const TargetManager: React.FC = () => {
   // Fetch machines
   const { data: machinesData, isLoading: machinesLoading } = useQuery({
     queryKey: ['machines'],
-    queryFn: () => api.get('/machines/').then(res => res.data),
+    queryFn: () => api.get('/api/machines/').then(res => res.data),
   });
 
   // Fetch images
   const { data: imagesData, isLoading: imagesLoading } = useQuery({
     queryKey: ['images'],
-    queryFn: () => api.get('/images/').then(res => res.data),
+    queryFn: () => api.get('/api/images/').then(res => res.data),
   });
 
   // Create target mutation

@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true })
         
         try {
-          const response = await api.post('/auth/login', {
+          const response = await api.post('/api/auth/login', {
             username,
             password,
           })
@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthStore>()(
           api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
           // Get user info
-          const userResponse = await api.get('/auth/me')
+          const userResponse = await api.get('/api/auth/me')
           const user = userResponse.data
 
           set({
@@ -80,7 +80,7 @@ export const useAuthStore = create<AuthStore>()(
         
         try {
           if (accessToken) {
-            await api.post('/auth/logout')
+            await api.post('/api/auth/logout')
           }
         } catch (error) {
           // Ignore logout errors
@@ -108,7 +108,7 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         try {
-          const response = await api.post('/auth/refresh', {
+          const response = await api.post('/api/auth/refresh', {
             refresh_token: refreshToken,
           })
 

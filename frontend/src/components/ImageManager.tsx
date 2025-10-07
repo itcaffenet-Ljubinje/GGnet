@@ -88,14 +88,14 @@ const ImageManager: React.FC = () => {
   // Fetch images
   const { data: imagesData, isLoading: imagesLoading, refetch: refetchImages } = useQuery({
     queryKey: ['images'],
-    queryFn: () => api.get('/images/').then(res => res.data),
+    queryFn: () => api.get('/api/images/').then(res => res.data),
     refetchInterval: 5000, // Refresh every 5 seconds for processing status
   });
 
   // Fetch conversion jobs
   const { data: conversionJobsData } = useQuery({
     queryKey: ['conversion-jobs'],
-    queryFn: () => api.get('/images/conversion-jobs').then(res => res.data),
+    queryFn: () => api.get('/api/images/conversion-jobs').then(res => res.data),
     refetchInterval: 2000, // Refresh every 2 seconds for job progress
   });
 

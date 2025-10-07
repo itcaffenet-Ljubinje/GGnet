@@ -42,7 +42,7 @@ interface SessionData {
 
 // Create an AxiosInstance
 export const api: AxiosInstance = axios.create({
-  baseURL: "/api",
+  baseURL: "",  // No prefix - paths should include /api if needed
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -130,32 +130,32 @@ api.interceptors.response.use(
 export const apiHelpers = {
   // Auth
   login: (username: string, password: string) =>
-    api.post('/auth/login', { username, password }),
+    api.post('/api/auth/login', { username, password }),
   
   logout: () =>
-    api.post('/auth/logout'),
+    api.post('/api/auth/logout'),
   
   refreshToken: (refreshToken: string) =>
-    api.post('/auth/refresh', { refresh_token: refreshToken }),
+    api.post('/api/auth/refresh', { refresh_token: refreshToken }),
   
   getCurrentUser: () =>
-    api.get('/auth/me'),
+    api.get('/api/auth/me'),
   
   changePassword: (currentPassword: string, newPassword: string) =>
-    api.post('/auth/change-password', {
+    api.post('/api/auth/change-password', {
       current_password: currentPassword,
       new_password: newPassword,
     }),
 
   // Images
   getImages: (params?: QueryParams) =>
-    api.get('/images', { params }).then(response => response.data),
+    api.get('/api/images', { params }).then(response => response.data),
   
   getImage: (id: number) =>
-    api.get(`/images/${id}`).then(response => response.data),
+    api.get(`/api/images/${id}`).then(response => response.data),
   
   uploadImage: (formData: FormData, options?: { onProgress?: (progress: number) => void; signal?: AbortSignal }) =>
-    api.post('/images/upload', formData, {
+    api.post('/api/images/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -171,99 +171,99 @@ export const apiHelpers = {
     }).then(response => response.data),
   
   updateImage: (id: number, data: ImageData) =>
-    api.put(`/images/${id}`, data).then(response => response.data),
+    api.put(`/api/images/${id}`, data).then(response => response.data),
   
   deleteImage: (id: number) =>
-    api.delete(`/images/${id}`).then(response => response.data),
+    api.delete(`/api/images/${id}`).then(response => response.data),
 
   // Machines
   getMachines: (params?: QueryParams) =>
-    api.get('/machines', { params }).then(response => response.data),
+    api.get('/api/machines', { params }).then(response => response.data),
   
   getMachine: (id: number) =>
-    api.get(`/machines/${id}`).then(response => response.data),
+    api.get(`/api/machines/${id}`).then(response => response.data),
   
   createMachine: (data: MachineData) =>
-    api.post('/machines', data).then(response => response.data),
+    api.post('/api/machines', data).then(response => response.data),
   
   updateMachine: (id: number, data: Partial<MachineData>) =>
-    api.put(`/machines/${id}`, data).then(response => response.data),
+    api.put(`/api/machines/${id}`, data).then(response => response.data),
   
   deleteMachine: (id: number) =>
-    api.delete(`/machines/${id}`).then(response => response.data),
+    api.delete(`/api/machines/${id}`).then(response => response.data),
 
   // Targets
   getTargets: (params?: QueryParams) =>
-    api.get('/targets', { params }).then(response => response.data),
+    api.get('/api/api/v1/targets', { params }).then(response => response.data),
   
   getTarget: (id: number) =>
-    api.get(`/targets/${id}`).then(response => response.data),
+    api.get(`/api/api/v1/targets/${id}`).then(response => response.data),
   
   createTarget: (data: TargetData) =>
-    api.post('/targets', data).then(response => response.data),
+    api.post('/api/api/v1/targets', data).then(response => response.data),
   
   updateTarget: (id: number, data: Partial<TargetData>) =>
-    api.put(`/targets/${id}`, data).then(response => response.data),
+    api.put(`/api/api/v1/targets/${id}`, data).then(response => response.data),
   
   deleteTarget: (id: number) =>
-    api.delete(`/targets/${id}`).then(response => response.data),
+    api.delete(`/api/api/v1/targets/${id}`).then(response => response.data),
 
   // Sessions
   getSessions: (params?: QueryParams) =>
-    api.get('/sessions', { params }).then(response => response.data),
+    api.get('/api/api/v1/sessions', { params }).then(response => response.data),
   
   getSessionStatus: (sessionId: string) =>
-    api.get(`/sessions/${sessionId}/status`).then(response => response.data),
+    api.get(`/api/api/v1/sessions/${sessionId}/status`).then(response => response.data),
   
   startSession: (data: SessionData) =>
-    api.post('/sessions/start', data).then(response => response.data),
+    api.post('/api/api/v1/sessions/start', data).then(response => response.data),
   
   stopSession: (sessionId: string) =>
-    api.post(`/sessions/${sessionId}/stop`).then(response => response.data),
+    api.post(`/api/api/v1/sessions/${sessionId}/stop`).then(response => response.data),
 
   // Storage
   getStorageInfo: () =>
-    api.get('/storage/info').then(response => response.data),
+    api.get('/api/storage/info').then(response => response.data),
   
   getStorageHealth: () =>
-    api.get('/storage/health').then(response => response.data),
+    api.get('/api/storage/health').then(response => response.data),
   
   cleanupStorage: () =>
-    api.post('/storage/cleanup').then(response => response.data),
+    api.post('/api/storage/cleanup').then(response => response.data),
 
   // Health
   getHealth: () =>
-    api.get('/health').then(response => response.data),
+    api.get('/api/health').then(response => response.data),
   
   getDetailedHealth: () =>
-    api.get('/health/detailed').then(response => response.data),
+    api.get('/api/health/detailed').then(response => response.data),
 
   // Monitoring
   getPerformanceMetrics: () =>
-    api.get('/monitoring/metrics').then(response => response.data),
+    api.get('/api/monitoring/metrics').then(response => response.data),
   
   getActiveSessions: () =>
-    api.get('/monitoring/sessions/active').then(response => response.data),
+    api.get('/api/monitoring/sessions/active').then(response => response.data),
 
   // Session Monitoring
   getSessionStats: () =>
-    api.get('/sessions/stats/overview').then(response => response.data),
+    api.get('/api/sessions/stats/overview').then(response => response.data),
 
   getActiveSessionsDetailed: () =>
-    api.get('/sessions/active').then(response => response.data),
+    api.get('/api/sessions/active').then(response => response.data),
 
   getRealtimeSessionData: () =>
-    api.get('/sessions/monitoring/realtime').then(response => response.data),
+    api.get('/api/sessions/monitoring/realtime').then(response => response.data),
 
   killSession: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/kill`).then(response => response.data),
 
   // iSCSI Target Management
   createIscsiTarget: (data: TargetData) =>
-    api.post('/iscsi', data).then(response => response.data),
+    api.post('/api/iscsi', data).then(response => response.data),
 
   getIscsiTargets: () =>
-    api.get('/iscsi').then(response => response.data),
+    api.get('/api/iscsi').then(response => response.data),
 
   getIscsiTarget: (id: number) =>
     api.get(`/iscsi/${id}`).then(response => response.data),

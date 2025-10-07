@@ -123,7 +123,7 @@ const SessionManager: React.FC = () => {
   // Fetch images
   const { data: imagesData, isLoading: imagesLoading } = useQuery({
     queryKey: ['images'],
-    queryFn: () => api.get('/images/').then(res => res.data),
+    queryFn: () => api.get('/api/images/').then(res => res.data),
   });
 
   // Start session mutation
