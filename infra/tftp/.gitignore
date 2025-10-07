@@ -1,0 +1,14 @@
+# Ignore iPXE binary files (large files, download with script)
+*.efi
+*.kpxe
+*.pxe
+*.iso
+*.img
+
+# Keep scripts and docs
+!*.sh
+!*.ps1
+!*.md
+!*.txt
+!*.ipxe
+

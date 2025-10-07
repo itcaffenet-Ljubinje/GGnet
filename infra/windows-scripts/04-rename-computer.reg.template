@@ -1,0 +1,29 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Rename Computer
+; ============================================================================
+; This template renames the computer to match GGnet machine inventory
+; 
+; TEMPLATE VARIABLES (replace before applying):
+;   {COMPUTER_NAME} - New computer name (e.g., "GGNET-MACHINE-001")
+; 
+; Example:
+;   "ComputerName"="GGNET-PC-042"
+; 
+; NOTE: Requires restart to take effect!
+; ============================================================================
+
+; Set computer name
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\ComputerName\ComputerName]
+"ComputerName"="{COMPUTER_NAME}"
+
+; Set active computer name
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName]
+"ComputerName"="{COMPUTER_NAME}"
+
+; Set DNS hostname
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters]
+"Hostname"="{COMPUTER_NAME}"
+"NV Hostname"="{COMPUTER_NAME}"
+

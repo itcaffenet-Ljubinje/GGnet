@@ -1,0 +1,24 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Disable UAC (User Account Control)
+; ============================================================================
+; This disables UAC prompts for diskless Windows clients
+; Required for unattended operation in diskless environments
+; ============================================================================
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System]
+"EnableLUA"=dword:00000000
+"ConsentPromptBehaviorAdmin"=dword:00000000
+"ConsentPromptBehaviorUser"=dword:00000000
+"PromptOnSecureDesktop"=dword:00000000
+"EnableInstallerDetection"=dword:00000000
+"ValidateAdminCodeSignatures"=dword:00000000
+"EnableSecureUIAPaths"=dword:00000000
+"EnableUIADesktopToggle"=dword:00000000
+"FilterAdministratorToken"=dword:00000000
+
+; Disable UAC notification
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer]
+"EnableAutoTray"=dword:00000000
+
