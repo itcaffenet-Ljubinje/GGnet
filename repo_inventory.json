@@ -1,215 +1,1802 @@
-{
-  "project_name": "GGnet Diskless Server",
-  "version": "1.0.0",
-  "analysis_date": "2025-01-06",
-  "current_architecture": {
-    "backend": {
-      "framework": "FastAPI",
-      "database": "SQLAlchemy + Alembic",
-      "auth": "JWT + Redis",
-      "structure": "Modular FastAPI app"
+﻿[
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\.bandit",
+        "Length":  84,
+        "LastWriteTime":  "\/Date(1759756652492)\/"
     },
-    "frontend": {
-      "framework": "React + TypeScript",
-      "build_tool": "Vite",
-      "styling": "Tailwind CSS",
-      "state_management": "Zustand + React Query"
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\.safety",
+        "Length":  218,
+        "LastWriteTime":  "\/Date(1759756664120)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\ADMIN_LOGIN_GUIDE.md",
+        "Length":  5196,
+        "LastWriteTime":  "\/Date(1759867739247)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\BACKUP_RESTORE.md",
+        "Length":  23077,
+        "LastWriteTime":  "\/Date(1759754860920)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\CHANGELOG.md",
+        "Length":  9242,
+        "LastWriteTime":  "\/Date(1759881815742)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\change_password.py",
+        "Length":  2294,
+        "LastWriteTime":  "\/Date(1759597577866)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\change_password_linux.py",
+        "Length":  2484,
+        "LastWriteTime":  "\/Date(1759601680259)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\check_database_status.py",
+        "Length":  1858,
+        "LastWriteTime":  "\/Date(1759608022231)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\codecov.yml",
+        "Length":  831,
+        "LastWriteTime":  "\/Date(1759764693490)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\CODECOV_SETUP.md",
+        "Length":  3393,
+        "LastWriteTime":  "\/Date(1759764745322)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\DEPLOYMENT_GUIDE.md",
+        "Length":  12189,
+        "LastWriteTime":  "\/Date(1759756110449)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\DEPLOYMENT_SUMMARY.md",
+        "Length":  10965,
+        "LastWriteTime":  "\/Date(1759754860924)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker-compose.yml",
+        "Length":  6654,
+        "LastWriteTime":  "\/Date(1759882345749)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\env.example",
+        "Length":  1518,
+        "LastWriteTime":  "\/Date(1759584065703)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\environment.yml",
+        "Length":  1380,
+        "LastWriteTime":  "\/Date(1759523574741)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\ESLINT_CLEANUP_SUMMARY.md",
+        "Length":  7668,
+        "LastWriteTime":  "\/Date(1759838685088)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\FINAL_STARTUP_GUIDE.md",
+        "Length":  6227,
+        "LastWriteTime":  "\/Date(1759871975711)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\FULL_FRONTEND_RESET.bat",
+        "Length":  844,
+        "LastWriteTime":  "\/Date(1759870547166)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\ggnet.db",
+        "Length":  0,
+        "LastWriteTime":  "\/Date(1759608001617)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\GGROCK_COMPARISON.md",
+        "Length":  25381,
+        "LastWriteTime":  "\/Date(1759879448204)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\GGROCK_FULL_ANALYSIS.md",
+        "Length":  12743,
+        "LastWriteTime":  "\/Date(1759882636223)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\GGROCK_PARITY_FINAL.md",
+        "Length":  22153,
+        "LastWriteTime":  "\/Date(1759882636223)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\install.sh",
+        "Length":  8167,
+        "LastWriteTime":  "\/Date(1759882272349)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\LICENSE",
+        "Length":  1099,
+        "LastWriteTime":  "\/Date(1759408224720)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\LOGIN_TROUBLESHOOTING.md",
+        "Length":  2929,
+        "LastWriteTime":  "\/Date(1759601542513)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\MISSING_FEATURES_ROADMAP.md",
+        "Length":  24702,
+        "LastWriteTime":  "\/Date(1759878172759)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\NEXT_STEPS.md",
+        "Length":  10554,
+        "LastWriteTime":  "\/Date(1759755754790)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE1_COMPLETION.md",
+        "Length":  15703,
+        "LastWriteTime":  "\/Date(1759879679061)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE2_COMPLETION.md",
+        "Length":  15399,
+        "LastWriteTime":  "\/Date(1759881266209)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_ASSUMPTIONS.md",
+        "Length":  6798,
+        "LastWriteTime":  "\/Date(1759754860927)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_CHANGES.md",
+        "Length":  4847,
+        "LastWriteTime":  "\/Date(1759754860930)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_CHECKLIST.md",
+        "Length":  7807,
+        "LastWriteTime":  "\/Date(1759754860933)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_MAPPING.md",
+        "Length":  8538,
+        "LastWriteTime":  "\/Date(1759754860934)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_RISKS.md",
+        "Length":  7750,
+        "LastWriteTime":  "\/Date(1759754860936)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_0_TESTS.md",
+        "Length":  7757,
+        "LastWriteTime":  "\/Date(1759754860937)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_1_ASSUMPTIONS.md",
+        "Length":  10238,
+        "LastWriteTime":  "\/Date(1759754860939)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_1_CHANGES.md",
+        "Length":  8920,
+        "LastWriteTime":  "\/Date(1759754860941)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_1_CHECKLIST.md",
+        "Length":  4648,
+        "LastWriteTime":  "\/Date(1759754860945)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_1_TESTS.md",
+        "Length":  15893,
+        "LastWriteTime":  "\/Date(1759754860947)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_2_CHANGES.md",
+        "Length":  7846,
+        "LastWriteTime":  "\/Date(1759754860950)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_2_CHECKLIST.md",
+        "Length":  9534,
+        "LastWriteTime":  "\/Date(1759754860952)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_2_TESTS.md",
+        "Length":  11703,
+        "LastWriteTime":  "\/Date(1759754860953)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_3_ASSUMPTIONS.md",
+        "Length":  9562,
+        "LastWriteTime":  "\/Date(1759754860955)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_3_CHANGES.md",
+        "Length":  9981,
+        "LastWriteTime":  "\/Date(1759754860957)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_3_CHECKLIST.md",
+        "Length":  9213,
+        "LastWriteTime":  "\/Date(1759754860959)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_3_TESTS.md",
+        "Length":  11099,
+        "LastWriteTime":  "\/Date(1759754860961)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_4_ASSUMPTIONS.md",
+        "Length":  10609,
+        "LastWriteTime":  "\/Date(1759754860963)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_4_CHANGES.md",
+        "Length":  9115,
+        "LastWriteTime":  "\/Date(1759754860965)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_4_CHECKLIST.md",
+        "Length":  8992,
+        "LastWriteTime":  "\/Date(1759754860967)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_4_TESTS.md",
+        "Length":  13186,
+        "LastWriteTime":  "\/Date(1759754860969)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_5_ASSUMPTIONS.md",
+        "Length":  11955,
+        "LastWriteTime":  "\/Date(1759754860971)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_5_CHANGES.md",
+        "Length":  11843,
+        "LastWriteTime":  "\/Date(1759754860973)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_5_CHECKLIST.md",
+        "Length":  10445,
+        "LastWriteTime":  "\/Date(1759754860975)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_5_TESTS.md",
+        "Length":  21780,
+        "LastWriteTime":  "\/Date(1759754860984)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_6_ASSUMPTIONS.md",
+        "Length":  1129,
+        "LastWriteTime":  "\/Date(1759754860990)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_6_CHANGES.md",
+        "Length":  1789,
+        "LastWriteTime":  "\/Date(1759754861000)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_6_CHECKLIST.md",
+        "Length":  550,
+        "LastWriteTime":  "\/Date(1759754861003)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_6_TESTS.md",
+        "Length":  1552,
+        "LastWriteTime":  "\/Date(1759754861005)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_7_ASSUMPTIONS.md",
+        "Length":  11562,
+        "LastWriteTime":  "\/Date(1759754861015)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_7_CHANGES.md",
+        "Length":  9190,
+        "LastWriteTime":  "\/Date(1759754861023)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_7_CHECKLIST.md",
+        "Length":  7661,
+        "LastWriteTime":  "\/Date(1759754861029)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_7_TESTS.md",
+        "Length":  13079,
+        "LastWriteTime":  "\/Date(1759754861054)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_8_ASSUMPTIONS.md",
+        "Length":  13349,
+        "LastWriteTime":  "\/Date(1759754861070)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_8_CHANGES.md",
+        "Length":  12110,
+        "LastWriteTime":  "\/Date(1759754861074)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_8_CHECKLIST.md",
+        "Length":  14380,
+        "LastWriteTime":  "\/Date(1759754861077)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PHASE_8_TESTS.md",
+        "Length":  13546,
+        "LastWriteTime":  "\/Date(1759754861082)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PROJECT_COMPLETION.md",
+        "Length":  12367,
+        "LastWriteTime":  "\/Date(1759754861084)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\PROJECT_STATUS_REPORT.md",
+        "Length":  11275,
+        "LastWriteTime":  "\/Date(1759754913416)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\pytest.ini",
+        "Length":  582,
+        "LastWriteTime":  "\/Date(1759590532399)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\README.md",
+        "Length":  13049,
+        "LastWriteTime":  "\/Date(1759881894345)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\repo_inventory.json",
+        "Length":  0,
+        "LastWriteTime":  "\/Date(1759883639755)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\requirements.txt",
+        "Length":  914,
+        "LastWriteTime":  "\/Date(1759523574743)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\RESTART_FRONTEND.md",
+        "Length":  2630,
+        "LastWriteTime":  "\/Date(1759870295946)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\RUNBOOK.md",
+        "Length":  19259,
+        "LastWriteTime":  "\/Date(1759754861088)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\setup_database_linux.py",
+        "Length":  4140,
+        "LastWriteTime":  "\/Date(1759602676788)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\setup_database_postgresql.py",
+        "Length":  4934,
+        "LastWriteTime":  "\/Date(1759613884521)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\setup_postgresql.sh",
+        "Length":  2367,
+        "LastWriteTime":  "\/Date(1759605370385)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\START_PROJECT.md",
+        "Length":  6822,
+        "LastWriteTime":  "\/Date(1759868270077)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\test_database_connection.py",
+        "Length":  8354,
+        "LastWriteTime":  "\/Date(1759608022228)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\UPGRADE.md",
+        "Length":  15626,
+        "LastWriteTime":  "\/Date(1759754861090)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\.vscode\\css_custom_data.json",
+        "Length":  665,
+        "LastWriteTime":  "\/Date(1759662072554)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\.vscode\\settings.json",
+        "Length":  499,
+        "LastWriteTime":  "\/Date(1759836803853)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\alembic.ini",
+        "Length":  3378,
+        "LastWriteTime":  "\/Date(1759408483716)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\check_admin.py",
+        "Length":  1691,
+        "LastWriteTime":  "\/Date(1759777998927)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\create_admin.py",
+        "Length":  2213,
+        "LastWriteTime":  "\/Date(1759777976278)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\create_admin_postgres.py",
+        "Length":  2525,
+        "LastWriteTime":  "\/Date(1759867614565)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\debug_login.py",
+        "Length":  2933,
+        "LastWriteTime":  "\/Date(1759778020380)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\docker-entrypoint.sh",
+        "Length":  1211,
+        "LastWriteTime":  "\/Date(1759867672893)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\Dockerfile",
+        "Length":  1338,
+        "LastWriteTime":  "\/Date(1759867704841)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\ggnet.db",
+        "Length":  188416,
+        "LastWriteTime":  "\/Date(1759883156125)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\init.sql",
+        "Length":  2814,
+        "LastWriteTime":  "\/Date(1759408496824)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\init_admin.py",
+        "Length":  1854,
+        "LastWriteTime":  "\/Date(1759867645790)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\package-lock.json",
+        "Length":  86,
+        "LastWriteTime":  "\/Date(1759667564262)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\pyproject.toml",
+        "Length":  1053,
+        "LastWriteTime":  "\/Date(1759754866371)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\pytest.ini",
+        "Length":  507,
+        "LastWriteTime":  "\/Date(1759826014952)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\README_FIXES.md",
+        "Length":  4206,
+        "LastWriteTime":  "\/Date(1759754861097)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\requirements.txt",
+        "Length":  791,
+        "LastWriteTime":  "\/Date(1759778877625)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\test.db",
+        "Length":  163840,
+        "LastWriteTime":  "\/Date(1759829197452)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\test_login_correct.py",
+        "Length":  1787,
+        "LastWriteTime":  "\/Date(1759868106326)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\test_login_direct.py",
+        "Length":  1655,
+        "LastWriteTime":  "\/Date(1759867572991)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\test_password.py",
+        "Length":  1666,
+        "LastWriteTime":  "\/Date(1759867510576)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\adapters\\targetcli.py",
+        "Length":  21313,
+        "LastWriteTime":  "\/Date(1759754861102)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\adapters\\__init__.py",
+        "Length":  116,
+        "LastWriteTime":  "\/Date(1759754861100)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\alembic\\env.py",
+        "Length":  2814,
+        "LastWriteTime":  "\/Date(1759536484808)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\alembic\\script.py.mako",
+        "Length":  536,
+        "LastWriteTime":  "\/Date(1759408483782)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\alembic\\versions\\20251006_2103_9d9e5558e847_initial_migration_create_all_tables.py",
+        "Length":  17557,
+        "LastWriteTime":  "\/Date(1759777417880)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\main.py",
+        "Length":  8170,
+        "LastWriteTime":  "\/Date(1759881103298)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\__init__.py",
+        "Length":  35,
+        "LastWriteTime":  "\/Date(1759408482259)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\adapters\\dhcp.py",
+        "Length":  12998,
+        "LastWriteTime":  "\/Date(1759761185924)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\adapters\\ipxe.py",
+        "Length":  11388,
+        "LastWriteTime":  "\/Date(1759759907840)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\adapters\\targetcli.py",
+        "Length":  21303,
+        "LastWriteTime":  "\/Date(1759761223036)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\adapters\\tftp.py",
+        "Length":  12843,
+        "LastWriteTime":  "\/Date(1759760321810)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\adapters\\__init__.py",
+        "Length":  1188,
+        "LastWriteTime":  "\/Date(1759759560273)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\api\\sessions.py",
+        "Length":  19888,
+        "LastWriteTime":  "\/Date(1759773764640)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\api\\targets.py",
+        "Length":  15225,
+        "LastWriteTime":  "\/Date(1759765331641)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\api\\__init__.py",
+        "Length":  54,
+        "LastWriteTime":  "\/Date(1759754861119)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\config.py",
+        "Length":  6407,
+        "LastWriteTime":  "\/Date(1759778785472)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\database.py",
+        "Length":  4722,
+        "LastWriteTime":  "\/Date(1759778824847)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\dependencies.py",
+        "Length":  11174,
+        "LastWriteTime":  "\/Date(1759831292477)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\exceptions.py",
+        "Length":  5013,
+        "LastWriteTime":  "\/Date(1759758944431)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\logging_config.py",
+        "Length":  5567,
+        "LastWriteTime":  "\/Date(1759761796857)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\security.py",
+        "Length":  14895,
+        "LastWriteTime":  "\/Date(1759831224631)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\serializers.py",
+        "Length":  7375,
+        "LastWriteTime":  "\/Date(1759754861203)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\validators.py",
+        "Length":  6996,
+        "LastWriteTime":  "\/Date(1759754861206)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\core\\__init__.py",
+        "Length":  30,
+        "LastWriteTime":  "\/Date(1759408483266)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\middleware\\logging.py",
+        "Length":  3220,
+        "LastWriteTime":  "\/Date(1759754861219)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\middleware\\metrics.py",
+        "Length":  1248,
+        "LastWriteTime":  "\/Date(1759754861220)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\middleware\\rate_limiting.py",
+        "Length":  5357,
+        "LastWriteTime":  "\/Date(1759754861222)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\middleware\\__init__.py",
+        "Length":  24,
+        "LastWriteTime":  "\/Date(1759408486292)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\audit.py",
+        "Length":  8102,
+        "LastWriteTime":  "\/Date(1759536695031)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\image.py",
+        "Length":  5257,
+        "LastWriteTime":  "\/Date(1759754861224)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\machine.py",
+        "Length":  5784,
+        "LastWriteTime":  "\/Date(1759536708059)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\session.py",
+        "Length":  7048,
+        "LastWriteTime":  "\/Date(1759754861229)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\target.py",
+        "Length":  1988,
+        "LastWriteTime":  "\/Date(1759754861234)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\user.py",
+        "Length":  3668,
+        "LastWriteTime":  "\/Date(1759754861238)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\models\\__init__.py",
+        "Length":  548,
+        "LastWriteTime":  "\/Date(1759584065701)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\auth.py",
+        "Length":  24493,
+        "LastWriteTime":  "\/Date(1759764252519)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\file_upload.py",
+        "Length":  13647,
+        "LastWriteTime":  "\/Date(1759778048731)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\hardware.py",
+        "Length":  8308,
+        "LastWriteTime":  "\/Date(1759882875265)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\health.py",
+        "Length":  7517,
+        "LastWriteTime":  "\/Date(1759763030952)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\images.py",
+        "Length":  17704,
+        "LastWriteTime":  "\/Date(1759774591451)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\iscsi.py",
+        "Length":  18564,
+        "LastWriteTime":  "\/Date(1759758007855)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\machines.py",
+        "Length":  14668,
+        "LastWriteTime":  "\/Date(1759754861271)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\metrics.py",
+        "Length":  6016,
+        "LastWriteTime":  "\/Date(1759754861285)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\monitoring.py",
+        "Length":  10093,
+        "LastWriteTime":  "\/Date(1759754861289)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\sessions.py",
+        "Length":  25339,
+        "LastWriteTime":  "\/Date(1759754861301)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\storage.py",
+        "Length":  11537,
+        "LastWriteTime":  "\/Date(1759758007857)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\routes\\__init__.py",
+        "Length":  16,
+        "LastWriteTime":  "\/Date(1759746578093)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\websocket\\manager.py",
+        "Length":  5061,
+        "LastWriteTime":  "\/Date(1759754861318)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\app\\websocket\\__init__.py",
+        "Length":  20,
+        "LastWriteTime":  "\/Date(1759754861315)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\logs\\app.log",
+        "Length":  1200933,
+        "LastWriteTime":  "\/Date(1759883215160)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\logs\\audit.log",
+        "Length":  0,
+        "LastWriteTime":  "\/Date(1759761934577)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\logs\\error.log",
+        "Length":  578,
+        "LastWriteTime":  "\/Date(1759879929542)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\logs\\performance.log",
+        "Length":  2869,
+        "LastWriteTime":  "\/Date(1759883207477)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\logs\\security.log",
+        "Length":  0,
+        "LastWriteTime":  "\/Date(1759761934577)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\scripts\\preflight.py",
+        "Length":  9098,
+        "LastWriteTime":  "\/Date(1759881150774)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\scripts\\qemu_convert.py",
+        "Length":  12132,
+        "LastWriteTime":  "\/Date(1759754866391)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\conftest.py",
+        "Length":  7374,
+        "LastWriteTime":  "\/Date(1759830826043)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_auth.py",
+        "Length":  6432,
+        "LastWriteTime":  "\/Date(1759754866430)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_health.py",
+        "Length":  2111,
+        "LastWriteTime":  "\/Date(1759764281753)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_images.py",
+        "Length":  5998,
+        "LastWriteTime":  "\/Date(1759591871447)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_image_conversion.py",
+        "Length":  16505,
+        "LastWriteTime":  "\/Date(1759831716182)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_integration.py",
+        "Length":  17335,
+        "LastWriteTime":  "\/Date(1759754866434)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_machines_edge_cases.py",
+        "Length":  15839,
+        "LastWriteTime":  "\/Date(1759754866439)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_phase4_sessions.py",
+        "Length":  28645,
+        "LastWriteTime":  "\/Date(1759832909705)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_redis_integration.py",
+        "Length":  12650,
+        "LastWriteTime":  "\/Date(1759826014939)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_targetcli_adapter.py",
+        "Length":  18006,
+        "LastWriteTime":  "\/Date(1759775798959)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\test_targets_api.py",
+        "Length":  21313,
+        "LastWriteTime":  "\/Date(1759774327135)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\tests\\__init__.py",
+        "Length":  18,
+        "LastWriteTime":  "\/Date(1759408505391)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\240a1653-d4d5-4d85-870f-88316da8ccd7.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759778137228)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\579eb4d0-2c55-4e8f-841b-e236a83d438d.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759824461980)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\8e8efdc5-0387-4357-8b4a-2b18174f2b13.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759777471275)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\b1c63142-9201-4f7e-bd91-ec5c5cb21c30.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759775857145)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\d0cc3ab9-8fbb-4688-bb22-b943e0f9a835.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759779056471)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\e921c4c5-8160-429e-baac-994b3b9b054b.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759775660449)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\uploads\\f4bdb031-daff-4715-a6f9-b1b84864e953.vhd",
+        "Length":  16000,
+        "LastWriteTime":  "\/Date(1759776521037)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\worker\\convert.py",
+        "Length":  10654,
+        "LastWriteTime":  "\/Date(1759763280369)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\backend\\worker\\__init__.py",
+        "Length":  100,
+        "LastWriteTime":  "\/Date(1759754866456)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\dhcp\\dhcpd.conf",
+        "Length":  4028,
+        "LastWriteTime":  "\/Date(1759878988911)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\dnsmasq\\dnsmasq.conf",
+        "Length":  1701,
+        "LastWriteTime":  "\/Date(1759882316607)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\grafana\\README.md",
+        "Length":  3343,
+        "LastWriteTime":  "\/Date(1759880779425)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\grafana\\dashboards\\ggnet-overview.json",
+        "Length":  9963,
+        "LastWriteTime":  "\/Date(1759880704326)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\grafana\\provisioning\\dashboards\\default.yml",
+        "Length":  286,
+        "LastWriteTime":  "\/Date(1759880666383)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\grafana\\provisioning\\datasources\\prometheus.yml",
+        "Length":  266,
+        "LastWriteTime":  "\/Date(1759880648381)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\nginx\\nginx.conf",
+        "Length":  3699,
+        "LastWriteTime":  "\/Date(1759754866469)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docker\\prometheus\\prometheus.yml",
+        "Length":  1103,
+        "LastWriteTime":  "\/Date(1759880619955)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docs\\api.md",
+        "Length":  13069,
+        "LastWriteTime":  "\/Date(1759408505094)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docs\\installation.md",
+        "Length":  11316,
+        "LastWriteTime":  "\/Date(1759408504794)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docs\\PHASE1_TESTING_PLAN.md",
+        "Length":  13325,
+        "LastWriteTime":  "\/Date(1759879551179)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docs\\SECUREBOOT_SETUP.md",
+        "Length":  11294,
+        "LastWriteTime":  "\/Date(1759879334378)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\docs\\WINDOWS_TOOLCHAIN_GUIDE.md",
+        "Length":  16574,
+        "LastWriteTime":  "\/Date(1759879425906)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\.eslintrc.json",
+        "Length":  1330,
+        "LastWriteTime":  "\/Date(1759758347617)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\.prettierrc",
+        "Length":  189,
+        "LastWriteTime":  "\/Date(1759754866478)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\Dockerfile",
+        "Length":  930,
+        "LastWriteTime":  "\/Date(1759833672708)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\index.html",
+        "Length":  1710,
+        "LastWriteTime":  "\/Date(1759872792309)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\nginx.conf",
+        "Length":  2472,
+        "LastWriteTime":  "\/Date(1759408498510)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\package-lock.json",
+        "Length":  284751,
+        "LastWriteTime":  "\/Date(1759870871753)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\package.json",
+        "Length":  1847,
+        "LastWriteTime":  "\/Date(1759870871422)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\postcss.config.js",
+        "Length":  86,
+        "LastWriteTime":  "\/Date(1759754866491)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\tailwind.config.js",
+        "Length":  3608,
+        "LastWriteTime":  "\/Date(1759754866902)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\TEST_RENDER.md",
+        "Length":  4268,
+        "LastWriteTime":  "\/Date(1759869287811)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\tsconfig.json",
+        "Length":  791,
+        "LastWriteTime":  "\/Date(1759763293754)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\tsconfig.node.json",
+        "Length":  225,
+        "LastWriteTime":  "\/Date(1759408499466)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\vite.config.ts",
+        "Length":  1329,
+        "LastWriteTime":  "\/Date(1759875363579)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\vitest.config.ts",
+        "Length":  364,
+        "LastWriteTime":  "\/Date(1759760321810)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\.vscode\\css_custom_data.json",
+        "Length":  2093,
+        "LastWriteTime":  "\/Date(1759662012250)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\.vscode\\extensions.json",
+        "Length":  140,
+        "LastWriteTime":  "\/Date(1759662012250)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\.vscode\\settings.json",
+        "Length":  432,
+        "LastWriteTime":  "\/Date(1759662012247)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\base.css",
+        "Length":  5394,
+        "LastWriteTime":  "\/Date(1759769125044)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\block-navigation.js",
+        "Length":  2655,
+        "LastWriteTime":  "\/Date(1759769125047)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\clover.xml",
+        "Length":  444101,
+        "LastWriteTime":  "\/Date(1759769125469)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\coverage-final.json",
+        "Length":  729310,
+        "LastWriteTime":  "\/Date(1759769125489)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\favicon.png",
+        "Length":  445,
+        "LastWriteTime":  "\/Date(1759769125050)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\index.html",
+        "Length":  11987,
+        "LastWriteTime":  "\/Date(1759769125070)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\prettify.css",
+        "Length":  676,
+        "LastWriteTime":  "\/Date(1759769125062)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\prettify.js",
+        "Length":  17590,
+        "LastWriteTime":  "\/Date(1759769125066)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\sort-arrow-sprite.png",
+        "Length":  138,
+        "LastWriteTime":  "\/Date(1759769125053)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\sorter.js",
+        "Length":  6731,
+        "LastWriteTime":  "\/Date(1759769125059)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\index.html",
+        "Length":  5052,
+        "LastWriteTime":  "\/Date(1759769125073)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\postcss.config.js.html",
+        "Length":  4188,
+        "LastWriteTime":  "\/Date(1759769125078)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\tailwind.config.js.html",
+        "Length":  25834,
+        "LastWriteTime":  "\/Date(1759769125082)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\App.tsx.html",
+        "Length":  11122,
+        "LastWriteTime":  "\/Date(1759769125086)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\index.html",
+        "Length":  5732,
+        "LastWriteTime":  "\/Date(1759769125084)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\main.tsx.html",
+        "Length":  13603,
+        "LastWriteTime":  "\/Date(1759769125088)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\setupTests.ts.html",
+        "Length":  16136,
+        "LastWriteTime":  "\/Date(1759769125092)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ErrorBoundary.tsx.html",
+        "Length":  24598,
+        "LastWriteTime":  "\/Date(1759769125097)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\FileUpload.tsx.html",
+        "Length":  59710,
+        "LastWriteTime":  "\/Date(1759769125101)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ImageManager.tsx.html",
+        "Length":  112221,
+        "LastWriteTime":  "\/Date(1759769125111)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\index.html",
+        "Length":  10571,
+        "LastWriteTime":  "\/Date(1759769125095)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\Layout.tsx.html",
+        "Length":  52185,
+        "LastWriteTime":  "\/Date(1759769125115)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\LoadingSpinner.tsx.html",
+        "Length":  16321,
+        "LastWriteTime":  "\/Date(1759769125118)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\MachineModal.tsx.html",
+        "Length":  63138,
+        "LastWriteTime":  "\/Date(1759769125123)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\NetworkBootMonitor.tsx.html",
+        "Length":  80773,
+        "LastWriteTime":  "\/Date(1759769125132)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\SessionManager.tsx.html",
+        "Length":  91417,
+        "LastWriteTime":  "\/Date(1759769125142)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\SystemMonitor.tsx.html",
+        "Length":  110417,
+        "LastWriteTime":  "\/Date(1759769125157)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\TargetManager.tsx.html",
+        "Length":  99296,
+        "LastWriteTime":  "\/Date(1759769125162)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\charts\\index.html",
+        "Length":  5129,
+        "LastWriteTime":  "\/Date(1759769125165)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\charts\\index.ts.html",
+        "Length":  3537,
+        "LastWriteTime":  "\/Date(1759769125168)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\charts\\UsageChart.tsx.html",
+        "Length":  28456,
+        "LastWriteTime":  "\/Date(1759769125167)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\notifications\\index.html",
+        "Length":  4503,
+        "LastWriteTime":  "\/Date(1759769125169)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\notifications\\index.tsx.html",
+        "Length":  33682,
+        "LastWriteTime":  "\/Date(1759769125172)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\tables\\DataTable.tsx.html",
+        "Length":  44476,
+        "LastWriteTime":  "\/Date(1759769125176)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\tables\\index.html",
+        "Length":  5126,
+        "LastWriteTime":  "\/Date(1759769125174)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\tables\\index.ts.html",
+        "Length":  3716,
+        "LastWriteTime":  "\/Date(1759769125177)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\Button.tsx.html",
+        "Length":  14829,
+        "LastWriteTime":  "\/Date(1759769125181)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\Card.tsx.html",
+        "Length":  23497,
+        "LastWriteTime":  "\/Date(1759769125184)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\index.html",
+        "Length":  8510,
+        "LastWriteTime":  "\/Date(1759769125179)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\index.ts.html",
+        "Length":  3989,
+        "LastWriteTime":  "\/Date(1759769125193)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\Input.tsx.html",
+        "Length":  17286,
+        "LastWriteTime":  "\/Date(1759769125187)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\Modal.tsx.html",
+        "Length":  29752,
+        "LastWriteTime":  "\/Date(1759769125189)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\ProgressBar.tsx.html",
+        "Length":  13472,
+        "LastWriteTime":  "\/Date(1759769125190)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\components\\ui\\StatusBadge.tsx.html",
+        "Length":  15838,
+        "LastWriteTime":  "\/Date(1759769125192)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\hooks\\index.html",
+        "Length":  5131,
+        "LastWriteTime":  "\/Date(1759769125195)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\hooks\\useRealTimeUpdates.ts.html",
+        "Length":  21741,
+        "LastWriteTime":  "\/Date(1759769125197)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\hooks\\useWebSocket.ts.html",
+        "Length":  29942,
+        "LastWriteTime":  "\/Date(1759769125200)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\lib\\api.ts.html",
+        "Length":  41949,
+        "LastWriteTime":  "\/Date(1759769125205)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\lib\\index.html",
+        "Length":  5101,
+        "LastWriteTime":  "\/Date(1759769125202)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\lib\\index.ts.html",
+        "Length":  3451,
+        "LastWriteTime":  "\/Date(1759769125207)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\ArrayConfigurationPage.tsx.html",
+        "Length":  171368,
+        "LastWriteTime":  "\/Date(1759769125217)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\DashboardPage.tsx.html",
+        "Length":  90670,
+        "LastWriteTime":  "\/Date(1759769125221)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\ImagesPage.tsx.html",
+        "Length":  4753,
+        "LastWriteTime":  "\/Date(1759769125223)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\index.html",
+        "Length":  12056,
+        "LastWriteTime":  "\/Date(1759769125209)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\LoginPage.tsx.html",
+        "Length":  34778,
+        "LastWriteTime":  "\/Date(1759769125225)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\MachinesPage.tsx.html",
+        "Length":  94729,
+        "LastWriteTime":  "\/Date(1759769125229)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\MonitoringPage.tsx.html",
+        "Length":  114095,
+        "LastWriteTime":  "\/Date(1759769125234)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\NetworkBootPage.tsx.html",
+        "Length":  5411,
+        "LastWriteTime":  "\/Date(1759769125235)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\NotFoundPage.tsx.html",
+        "Length":  10478,
+        "LastWriteTime":  "\/Date(1759769125237)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\SessionsPage.tsx.html",
+        "Length":  4767,
+        "LastWriteTime":  "\/Date(1759769125238)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\SettingsPage.tsx.html",
+        "Length":  64984,
+        "LastWriteTime":  "\/Date(1759769125242)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\SystemMonitorPage.tsx.html",
+        "Length":  5414,
+        "LastWriteTime":  "\/Date(1759769125244)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\pages\\TargetsPage.tsx.html",
+        "Length":  5266,
+        "LastWriteTime":  "\/Date(1759769125245)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\stores\\authStore.ts.html",
+        "Length":  29221,
+        "LastWriteTime":  "\/Date(1759769125248)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\stores\\index.html",
+        "Length":  4452,
+        "LastWriteTime":  "\/Date(1759769125246)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\utils\\index.html",
+        "Length":  4456,
+        "LastWriteTime":  "\/Date(1759769125250)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\coverage\\frontend\\src\\utils\\statusMapping.ts.html",
+        "Length":  16312,
+        "LastWriteTime":  "\/Date(1759769125251)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\App.test.tsx",
+        "Length":  709,
+        "LastWriteTime":  "\/Date(1759873195048)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\App.tsx",
+        "Length":  2223,
+        "LastWriteTime":  "\/Date(1759872749884)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\index.css",
+        "Length":  7397,
+        "LastWriteTime":  "\/Date(1759869287810)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\main.tsx",
+        "Length":  1604,
+        "LastWriteTime":  "\/Date(1759872826280)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\setupTests.ts",
+        "Length":  1789,
+        "LastWriteTime":  "\/Date(1759838685080)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\vitest.d.ts",
+        "Length":  518,
+        "LastWriteTime":  "\/Date(1759754866892)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ErrorBoundary.tsx",
+        "Length":  3662,
+        "LastWriteTime":  "\/Date(1759779464403)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\FileUpload.tsx",
+        "Length":  10504,
+        "LastWriteTime":  "\/Date(1759828039524)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ImageManager.tsx",
+        "Length":  23652,
+        "LastWriteTime":  "\/Date(1759877259022)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\Layout.tsx",
+        "Length":  10391,
+        "LastWriteTime":  "\/Date(1759767184089)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\LoadingSpinner.tsx",
+        "Length":  1971,
+        "LastWriteTime":  "\/Date(1759765739976)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\MachineModal.tsx",
+        "Length":  13179,
+        "LastWriteTime":  "\/Date(1759864607425)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\NetworkBootMonitor.tsx",
+        "Length":  16673,
+        "LastWriteTime":  "\/Date(1759838685069)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\SessionManager.tsx",
+        "Length":  19052,
+        "LastWriteTime":  "\/Date(1759875363595)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\SystemMonitor.tsx",
+        "Length":  22060,
+        "LastWriteTime":  "\/Date(1759864657685)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\TargetManager.tsx",
+        "Length":  20487,
+        "LastWriteTime":  "\/Date(1759875363587)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\charts\\index.ts",
+        "Length":  57,
+        "LastWriteTime":  "\/Date(1759754866620)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\charts\\UsageChart.tsx",
+        "Length":  4302,
+        "LastWriteTime":  "\/Date(1759754866618)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\notifications\\index.tsx",
+        "Length":  5365,
+        "LastWriteTime":  "\/Date(1759827677397)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\tables\\DataTable.tsx",
+        "Length":  8013,
+        "LastWriteTime":  "\/Date(1759864506284)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\tables\\index.ts",
+        "Length":  92,
+        "LastWriteTime":  "\/Date(1759754866631)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\Button.tsx",
+        "Length":  2760,
+        "LastWriteTime":  "\/Date(1759833461381)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\Card.tsx",
+        "Length":  3459,
+        "LastWriteTime":  "\/Date(1759833528668)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\index.ts",
+        "Length":  301,
+        "LastWriteTime":  "\/Date(1759754866688)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\Input.tsx",
+        "Length":  2399,
+        "LastWriteTime":  "\/Date(1759833561146)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\Modal.tsx",
+        "Length":  4091,
+        "LastWriteTime":  "\/Date(1759833577370)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\ProgressBar.tsx",
+        "Length":  1528,
+        "LastWriteTime":  "\/Date(1759765697986)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\components\\ui\\StatusBadge.tsx",
+        "Length":  2283,
+        "LastWriteTime":  "\/Date(1759765708044)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\hooks\\useRealTimeUpdates.ts",
+        "Length":  3639,
+        "LastWriteTime":  "\/Date(1759873195048)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\hooks\\useWebSocket.ts",
+        "Length":  5099,
+        "LastWriteTime":  "\/Date(1759873517586)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\lib\\api.ts",
+        "Length":  8567,
+        "LastWriteTime":  "\/Date(1759875363579)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\lib\\index.ts",
+        "Length":  23,
+        "LastWriteTime":  "\/Date(1759415588532)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\ArrayConfigurationPage.tsx",
+        "Length":  36870,
+        "LastWriteTime":  "\/Date(1759767184083)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\DashboardPage.tsx",
+        "Length":  17209,
+        "LastWriteTime":  "\/Date(1759864559279)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\ImagesPage.tsx",
+        "Length":  221,
+        "LastWriteTime":  "\/Date(1759766110294)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\LoginPage.tsx",
+        "Length":  6266,
+        "LastWriteTime":  "\/Date(1759754866771)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\MachinesPage.tsx",
+        "Length":  19742,
+        "LastWriteTime":  "\/Date(1759838685070)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\MonitoringPage.tsx",
+        "Length":  22494,
+        "LastWriteTime":  "\/Date(1759838685073)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\NetworkBootPage.tsx",
+        "Length":  345,
+        "LastWriteTime":  "\/Date(1759766131684)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\NotFoundPage.tsx",
+        "Length":  1466,
+        "LastWriteTime":  "\/Date(1759408503433)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\SessionsPage.tsx",
+        "Length":  231,
+        "LastWriteTime":  "\/Date(1759766142951)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\SettingsPage.tsx",
+        "Length":  13753,
+        "LastWriteTime":  "\/Date(1759616050715)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\SystemMonitorPage.tsx",
+        "Length":  344,
+        "LastWriteTime":  "\/Date(1759766153779)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\pages\\TargetsPage.tsx",
+        "Length":  305,
+        "LastWriteTime":  "\/Date(1759766164201)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\stores\\authStore.ts",
+        "Length":  3752,
+        "LastWriteTime":  "\/Date(1759875363587)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\test\\setup.ts",
+        "Length":  966,
+        "LastWriteTime":  "\/Date(1759838685081)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\frontend\\src\\utils\\statusMapping.ts",
+        "Length":  1858,
+        "LastWriteTime":  "\/Date(1759764155097)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\docker-compose.yml",
+        "Length":  933,
+        "LastWriteTime":  "\/Date(1759754866952)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\install.sh",
+        "Length":  2933,
+        "LastWriteTime":  "\/Date(1759754867004)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\README.md",
+        "Length":  1231,
+        "LastWriteTime":  "\/Date(1759754866933)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\examples\\dhcpd.conf",
+        "Length":  2501,
+        "LastWriteTime":  "\/Date(1759754866981)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\examples\\tftp\\boot.ipxe",
+        "Length":  1605,
+        "LastWriteTime":  "\/Date(1759754866991)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\examples\\tftp\\pxelinux.cfg\\default",
+        "Length":  606,
+        "LastWriteTime":  "\/Date(1759754867002)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\nginx\\ggnet.conf",
+        "Length":  906,
+        "LastWriteTime":  "\/Date(1759754867013)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\systemd\\ggnet-backend.service",
+        "Length":  394,
+        "LastWriteTime":  "\/Date(1759754867066)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\systemd\\ggnet-worker.service",
+        "Length":  373,
+        "LastWriteTime":  "\/Date(1759754867073)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\tftp\\boot.ipxe.example",
+        "Length":  2550,
+        "LastWriteTime":  "\/Date(1759878465928)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\tftp\\download-ipxe.ps1",
+        "Length":  4049,
+        "LastWriteTime":  "\/Date(1759878369192)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\tftp\\download-ipxe.sh",
+        "Length":  2871,
+        "LastWriteTime":  "\/Date(1759878405069)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\tftp\\README.md",
+        "Length":  5977,
+        "LastWriteTime":  "\/Date(1759878333213)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\01-disable-uac.reg",
+        "Length":  1051,
+        "LastWriteTime":  "\/Date(1759878504852)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\02-disable-firewall.reg",
+        "Length":  1353,
+        "LastWriteTime":  "\/Date(1759878530785)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\03-enable-autologon.reg.template",
+        "Length":  1402,
+        "LastWriteTime":  "\/Date(1759878557004)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\04-rename-computer.reg.template",
+        "Length":  1062,
+        "LastWriteTime":  "\/Date(1759878584249)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\05-ggnet-client-install.reg",
+        "Length":  2184,
+        "LastWriteTime":  "\/Date(1759878611521)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\06-inject-environment-vars.reg.template",
+        "Length":  1189,
+        "LastWriteTime":  "\/Date(1759878634812)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\07-enable-rdp.reg",
+        "Length":  1428,
+        "LastWriteTime":  "\/Date(1759878658332)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\08-optimize-performance.reg",
+        "Length":  2305,
+        "LastWriteTime":  "\/Date(1759878689103)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\09-disable-telemetry.reg",
+        "Length":  2383,
+        "LastWriteTime":  "\/Date(1759878718780)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\apply-all.bat",
+        "Length":  1762,
+        "LastWriteTime":  "\/Date(1759878744758)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\infra\\windows-scripts\\README.md",
+        "Length":  9395,
+        "LastWriteTime":  "\/Date(1759878808456)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\dhcp_config.sh",
+        "Length":  5655,
+        "LastWriteTime":  "\/Date(1759754867114)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\ggnet",
+        "Length":  6341,
+        "LastWriteTime":  "\/Date(1759882177641)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\ggnet-iscsi",
+        "Length":  4789,
+        "LastWriteTime":  "\/Date(1759882216463)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\hardware_detect.py",
+        "Length":  10236,
+        "LastWriteTime":  "\/Date(1759881063550)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\image_converter.py",
+        "Length":  14654,
+        "LastWriteTime":  "\/Date(1759408497498)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\install.sh",
+        "Length":  25784,
+        "LastWriteTime":  "\/Date(1759754867118)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\iscsi_config.sh",
+        "Length":  10448,
+        "LastWriteTime":  "\/Date(1759754867131)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\iscsi_manager.py",
+        "Length":  15397,
+        "LastWriteTime":  "\/Date(1759408497300)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\tftp_config.sh",
+        "Length":  10110,
+        "LastWriteTime":  "\/Date(1759754867156)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\uefi_boot_manager.py",
+        "Length":  18507,
+        "LastWriteTime":  "\/Date(1759408497754)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\scripts\\__init__.py",
+        "Length":  28,
+        "LastWriteTime":  "\/Date(1759408497109)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\systemd\\ggnet-backend.service",
+        "Length":  1236,
+        "LastWriteTime":  "\/Date(1759408503732)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\systemd\\ggnet-preflight.service",
+        "Length":  475,
+        "LastWriteTime":  "\/Date(1759881171495)\/"
+    },
+    {
+        "FullName":  "C:\\Users\\SERVER-PC\\Documents\\GGnet-projects\\GGnet\\systemd\\ggnet-worker.service",
+        "Length":  764,
+        "LastWriteTime":  "\/Date(1759754867175)\/"
     }
-  },
-  "file_structure": {
-    "backend": {
-      "app": {
-        "main.py": "FastAPI application entry point",
-        "core": {
-          "config.py": "Application configuration",
-          "database.py": "Database connection and session management",
-          "security.py": "JWT token handling and password hashing",
-          "dependencies.py": "FastAPI dependencies",
-          "exceptions.py": "Custom exception classes",
-          "cache.py": "Redis cache management",
-          "validators.py": "Pydantic field validators",
-          "serializers.py": "Model serialization helpers"
-        },
-        "models": {
-          "user.py": "User model with roles (admin, operator, viewer)",
-          "machine.py": "Client machine model with boot configuration",
-          "image.py": "Disk image model (VHD/VHDX/RAW/QCOW2)",
-          "target.py": "iSCSI target model",
-          "session.py": "Boot session tracking model",
-          "audit.py": "Audit logging model"
-        },
-        "routes": {
-          "auth.py": "Authentication endpoints (login, refresh, logout)",
-          "machines.py": "Machine CRUD operations",
-          "images.py": "Image management and upload",
-          "targets.py": "iSCSI target management",
-          "sessions.py": "Session lifecycle management",
-          "storage.py": "Storage management",
-          "monitoring.py": "System monitoring endpoints",
-          "file_upload.py": "File upload handling",
-          "iscsi.py": "iSCSI operations",
-          "health.py": "Health check endpoints"
-        },
-        "middleware": {
-          "rate_limiting.py": "API rate limiting",
-          "logging.py": "Request logging"
-        },
-        "websocket": {
-          "manager.py": "WebSocket connection management"
-        }
-      },
-      "tests": {
-        "conftest.py": "Test fixtures and configuration",
-        "test_auth.py": "Authentication tests",
-        "test_health.py": "Health check tests",
-        "test_images.py": "Image management tests",
-        "test_machines_edge_cases.py": "Machine edge case tests",
-        "test_redis_integration.py": "Redis integration tests",
-        "test_integration.py": "Full integration tests"
-      },
-      "alembic": "Database migrations",
-      "requirements.txt": "Python dependencies",
-      "Dockerfile": "Backend container configuration"
-    },
-    "frontend": {
-      "src": {
-        "App.tsx": "Main React application",
-        "main.tsx": "Application entry point",
-        "components": {
-          "Layout.tsx": "Main application layout",
-          "ui": "Reusable UI components (Button, Card, etc.)",
-          "MachineModal.tsx": "Machine creation/editing modal",
-          "FileUpload.tsx": "File upload component",
-          "notifications": "Notification system",
-          "tables": "Data table components",
-          "charts": "Chart components"
-        },
-        "pages": {
-          "LoginPage.tsx": "User authentication",
-          "DashboardPage.tsx": "Main dashboard",
-          "MachinesPage.tsx": "Machine management",
-          "ImagesPage.tsx": "Image management",
-          "SessionsPage.tsx": "Session monitoring",
-          "ArrayConfigurationPage.tsx": "Storage/RAID configuration",
-          "MonitoringPage.tsx": "System monitoring"
-        },
-        "hooks": {
-          "useWebSocket.ts": "WebSocket connection hook",
-          "useRealTimeUpdates.ts": "Real-time data updates"
-        },
-        "lib": {
-          "api.ts": "API client functions"
-        },
-        "stores": {
-          "authStore.ts": "Authentication state management"
-        }
-      },
-      "package.json": "Node.js dependencies and scripts",
-      "Dockerfile": "Frontend container configuration"
-    },
-    "infrastructure": {
-      "docker-compose.yml": "Multi-container orchestration",
-      "docker": {
-        "nginx": "Reverse proxy configuration",
-        "dhcp": "DHCP server configuration"
-      },
-      "systemd": "System service definitions",
-      "scripts": "Installation and configuration scripts"
-    }
-  },
-  "current_features": {
-    "authentication": {
-      "jwt_tokens": "Access + refresh token system",
-      "role_based_access": "Admin, operator, viewer roles",
-      "redis_session_storage": "Session management with Redis"
-    },
-    "machine_management": {
-      "crud_operations": "Create, read, update, delete machines",
-      "boot_configuration": "UEFI, Legacy, Secure Boot support",
-      "network_identification": "MAC address, IP, hostname tracking",
-      "status_monitoring": "Online/offline status tracking"
-    },
-    "image_management": {
-      "file_upload": "Multipart file upload with progress",
-      "format_support": "VHD, VHDX, RAW, QCOW2, VMDK, VDI",
-      "status_tracking": "Upload, processing, ready, error states",
-      "checksum_validation": "MD5 and SHA256 checksums"
-    },
-    "iscsi_targets": {
-      "target_creation": "iSCSI target management",
-      "lun_mapping": "System and extra disk mapping",
-      "access_control": "CHAP authentication support",
-      "performance_settings": "Block size, cache, connection limits"
-    },
-    "session_management": {
-      "session_tracking": "Boot session lifecycle",
-      "performance_metrics": "Boot time, resource usage",
-      "real_time_updates": "WebSocket-based live updates",
-      "error_handling": "Retry logic and error tracking"
-    },
-    "monitoring": {
-      "health_checks": "System health monitoring",
-      "audit_logging": "User activity tracking",
-      "rate_limiting": "API request limiting",
-      "structured_logging": "JSON-based logging"
-    }
-  },
-  "missing_ggrock_features": {
-    "image_conversion": {
-      "qemu_img_integration": "Background image conversion using qemu-img",
-      "format_conversion": "VHDX to RAW conversion for iSCSI",
-      "sparse_file_support": "Sparse file creation for efficiency"
-    },
-    "iscsi_automation": {
-      "targetcli_wrapper": "Automated targetcli command execution",
-      "backstore_management": "File-backed and LVM backstore creation",
-      "acl_management": "Automatic ACL configuration for machines"
-    },
-    "pxe_boot": {
-      "ipxe_script_generation": "Dynamic iPXE script creation",
-      "dhcp_integration": "DHCP server configuration for PXE",
-      "tftp_support": "TFTP server for boot files"
-    },
-    "session_orchestration": {
-      "automated_target_creation": "Auto-create targets on session start",
-      "boot_script_delivery": "Deliver iPXE scripts to clients",
-      "session_cleanup": "Automatic cleanup on session end"
-    },
-    "infrastructure": {
-      "systemd_services": "Backend and worker service definitions",
-      "nginx_configuration": "Reverse proxy and SSL termination",
-      "install_scripts": "Automated dependency installation"
-    }
-  },
-  "external_dependencies": {
-    "system_tools": {
-      "qemu_img": "Image format conversion",
-      "targetcli": "iSCSI target management",
-      "tftpd_hpa": "TFTP server for PXE boot",
-      "isc_dhcp_server": "DHCP server for network boot",
-      "ipxe": "Enhanced PXE boot environment"
-    },
-    "privileges_required": {
-      "root_access": "Required for targetcli, DHCP, TFTP configuration",
-      "systemd_services": "Service installation and management",
-      "network_configuration": "DHCP and TFTP server setup"
-    }
-  },
-  "technical_debt": {
-    "code_quality": {
-      "pydantic_v2": "Already migrated to Pydantic V2",
-      "test_coverage": "Good test coverage with edge cases",
-      "error_handling": "Comprehensive error handling implemented"
-    },
-    "architecture": {
-      "modular_design": "Well-structured modular FastAPI app",
-      "separation_of_concerns": "Clear separation between models, routes, core",
-      "dependency_injection": "Proper FastAPI dependency injection"
-    },
-    "security": {
-      "jwt_implementation": "Secure JWT token handling",
-      "password_hashing": "bcrypt password hashing",
-      "rate_limiting": "API rate limiting implemented"
-    }
-  }
-}
+]
