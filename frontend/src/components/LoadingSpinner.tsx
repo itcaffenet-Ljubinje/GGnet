@@ -82,3 +82,6 @@ export const LoadingPage: React.FC<LoadingPageProps> = ({ text = 'Loading...' })
     </div>
   )
 }
+
+// Default export for convenience
+export default LoadingSpinner

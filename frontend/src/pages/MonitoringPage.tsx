@@ -565,25 +565,40 @@ export default function MonitoringPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         <Suspense fallback={<div className="h-[200px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />}>
           <UsageChart
-            data={chartData.cpu}
-            title="CPU Usage"
+            data={chartData.cpu.map(item => ({
+              time: item.time,
+              cpu: item.value,
+              memory: 0,
+              disk: 0,
+              network: 0
+            }))}
+            dataKey="cpu"
             color="#ef4444"
-            unit="%"
             type="area"
           />
         </Suspense>
         <Suspense fallback={<div className="h-[200px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />}>
           <UsageChart
-            data={chartData.memory}
-            title="Memory Usage"
+            data={chartData.memory.map(item => ({
+              time: item.time,
+              cpu: 0,
+              memory: item.value,
+              disk: 0,
+              network: 0
+            }))}
+            dataKey="memory"
             color="#3b82f6"
-            unit="%"
             type="area"
           />
         </Suspense>
         <Suspense fallback={<div className="h-[200px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />}>
           <NetworkChart
-            data={chartData.network}
+            data={chartData.network.map(item => ({
+              time: item.time,
+              value: item.sent + item.received
+            }))}
+            label="Network I/O"
+            color="#10b981"
           />
         </Suspense>
       </div>
