@@ -6,7 +6,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.cors import CORSMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # pyright: ignore[reportMissingImports]
+from fastapi.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
+from starlette.middleware.base import BaseHTTPMiddleware  # pyright: ignore[reportMissingImports]
+from starlette.responses import Response  # pyright: ignore[reportMissingImports]
 import structlog  # pyright: ignore[reportMissingImports]
 import time
 
@@ -40,6 +43,27 @@ structlog.configure(
 )
 
 logger = structlog.get_logger()
+
+
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    """Middleware to add cache control headers to responses"""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Don't cache API responses by default
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        # Cache static endpoints
+        elif request.url.path.startswith("/health") or request.url.path.startswith("/metrics"):
+            response.headers["Cache-Control"] = "public, max-age=60"
+        # Cache images metadata
+        elif request.url.path.startswith("/images") and request.method == "GET":
+            response.headers["Cache-Control"] = "public, max-age=300"
+        
+        return response
 
 
 @asynccontextmanager
@@ -103,7 +127,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
+    # Compression middleware (should be first to compress all responses)
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
+    
     # Custom middleware
+    app.add_middleware(CacheControlMiddleware)
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
