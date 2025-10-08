@@ -13,7 +13,7 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe
 from app.api import targets, sessions as sessions_api
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -158,6 +158,7 @@ def create_app() -> FastAPI:
     app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
     app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
     app.include_router(hardware.router, tags=["hardware"])
+    app.include_router(winpe.router, tags=["winpe"])
     app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
     
     # WebSocket endpoint
