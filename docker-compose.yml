@@ -128,6 +128,20 @@ services:
       - ./docker/tftp:/var/tftpboot
     restart: unless-stopped
 
+  # dnsmasq (Alternative: integrated DHCP+TFTP+DNS like ggRock)
+  # Uncomment to use dnsmasq instead of separate dhcp+tftp services
+  # dnsmasq:
+  #   image: strm/dnsmasq
+  #   container_name: ggnet-dnsmasq
+  #   network_mode: host
+  #   volumes:
+  #     - ./docker/dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
+  #     - ./infra/tftp:/var/lib/tftp
+  #   cap_add:
+  #     - NET_ADMIN
+  #   restart: unless-stopped
+  #   privileged: true
+
   # iSCSI Target (requires privileged access)
   iscsi:
     image: openebs/tgt
