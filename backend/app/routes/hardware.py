@@ -8,10 +8,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
-from app.core.dependencies import get_db, require_operator
+from app.core.dependencies import get_db, require_operator, log_user_activity
 from app.models.user import User
 from app.models.machine import Machine, MachineStatus
-from app.models.audit import log_user_activity, AuditAction
+from app.models.audit import AuditAction
 
 router = APIRouter(prefix="/api/hardware", tags=["hardware"])
 
