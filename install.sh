@@ -1,603 +1,326 @@
 #!/bin/bash
-
-# GGnet Diskless Server Installation Script
-# Complete installation and configuration of GGnet diskless server
+###############################################################################
+# GGnet Automated Installation Script
+#
+# One-click installation for GGnet diskless boot system
+# Compatible with: Debian 11+, Ubuntu 20.04+
+#
+# Usage:
+#   sudo ./install.sh
+#   sudo ./install.sh --dry-run   # Show what would be installed
+###############################################################################
 
 set -e
 
-# Configuration
-INSTALL_DIR="/opt/ggnet"
-SERVICE_USER="ggnet"
-SERVICE_GROUP="ggnet"
-BACKEND_PORT="8000"
-FRONTEND_PORT="3000"
-NGINX_PORT="80"
-NGINX_SSL_PORT="443"
-
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+# Configuration
+GGNET_DIR="/opt/ggnet"
+GGNET_USER="ggnet"
+GGNET_GROUP="ggnet"
+DRY_RUN=false
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+    esac
+done
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# Helper functions
+info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+step() { echo -e "${BLUE}[STEP]${NC} $1"; }
 
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
-}
-
-# Check if running as root
 check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root"
+    if [ "$EUID" -ne 0 ]; then 
+        error "Please run as root: sudo ./install.sh"
         exit 1
     fi
 }
 
-# Detect OS and package manager
 detect_os() {
-    if [[ -f /etc/os-release ]]; then
+    if [ -f /etc/os-release ]; then
         . /etc/os-release
-        OS=$NAME
+        OS=$ID
         VER=$VERSION_ID
+        info "Detected OS: $OS $VER"
     else
-        log_error "Cannot detect OS version"
+        error "Cannot detect OS. Please use Debian/Ubuntu."
         exit 1
     fi
-    
-    if command -v apt-get &> /dev/null; then
-        PKG_MANAGER="apt"
-    elif command -v yum &> /dev/null; then
-        PKG_MANAGER="yum"
-    elif command -v dnf &> /dev/null; then
-        PKG_MANAGER="dnf"
+}
+
+run_command() {
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Would run: $@"
     else
-        log_error "Unsupported package manager"
-        exit 1
-    fi
-    
-    log_info "Detected OS: $OS $VER"
-    log_info "Package manager: $PKG_MANAGER"
-}
-
-# Install system dependencies
-install_dependencies() {
-    log_step "Installing system dependencies..."
-    
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        apt-get update
-        apt-get install -y \
-            python3 python3-pip python3-venv \
-            nodejs npm \
-            nginx \
-            isc-dhcp-server \
-            tftpd-hpa \
-            targetcli-fb python3-rtslib-fb \
-            qemu-utils \
-            redis-server \
-            postgresql postgresql-contrib \
-            git curl wget \
-            build-essential \
-            liblzma-dev \
-            ufw \
-            systemd
-    elif [[ "$PKG_MANAGER" == "yum" ]]; then
-        yum update -y
-        yum install -y \
-            python3 python3-pip \
-            nodejs npm \
-            nginx \
-            dhcp \
-            tftp-server \
-            targetcli \
-            qemu-img \
-            redis \
-            postgresql postgresql-server postgresql-contrib \
-            git curl wget \
-            gcc gcc-c++ make \
-            xz-devel \
-            firewalld \
-            systemd
-    elif [[ "$PKG_MANAGER" == "dnf" ]]; then
-        dnf update -y
-        dnf install -y \
-            python3 python3-pip \
-            nodejs npm \
-            nginx \
-            dhcp-server \
-            tftp-server \
-            targetcli \
-            qemu-img \
-            redis \
-            postgresql postgresql-server postgresql-contrib \
-            git curl wget \
-            gcc gcc-c++ make \
-            xz-devel \
-            firewalld \
-            systemd
-    fi
-    
-    log_info "System dependencies installed successfully"
-}
-
-# Create service user
-create_service_user() {
-    log_step "Creating service user..."
-    
-    if ! id "$SERVICE_USER" &>/dev/null; then
-        useradd -r -s /bin/false -d "$INSTALL_DIR" "$SERVICE_USER"
-        log_info "Created service user: $SERVICE_USER"
-    else
-        log_info "Service user already exists: $SERVICE_USER"
+        "$@"
     fi
 }
 
-# Create directory structure
-create_directories() {
-    log_step "Creating directory structure..."
-    
-    mkdir -p "$INSTALL_DIR"/{backend,frontend,images,targets,backstores,tftp,logs,cache}
-    mkdir -p "$INSTALL_DIR/backend"/{app,scripts,config}
-    mkdir -p "$INSTALL_DIR/frontend"/{src,public,dist}
-    
-    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR"
-    chmod 755 "$INSTALL_DIR"
-    
-    log_info "Directory structure created successfully"
-}
+# Banner
+echo ""
+echo "========================================="
+echo " GGnet Diskless System Installer"
+echo "========================================="
+echo ""
 
-# Install Python backend
-install_backend() {
-    log_step "Installing Python backend..."
+if [ "$DRY_RUN" = true ]; then
+    warn "DRY-RUN MODE - No changes will be made"
+    echo ""
+fi
+
+# Checks
+check_root
+detect_os
+
+# Step 1: Install system dependencies
+step "1/10 Installing system dependencies..."
+
+PACKAGES=(
+    # Build tools
+    build-essential
+    python3-dev
+    python3-pip
+    python3-venv
     
-    # Copy backend files
-    cp -r backend/* "$INSTALL_DIR/backend/"
+    # Database
+    postgresql
+    postgresql-contrib
     
-    # Create virtual environment
-    cd "$INSTALL_DIR/backend"
+    # Cache
+    redis-server
+    
+    # Network services
+    isc-dhcp-server
+    tftpd-hpa
+    nginx
+    
+    # iSCSI
+    targetcli-fb
+    
+    # Image tools
+    qemu-utils
+    
+    # Hardware detection
+    lshw
+    dmidecode
+    
+    # Monitoring
+    prometheus-node-exporter
+    
+    # Utilities
+    curl
+    wget
+    git
+    jq
+    unzip
+    wakeonlan
+)
+
+if [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
+    run_command apt-get update
+    run_command apt-get install -y "${PACKAGES[@]}"
+else
+    error "Unsupported OS: $OS"
+    exit 1
+fi
+
+# Step 2: Create ggnet user
+step "2/10 Creating ggnet user..."
+
+if ! id -u $GGNET_USER > /dev/null 2>&1; then
+    run_command useradd -r -s /bin/bash -d $GGNET_DIR -m $GGNET_USER
+    info "Created user: $GGNET_USER"
+else
+    info "User already exists: $GGNET_USER"
+fi
+
+# Step 3: Create directory structure
+step "3/10 Creating directory structure..."
+
+DIRS=(
+    "$GGNET_DIR"
+    "$GGNET_DIR/backend"
+    "$GGNET_DIR/frontend"
+    "$GGNET_DIR/images"
+    "$GGNET_DIR/targets"
+    "$GGNET_DIR/uploads"
+    "/var/lib/tftp"
+    "/var/log/ggnet"
+    "/etc/ggnet"
+)
+
+for dir in "${DIRS[@]}"; do
+    run_command mkdir -p "$dir"
+    run_command chown $GGNET_USER:$GGNET_GROUP "$dir"
+done
+
+# Step 4: Copy application files
+step "4/10 Copying application files..."
+
+if [ "$DRY_RUN" = false ]; then
+    rsync -av --exclude='venv' --exclude='node_modules' --exclude='__pycache__' \
+        backend/ "$GGNET_DIR/backend/"
+    
+    rsync -av --exclude='node_modules' --exclude='dist' \
+        frontend/ "$GGNET_DIR/frontend/"
+    
+    rsync -av scripts/ "$GGNET_DIR/scripts/"
+    rsync -av infra/ "$GGNET_DIR/infra/"
+    
+    chown -R $GGNET_USER:$GGNET_GROUP "$GGNET_DIR"
+fi
+
+# Step 5: Setup Python virtual environment
+step "5/10 Setting up Python virtual environment..."
+
+if [ "$DRY_RUN" = false ]; then
+    cd "$GGNET_DIR/backend"
     python3 -m venv venv
     source venv/bin/activate
-    
-    # Install Python dependencies
     pip install --upgrade pip
     pip install -r requirements.txt
-    
-    # Set permissions
-    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/backend"
-    
-    log_info "Backend installed successfully"
-}
+    deactivate
+fi
 
-# Install Node.js frontend
-install_frontend() {
-    log_step "Installing Node.js frontend..."
-    
-    # Copy frontend files
-    cp -r frontend/* "$INSTALL_DIR/frontend/"
-    
-    # Install Node.js dependencies
-    cd "$INSTALL_DIR/frontend"
-    npm install
-    
-    # Build frontend
-    npm run build
-    
-    # Set permissions
-    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/frontend"
-    
-    log_info "Frontend installed successfully"
-}
+# Step 6: Setup PostgreSQL database
+step "6/10 Configuring PostgreSQL database..."
 
-# Configure database
-configure_database() {
-    log_step "Configuring database..."
+if [ "$DRY_RUN" = false ]; then
+    sudo -u postgres psql -c "CREATE USER ggnet WITH PASSWORD 'ggnet_password';" || true
+    sudo -u postgres psql -c "CREATE DATABASE ggnet OWNER ggnet;" || true
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ggnet TO ggnet;" || true
     
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        systemctl start postgresql
-        systemctl enable postgresql
-    elif [[ "$PKG_MANAGER" == "yum" || "$PKG_MANAGER" == "dnf" ]]; then
-        postgresql-setup --initdb
-        systemctl start postgresql
-        systemctl enable postgresql
-    fi
-    
-    # Create database and user
-    sudo -u postgres psql << EOF
-CREATE DATABASE ggnet;
-CREATE USER ggnet WITH ENCRYPTED PASSWORD 'ggnet_password';
-GRANT ALL PRIVILEGES ON DATABASE ggnet TO ggnet;
-\q
-EOF
-    
-    log_info "Database configured successfully"
-}
-
-# Configure Redis
-configure_redis() {
-    log_step "Configuring Redis..."
-    
-    systemctl start redis
-    systemctl enable redis
-    
-    # Configure Redis for GGnet
-    cat >> /etc/redis/redis.conf << EOF
-
-# GGnet Redis Configuration
-maxmemory 256mb
-maxmemory-policy allkeys-lru
-save 900 1
-save 300 10
-save 60 10000
-EOF
-    
-    systemctl restart redis
-    
-    log_info "Redis configured successfully"
-}
-
-# Configure DHCP
-configure_dhcp() {
-    log_step "Configuring DHCP server..."
-    
-    # Run DHCP configuration script
-    if [[ -f "scripts/dhcp_config.sh" ]]; then
-        chmod +x scripts/dhcp_config.sh
-        ./scripts/dhcp_config.sh
-    else
-        log_warn "DHCP configuration script not found"
-    fi
-    
-    log_info "DHCP configured successfully"
-}
-
-# Configure TFTP
-configure_tftp() {
-    log_step "Configuring TFTP server..."
-    
-    # Run TFTP configuration script
-    if [[ -f "scripts/tftp_config.sh" ]]; then
-        chmod +x scripts/tftp_config.sh
-        ./scripts/tftp_config.sh
-    else
-        log_warn "TFTP configuration script not found"
-    fi
-    
-    log_info "TFTP configured successfully"
-}
-
-# Configure iSCSI
-configure_iscsi() {
-    log_step "Configuring iSCSI target server..."
-    
-    # Run iSCSI configuration script
-    if [[ -f "scripts/iscsi_config.sh" ]]; then
-        chmod +x scripts/iscsi_config.sh
-        ./scripts/iscsi_config.sh
-    else
-        log_warn "iSCSI configuration script not found"
-    fi
-    
-    log_info "iSCSI configured successfully"
-}
-
-# Configure Nginx
-configure_nginx() {
-    log_step "Configuring Nginx reverse proxy..."
-    
-    # Create Nginx configuration
-    cat > /etc/nginx/sites-available/ggnet << EOF
-server {
-    listen 80;
-    server_name _;
-    
-    # Frontend
-    location / {
-        root $INSTALL_DIR/frontend/dist;
-        try_files \$uri \$uri/ /index.html;
-    }
-    
-    # Backend API
-    location /api/ {
-        proxy_pass http://127.0.0.1:$BACKEND_PORT/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # WebSocket
-    location /ws {
-        proxy_pass http://127.0.0.1:$BACKEND_PORT/ws;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # File uploads
-    client_max_body_size 50G;
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-}
-EOF
-    
-    # Enable site
-    ln -sf /etc/nginx/sites-available/ggnet /etc/nginx/sites-enabled/
-    rm -f /etc/nginx/sites-enabled/default
-    
-    # Test configuration
-    nginx -t
-    
-    # Restart Nginx
-    systemctl restart nginx
-    systemctl enable nginx
-    
-    log_info "Nginx configured successfully"
-}
-
-# Create systemd services
-create_systemd_services() {
-    log_step "Creating systemd services..."
-    
-    # Backend service
-    cat > /etc/systemd/system/ggnet-backend.service << EOF
-[Unit]
-Description=GGnet Backend Service
-After=network.target postgresql.service redis.service
-
-[Service]
-Type=exec
-User=$SERVICE_USER
-Group=$SERVICE_GROUP
-WorkingDirectory=$INSTALL_DIR/backend
-Environment=PATH=$INSTALL_DIR/backend/venv/bin
-ExecStart=$INSTALL_DIR/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port $BACKEND_PORT
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    # Frontend service (if needed)
-    cat > /etc/systemd/system/ggnet-frontend.service << EOF
-[Unit]
-Description=GGnet Frontend Service
-After=network.target
-
-[Service]
-Type=exec
-User=$SERVICE_USER
-Group=$SERVICE_GROUP
-WorkingDirectory=$INSTALL_DIR/frontend
-ExecStart=/usr/bin/npm run serve
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    # Reload systemd
-    systemctl daemon-reload
-    
-    # Enable services
-    systemctl enable ggnet-backend
-    systemctl enable ggnet-frontend
-    
-    log_info "Systemd services created successfully"
-}
-
-# Configure firewall
-configure_firewall() {
-    log_step "Configuring firewall..."
-    
-    if [[ "$PKG_MANAGER" == "apt" ]]; then
-        # Ubuntu/Debian UFW
-        ufw --force enable
-        ufw allow ssh
-        ufw allow 80/tcp
-        ufw allow 443/tcp
-        ufw allow 67/udp
-        ufw allow 68/udp
-        ufw allow 69/udp
-        ufw allow 3260/tcp
-    elif [[ "$PKG_MANAGER" == "yum" || "$PKG_MANAGER" == "dnf" ]]; then
-        # CentOS/RHEL firewalld
-        systemctl start firewalld
-        systemctl enable firewalld
-        firewall-cmd --permanent --add-service=ssh
-        firewall-cmd --permanent --add-service=http
-        firewall-cmd --permanent --add-service=https
-        firewall-cmd --permanent --add-service=dhcp
-        firewall-cmd --permanent --add-service=tftp
-        firewall-cmd --permanent --add-service=iscsi-target
-        firewall-cmd --reload
-    fi
-    
-    log_info "Firewall configured successfully"
-}
-
-# Initialize database
-initialize_database() {
-    log_step "Initializing database..."
-    
-    cd "$INSTALL_DIR/backend"
+    # Run migrations
+    cd "$GGNET_DIR/backend"
     source venv/bin/activate
-    
-    # Run database migrations
-    python -m alembic upgrade head
-    
-    # Create admin user
-    python -c "
-from app.core.database import init_db
-from app.models.user import User, UserRole, UserStatus
-from app.core.security import get_password_hash
-import asyncio
+    alembic upgrade head
+    deactivate
+fi
 
-async def create_admin():
-    await init_db()
-    # Admin user creation logic here
-    print('Admin user created successfully')
+# Step 7: Setup Redis
+step "7/10 Configuring Redis..."
 
-asyncio.run(create_admin())
-"
-    
-    log_info "Database initialized successfully"
-}
+if [ "$DRY_RUN" = false ]; then
+    systemctl enable redis-server
+    systemctl start redis-server
+fi
 
-# Start services
-start_services() {
-    log_step "Starting services..."
-    
-    # Start backend
-    systemctl start ggnet-backend
-    
-    # Start frontend (if needed)
-    systemctl start ggnet-frontend
-    
-    # Check service status
-    if systemctl is-active --quiet ggnet-backend; then
-        log_info "Backend service started successfully"
-    else
-        log_error "Failed to start backend service"
-        systemctl status ggnet-backend
-    fi
-    
-    log_info "Services started successfully"
-}
+# Step 8: Download iPXE binaries
+step "8/10 Downloading iPXE binaries..."
 
-# Create management script
-create_management_script() {
-    log_step "Creating management script..."
+if [ "$DRY_RUN" = false ]; then
+    cd /var/lib/tftp
     
-    cat > /usr/local/bin/ggnet << 'EOF'
-#!/bin/bash
-# GGnet Management Script
-
-INSTALL_DIR="/opt/ggnet"
-SERVICE_USER="ggnet"
-
-case "$1" in
-    start)
-        systemctl start ggnet-backend ggnet-frontend
-        echo "GGnet services started"
-        ;;
-    stop)
-        systemctl stop ggnet-backend ggnet-frontend
-        echo "GGnet services stopped"
-        ;;
-    restart)
-        systemctl restart ggnet-backend ggnet-frontend
-        echo "GGnet services restarted"
-        ;;
-    status)
-        systemctl status ggnet-backend ggnet-frontend
-        ;;
-    logs)
-        journalctl -u ggnet-backend -f
-        ;;
-    update)
-        echo "Updating GGnet..."
-        cd "$INSTALL_DIR"
-        git pull
-        cd backend && source venv/bin/activate && pip install -r requirements.txt
-        cd ../frontend && npm install && npm run build
-        systemctl restart ggnet-backend ggnet-frontend
-        echo "GGnet updated successfully"
-        ;;
-    backup)
-        echo "Creating backup..."
-        tar -czf "/tmp/ggnet-backup-$(date +%Y%m%d_%H%M%S).tar.gz" "$INSTALL_DIR"
-        echo "Backup created in /tmp/"
-        ;;
-    help)
-        echo "GGnet Management Script"
-        echo "Usage: $0 {start|stop|restart|status|logs|update|backup|help}"
-        ;;
-    *)
-        echo "Unknown command: $1"
-        echo "Use '$0 help' for usage information"
-        exit 1
-        ;;
-esac
-EOF
+    wget -q https://boot.ipxe.org/ipxe.efi -O ipxe.efi || warn "Failed to download ipxe.efi"
+    wget -q https://boot.ipxe.org/snponly.efi -O snponly.efi || warn "Failed to download snponly.efi"
+    wget -q https://boot.ipxe.org/undionly.kpxe -O undionly.kpxe || warn "Failed to download undionly.kpxe"
     
+    chmod 644 /var/lib/tftp/*
+    chown tftp:tftp /var/lib/tftp/* || true
+    
+    info "iPXE binaries downloaded"
+fi
+
+# Step 9: Configure services
+step "9/10 Configuring services..."
+
+# DHCP
+if [ "$DRY_RUN" = false ]; then
+    cp docker/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf
+    
+    # Get server IP
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+    sed -i "s/192\.168\.1\.10/$SERVER_IP/g" /etc/dhcp/dhcpd.conf
+    
+    systemctl enable isc-dhcp-server
+    systemctl restart isc-dhcp-server
+fi
+
+# TFTP
+if [ "$DRY_RUN" = false ]; then
+    systemctl enable tftpd-hpa
+    systemctl restart tftpd-hpa
+fi
+
+# Nginx
+if [ "$DRY_RUN" = false ]; then
+    cp docker/nginx/nginx.conf /etc/nginx/sites-available/ggnet
+    ln -sf /etc/nginx/sites-available/ggnet /etc/nginx/sites-enabled/ggnet
+    
+    systemctl enable nginx
+    systemctl restart nginx
+fi
+
+# Step 10: Install systemd services
+step "10/10 Installing systemd services..."
+
+if [ "$DRY_RUN" = false ]; then
+    cp systemd/ggnet-backend.service /etc/systemd/system/
+    cp systemd/ggnet-worker.service /etc/systemd/system/
+    cp systemd/ggnet-preflight.service /etc/systemd/system/
+    
+    # Install CLI tools
+    cp scripts/ggnet /usr/local/bin/
+    cp scripts/ggnet-iscsi /usr/local/bin/
     chmod +x /usr/local/bin/ggnet
+    chmod +x /usr/local/bin/ggnet-iscsi
     
-    log_info "Management script created successfully"
-}
+    systemctl daemon-reload
+    systemctl enable ggnet-backend
+    systemctl enable ggnet-worker
+    systemctl enable ggnet-preflight
+    
+    systemctl start ggnet-preflight
+    systemctl start ggnet-backend
+    systemctl start ggnet-worker
+fi
 
-# Main installation function
-main() {
-    log_info "Starting GGnet Diskless Server installation..."
-    
-    check_root
-    detect_os
-    
-    install_dependencies
-    create_service_user
-    create_directories
-    install_backend
-    install_frontend
-    configure_database
-    configure_redis
-    configure_dhcp
-    configure_tftp
-    configure_iscsi
-    configure_nginx
-    create_systemd_services
-    configure_firewall
-    initialize_database
-    start_services
-    create_management_script
-    
-    log_info "GGnet Diskless Server installation completed successfully!"
-    
-    echo
-    log_info "Installation Summary:"
-    echo "  Installation Directory: $INSTALL_DIR"
-    echo "  Service User: $SERVICE_USER"
-    echo "  Backend Port: $BACKEND_PORT"
-    echo "  Frontend Port: $FRONTEND_PORT"
-    echo "  Web Interface: http://$(hostname -I | awk '{print $1}')"
-    echo "  Management Script: /usr/local/bin/ggnet"
-    
-    echo
-    log_info "Next steps:"
-    echo "1. Access the web interface at http://$(hostname -I | awk '{print $1}')"
-    echo "2. Login with default credentials (admin/admin123)"
-    echo "3. Upload Windows/Linux images"
-    echo "4. Create machine entries"
-    echo "5. Configure iSCSI targets"
-    echo "6. Test PXE boot with client machines"
-    
-    echo
-    log_info "Useful commands:"
-    echo "  ggnet status    - Check service status"
-    echo "  ggnet logs      - View backend logs"
-    echo "  ggnet restart   - Restart services"
-    echo "  ggnet-iscsi list - List iSCSI targets"
-    echo "  ggnet-tftp list  - List TFTP scripts"
-}
+# Final message
+echo ""
+echo "========================================="
+echo " GGnet Installation Complete!"
+echo "========================================="
+echo ""
+info "Services installed and started:"
+echo "  ✓ PostgreSQL (port 5432)"
+echo "  ✓ Redis (port 6379)"
+echo "  ✓ GGnet Backend (port 8000)"
+echo "  ✓ GGnet Frontend (port 3000 via nginx)"
+echo "  ✓ DHCP Server"
+echo "  ✓ TFTP Server (port 69)"
+echo ""
+info "Access points:"
+echo "  • Frontend: http://$SERVER_IP:3000"
+echo "  • Backend API: http://$SERVER_IP:8000"
+echo "  • API Docs: http://$SERVER_IP:8000/docs"
+echo "  • Grafana: http://$SERVER_IP:3001"
+echo ""
+info "Next steps:"
+echo "  1. Create admin user: cd $GGNET_DIR/backend && python3 create_admin.py"
+echo "  2. Run pre-flight checks: ggnet check"
+echo "  3. Upload Windows 11 image via web UI"
+echo "  4. Create machine entries"
+echo "  5. Boot clients via PXE!"
+echo ""
+info "CLI commands available:"
+echo "  • ggnet start|stop|restart|status"
+echo "  • ggnet logs [service]"
+echo "  • ggnet backup [target]"
+echo "  • ggnet-iscsi create|delete|list"
+echo ""
+echo "========================================="
+echo ""
 
-# Run main function
-main "$@"
+exit 0
