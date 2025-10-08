@@ -104,6 +104,7 @@ PACKAGES=(
     # Network services
     isc-dhcp-server
     tftpd-hpa
+    dnsmasq
     nginx
     
     # iSCSI
@@ -111,13 +112,29 @@ PACKAGES=(
     
     # Image tools
     qemu-utils
+    pv
     
     # Hardware detection
     lshw
     dmidecode
+    parted
     
     # Monitoring
     prometheus-node-exporter
+    
+    # Network tools
+    bridge-utils
+    ifenslave
+    
+    # Windows tools
+    chntpw
+    
+    # File sharing
+    cifs-utils
+    smbclient
+    
+    # SSH automation
+    sshpass
     
     # Utilities
     curl
@@ -126,6 +143,8 @@ PACKAGES=(
     jq
     unzip
     wakeonlan
+    xmlstarlet
+    dialog
 )
 
 if [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then

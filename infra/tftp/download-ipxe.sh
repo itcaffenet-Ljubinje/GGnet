@@ -41,14 +41,24 @@ download_file() {
 success=0
 failed=0
 
-# UEFI binaries
+# UEFI binaries (Latest)
 download_file "$BASE_URL/ipxe.efi" "ipxe.efi" "UEFI x64 (standard)" "false" && ((success++)) || ((failed++))
 download_file "$BASE_URL/snponly.efi" "snponly.efi" "UEFI x64 SecureBoot (Win11)" "true" && ((success++)) || ((failed++))
 download_file "$BASE_URL/ipxe-i386.efi" "ipxe32.efi" "UEFI IA32 (32-bit)" "false" && ((success++)) || ((failed++))
 
+# Legacy iPXE versions (for old hardware compatibility)
+echo ""
+info "Downloading legacy iPXE versions for older hardware..."
+download_file "https://github.com/ipxe/ipxe/releases/download/v1.21.1/ipxe.efi" "ipxe_202102.efi" "UEFI x64 (2021.02)" "false" && ((success++)) || ((failed++))
+download_file "https://github.com/ipxe/ipxe/releases/download/v1.20.1/ipxe.efi" "ipxe_202006.efi" "UEFI x64 (2020.06)" "false" && ((success++)) || ((failed++))
+
 # Legacy BIOS binaries  
 download_file "$BASE_URL/undionly.kpxe" "undionly.kpxe" "Legacy BIOS (UNDI driver)" "false" && ((success++)) || ((failed++))
 download_file "$BASE_URL/undionly.pxe" "undionly.pxe" "Legacy BIOS (PXE)" "false" && ((success++)) || ((failed++))
+
+# Legacy BIOS versions
+download_file "https://github.com/ipxe/ipxe/releases/download/v1.21.1/undionly.kpxe" "undionly_202102.kpxe" "BIOS UNDI (2021.02)" "false" && ((success++)) || ((failed++))
+download_file "https://github.com/ipxe/ipxe/releases/download/v1.20.1/undionly.kpxe" "undionly_202006.kpxe" "BIOS UNDI (2020.06)" "false" && ((success++)) || ((failed++))
 
 # Summary
 echo "========================================"
