@@ -1,14 +1,54 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, splitVendorChunkPlugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
+import viteCompression from 'vite-plugin-compression'
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    splitVendorChunkPlugin(),
+    // Precompress static assets for optimal delivery via nginx gzip_static
+    viteCompression({ algorithm: 'gzip', ext: '.gz', deleteOriginFile: false, threshold: 1024 }),
+    ...(process.env.ANALYZE ? [
+      visualizer({
+        filename: 'bundle-stats.html',
+        open: true,
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap'
+      })
+    ] : [])
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  build: {
+    target: 'es2019',
+    cssCodeSplit: true,
+    sourcemap: false,
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          query: ['@tanstack/react-query'],
+          charts: ['recharts'],
+          icons: ['lucide-react']
+        }
+      }
+    },
+    // Drop debug statements in production bundles
+    minify: 'esbuild',
+    // Configure esbuild to drop console/debugger in production
+    esbuild: {
+      drop: ['console', 'debugger']
+    },
+    assetsInlineLimit: 4096
   },
   server: {
     port: 3000,
@@ -53,4 +93,4 @@ export default defineConfig({
       ]
     }
   }
-})
+}))
