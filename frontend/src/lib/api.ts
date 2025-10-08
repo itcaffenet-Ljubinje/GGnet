@@ -65,8 +65,9 @@ api.interceptors.request.use(
       }
     }
     
-    // Add timestamp to prevent caching
-    if (config.method === 'get') {
+    // Only add cache-busting for specific endpoints that need it
+    // Most endpoints benefit from HTTP caching headers instead
+    if (config.method === 'get' && config.url?.includes('/monitoring/')) {
       config.params = {
         ...config.params,
         _t: Date.now(),

@@ -6,13 +6,23 @@ import { Toaster } from 'react-hot-toast'
 import App from './App.tsx'
 import './index.css'
 
-// Configure React Query client
+// Configure React Query client with optimized caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+      cacheTime: 10 * 60 * 1000, // 10 minutes - keep unused data in cache
+      refetchOnMount: false, // Don't refetch on component mount if data is fresh
+      refetchOnReconnect: 'always', // Always refetch on reconnect
+      // Use structural sharing to prevent unnecessary re-renders
+      structuralSharing: true,
+    },
+    mutations: {
+      retry: 1,
+      // Retry failed mutations on reconnect
+      retryOnMount: true,
     },
   },
 })
