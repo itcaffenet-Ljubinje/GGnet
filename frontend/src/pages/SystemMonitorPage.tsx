@@ -3,13 +3,15 @@
  * Page for system monitoring and performance metrics
  */
 
-// React is available globally;
-import SystemMonitor from '../components/SystemMonitor';
+import { lazy, Suspense } from 'react';
+const SystemMonitor = lazy(() => import('../components/SystemMonitor'));
 
 const SystemMonitorPage: React.FC = () => {
   return (
     <div>
-      <SystemMonitor />
+      <Suspense fallback={<div className="h-64 rounded-md bg-gray-100 dark:bg-gray-800 animate-pulse" /> }>
+        <SystemMonitor />
+      </Suspense>
     </div>
   );
 };
