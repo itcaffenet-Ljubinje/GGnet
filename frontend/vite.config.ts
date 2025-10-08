@@ -2,13 +2,44 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: 'stats.html',
+            template: 'treemap',
+            gzipSize: true,
+            brotliSize: true,
+            open: false,
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  build: {
+    sourcemap: false,
+    cssCodeSplit: true,
+    reportCompressedSize: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          icons: ['lucide-react'],
+        },
+      },
+    },
+  },
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
   },
   server: {
     port: 3000,
