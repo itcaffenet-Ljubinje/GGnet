@@ -16,7 +16,17 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area
+} from 'recharts';
 
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';

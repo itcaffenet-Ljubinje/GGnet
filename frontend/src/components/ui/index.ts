@@ -4,3 +4,4 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { Modal, ConfirmModal } from './Modal'
 export { ProgressBar } from './ProgressBar'
 export { StatusBadge } from './StatusBadge'
+export { Icon, icons, type IconName } from './Icon'
