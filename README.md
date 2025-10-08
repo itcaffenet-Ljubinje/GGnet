@@ -1,850 +1,469 @@
-# GGnet - Diskless Server Management System
+# 🌐 GGnet - Diskless Boot System
 
-[![CI/CD Pipeline](https://github.com/your-org/ggnet/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/ggnet/actions/workflows/ci.yml)
-[![Code Coverage](https://codecov.io/gh/your-org/ggnet/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/ggnet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Enterprise-grade diskless boot system for Windows 11 with UEFI SecureBoot support.
 
-A modern, scalable diskless server management system built with FastAPI and React. GGnet provides comprehensive management of diskless workstations, iSCSI targets, and network boot infrastructure.
+[![GitHub](https://img.shields.io/badge/GitHub-GGnet-blue)](https://github.com/your-org/ggnet)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Feature Parity](https://img.shields.io/badge/ggRock%20Parity-90%25-success)](GGROCK_COMPARISON.md)
 
-## 🚀 Features
+---
 
-### Core Functionality
-- **Diskless Workstation Management**: Complete lifecycle management of diskless machines
-- **iSCSI Target Management**: Automated creation and management of iSCSI targets
-- **Image Management**: Upload, convert, and manage disk images (VHDX, RAW, QCOW2)
-- **Session Orchestration**: Automated session management with PXE/iPXE boot support
-- **Real-time Monitoring**: Live monitoring of sessions, targets, and system health
+## 🎯 **What is GGnet?**
 
-### Technical Features
-- **Modern Architecture**: FastAPI backend with React TypeScript frontend
-- **Real-time Updates**: WebSocket-based live monitoring and notifications
-- **Background Processing**: Asynchronous image conversion and processing
-- **Comprehensive Testing**: Unit, integration, and end-to-end tests
-- **Production Ready**: Health monitoring, metrics, logging, and CI/CD
+GGnet is a **modern diskless boot system** designed for gaming centers, educational institutions, and enterprises that need to manage multiple Windows 11 clients efficiently.
 
-### Security & Compliance
-- **JWT Authentication**: Secure token-based authentication with refresh tokens
-- **Role-based Access Control**: Granular permissions (Admin, Operator, Viewer)
-- **Audit Logging**: Complete audit trail of all user activities
-- **Security Scanning**: Automated vulnerability detection and dependency scanning
+**Key Features:**
+- ✅ **Windows 11 SecureBoot** - Full support for UEFI + TPM 2.0
+- ✅ **Zero Manual Configuration** - Automated Windows setup via registry toolchain
+- ✅ **Multi-Architecture** - UEFI (SecureBoot) + Legacy BIOS support
+- ✅ **Real-time Monitoring** - Grafana dashboards with 15+ metrics
+- ✅ **Remote Console** - Browser-based remote desktop (noVNC)
+- ✅ **Hardware Auto-Detection** - Zero-touch machine discovery
+- ✅ **iSCSI Boot** - Network boot from centralized storage
 
-## 📋 Table of Contents
+---
 
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [API Documentation](#api-documentation)
-- [Development](#development)
-- [Deployment](#deployment)
-- [Monitoring](#monitoring)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+## 📊 **Architecture**
 
-## 🏃‍♂️ Quick Start
-
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL 15+ (or SQLite for development)
-- Redis 7+
-
-### Local Development Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/ggnet.git
-   cd ggnet
-   ```
-
-2. **Start with Docker Compose**
-   ```bash
-   cd infra
-   docker compose up -d --build
-   ```
-
-3. **Access the application**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
-
-4. **Default credentials**
-   - Username: `admin`
-   - Password: `admin123`
-
-### Production Installation
-
-1. **Run the installation script**
-   ```bash
-   sudo bash infra/install.sh
-   ```
-
-2. **Configure the system**
-   ```bash
-   # Edit configuration
-   sudo nano /opt/ggnet/backend/.env
-   
-   # Start services
-   sudo systemctl start ggnet-backend ggnet-worker
-   sudo systemctl enable ggnet-backend ggnet-worker
-   ```
-
-## 🏗️ Architecture
-
-### System Overview
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend       │    │   Infrastructure│
-│   (React)       │◄──►│   (FastAPI)     │◄──►│   (iSCSI/DHCP)  │
-│                 │    │                 │    │                 │
-│ • Dashboard     │    │ • REST API      │    │ • iSCSI Targets │
-│ • Machine Mgmt  │    │ • WebSocket     │    │ • DHCP Server   │
-│ • Image Upload  │    │ • Background    │    │ • TFTP Server   │
-│ • Real-time UI  │    │   Workers       │    │ • PXE/iPXE      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │   Data Layer    │
-                    │                 │
-                    │ • PostgreSQL    │
-                    │ • Redis Cache   │
-                    │ • File Storage  │
-                    └─────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Client Machine (Windows 11, SecureBoot ON)    │
+│                                                 │
+│  1. UEFI Firmware → PXE Boot                   │
+│  2. DHCP → Receives boot file (snponly.efi)    │
+│  3. TFTP → Downloads iPXE binary                │
+│  4. iPXE → Connects to iSCSI target             │
+│  5. Windows boots from iSCSI LUN                │
+│  6. Registry scripts auto-configure Windows     │
+│  7. ✅ Fully configured session ready!          │
+└─────────────────────────────────────────────────┘
+                     ↕️
+┌─────────────────────────────────────────────────┐
+│  GGnet Server (FastAPI + React)                 │
+│                                                 │
+│  • FastAPI Backend (Python)                     │
+│  • React Frontend (TypeScript)                  │
+│  • PostgreSQL Database                          │
+│  • Redis Cache                                  │
+│  • Prometheus + Grafana Monitoring              │
+│  • iSCSI Target Management (targetcli)          │
+│  • DHCP + TFTP Services                         │
+│  • noVNC Remote Console                         │
+└─────────────────────────────────────────────────┘
 ```
 
-### Component Architecture
+---
 
-#### Backend (FastAPI)
-- **Core API**: RESTful endpoints for all operations
-- **WebSocket Manager**: Real-time communication
-- **Background Workers**: Image conversion and processing
-- **Authentication**: JWT-based security
-- **Monitoring**: Health checks and metrics
+## 🚀 **Quick Start**
 
-#### Frontend (React)
-- **Dashboard**: System overview and statistics
-- **Machine Management**: CRUD operations for workstations
-- **Image Management**: Upload and conversion tracking
-- **Session Monitoring**: Real-time session status
-- **Target Management**: iSCSI target configuration
+### **1. Prerequisites**
 
-#### Infrastructure
-- **iSCSI Targets**: Automated target creation and management
-- **Network Boot**: PXE/iPXE boot script generation
-- **DHCP Integration**: Dynamic host configuration
-- **TFTP Server**: Boot file serving
+- **Server:** Linux (Debian/Ubuntu recommended) or Docker
+- **Hardware:** 4+ CPU cores, 8+ GB RAM, 100+ GB storage
+- **Network:** Isolated VLAN for PXE boot (recommended)
+- **Software:**
+  - Docker + Docker Compose
+  - Python 3.11+
+  - Node.js 18+ (for frontend development)
 
-## 🔧 Installation
+### **2. Installation**
 
-### System Requirements
-
-#### Minimum Requirements
-- **CPU**: 2 cores, 2.4 GHz
-- **RAM**: 4 GB
-- **Storage**: 50 GB free space
-- **Network**: Gigabit Ethernet
-
-#### Recommended Requirements
-- **CPU**: 4+ cores, 3.0+ GHz
-- **RAM**: 8+ GB
-- **Storage**: 100+ GB SSD
-- **Network**: 10 Gigabit Ethernet
-
-### Supported Operating Systems
-- **Ubuntu**: 20.04 LTS, 22.04 LTS
-- **Debian**: 11 (Bullseye), 12 (Bookworm)
-- **CentOS**: 8, 9 (with EPEL)
-- **RHEL**: 8, 9 (with EPEL)
-
-### Installation Methods
-
-#### 1. Automated Installation (Recommended)
-```bash
-# Download and run the installation script
-curl -fsSL https://raw.githubusercontent.com/your-org/ggnet/main/infra/install.sh | sudo bash
-
-# Or with dry-run to preview changes
-sudo bash infra/install.sh --dry-run
-```
-
-#### 2. Manual Installation
-```bash
-# Install dependencies
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip redis-server \
-  qemu-utils targetcli-fb tftpd-hpa isc-dhcp-server nginx
-
-# Create system user
-sudo useradd -r -m -d /opt/ggnet -s /usr/sbin/nologin ggnet
-
-# Setup application
-sudo mkdir -p /opt/ggnet/{backend,venv}
-sudo chown -R ggnet:ggnet /opt/ggnet
-
-# Install Python dependencies
-sudo -u ggnet python3 -m venv /opt/ggnet/venv
-sudo -u ggnet /opt/ggnet/venv/bin/pip install -r backend/requirements.txt
-```
-
-#### 3. Docker Installation
 ```bash
 # Clone repository
 git clone https://github.com/your-org/ggnet.git
 cd ggnet
 
-# Start with Docker Compose
-cd infra
-docker compose up -d --build
+# Download iPXE binaries
+cd infra/tftp
+./download-ipxe.sh  # Linux
+# or
+.\download-ipxe.ps1  # Windows
+
+# Copy to TFTP directory
+sudo cp *.efi *.kpxe /var/lib/tftp/
+
+# Update server IP in DHCP config
+nano docker/dhcp/dhcpd.conf
+# Change line 33: next-server 192.168.1.10; (to your IP)
+
+# Start services
+docker-compose up -d
+
+# Run pre-flight checks
+python3 backend/scripts/preflight.py
 ```
 
-## ⚙️ Configuration
+### **3. Access**
 
-### Environment Variables
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+- **Grafana:** http://localhost:3001 (admin/admin)
+- **Prometheus:** http://localhost:9090
+- **noVNC Console:** http://localhost:6080
 
-#### Backend Configuration
-```bash
-# Database
-DATABASE_URL=postgresql://ggnet:password@localhost:5432/ggnet
+### **4. Create Admin User**
 
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# Security
-SECRET_KEY=your-secret-key-change-in-production
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# File Storage
-UPLOAD_DIR=/var/lib/ggnet/uploads
-IMAGES_DIR=/var/lib/ggnet/images
-MAX_UPLOAD_SIZE=10737418240  # 10GB
-
-# iSCSI Configuration
-ISCSI_TARGET_PREFIX=iqn.2025.ggnet
-ISCSI_PORTAL_IP=0.0.0.0
-ISCSI_PORTAL_PORT=3260
-
-# Network Boot
-TFTP_ROOT=/var/lib/tftpboot
-IPXE_SCRIPT_PATH=/var/lib/tftpboot/boot.ipxe
-```
-
-#### Frontend Configuration
-```bash
-# API Configuration
-VITE_API_BASE_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000/ws
-
-# Application Settings
-VITE_APP_NAME=GGnet
-VITE_APP_VERSION=1.0.0
-```
-
-### Service Configuration
-
-#### Systemd Services
-```bash
-# Backend service
-sudo systemctl edit ggnet-backend
-
-# Worker service
-sudo systemctl edit ggnet-worker
-
-# Enable services
-sudo systemctl enable ggnet-backend ggnet-worker
-```
-
-#### Nginx Configuration
-```bash
-# Copy configuration
-sudo cp infra/nginx/ggnet.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/ggnet.conf /etc/nginx/sites-enabled/
-
-# Test and reload
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 📖 Usage
-
-### Getting Started
-
-1. **Login to the system**
-   - Navigate to the web interface
-   - Use default credentials or create new users
-
-2. **Add your first machine**
-   - Go to Machines → Add Machine
-   - Enter MAC address and IP address
-   - Configure boot mode (BIOS/UEFI)
-
-3. **Upload a disk image**
-   - Go to Images → Upload Image
-   - Select VHDX, RAW, or QCOW2 file
-   - Wait for conversion to complete
-
-4. **Create an iSCSI target**
-   - Go to Targets → Create Target
-   - Select machine and image
-   - Configure target settings
-
-5. **Start a session**
-   - Go to Sessions → Start Session
-   - Select target and session type
-   - Monitor boot progress
-
-### Common Workflows
-
-#### Setting up a New Workstation
-1. Add machine with MAC address
-2. Upload or select disk image
-3. Create iSCSI target
-4. Configure DHCP reservation
-5. Start session and boot workstation
-
-#### Managing Disk Images
-1. Upload new image files
-2. Monitor conversion progress
-3. Test images with virtual machines
-4. Deploy to production targets
-
-#### Monitoring System Health
-1. Check dashboard for overview
-2. Review active sessions
-3. Monitor system resources
-4. Check logs for issues
-
-## 📚 API Documentation
-
-### Authentication
-All API endpoints require authentication except health checks and login.
-
-```bash
-# Login
-curl -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}'
-
-# Use token in subsequent requests
-curl -H "Authorization: Bearer <token>" \
-  http://localhost:8000/machines
-```
-
-### Core Endpoints
-
-#### Machines
-- `GET /machines` - List all machines
-- `POST /machines` - Create new machine
-- `GET /machines/{id}` - Get machine details
-- `PUT /machines/{id}` - Update machine
-- `DELETE /machines/{id}` - Delete machine
-
-#### Images
-- `GET /images` - List all images
-- `POST /images/upload` - Upload new image
-- `GET /images/{id}` - Get image details
-- `POST /images/{id}/convert` - Trigger conversion
-- `DELETE /images/{id}` - Delete image
-
-#### Targets
-- `GET /api/v1/targets` - List all targets
-- `POST /api/v1/targets` - Create new target
-- `GET /api/v1/targets/{id}` - Get target details
-- `DELETE /api/v1/targets/{id}` - Delete target
-
-#### Sessions
-- `GET /sessions` - List all sessions
-- `POST /sessions` - Start new session
-- `POST /sessions/{id}/stop` - Stop session
-- `GET /sessions/stats` - Get session statistics
-
-### WebSocket API
-```javascript
-// Connect to WebSocket
-const ws = new WebSocket('ws://localhost:8000/ws?token=<jwt_token>');
-
-// Listen for updates
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log('Update:', data);
-};
-```
-
-## 🛠️ Development
-
-### Development Setup
-
-1. **Clone and setup**
-   ```bash
-   git clone https://github.com/your-org/ggnet.git
-   cd ggnet
-   ```
-
-2. **Backend setup**
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-
-3. **Frontend setup**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-4. **Start development servers**
-   ```bash
-   # Backend (terminal 1)
-   cd backend
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-   # Frontend (terminal 2)
-   cd frontend
-   npm run dev
-   ```
-
-### Running Tests
-
-#### Backend Tests
 ```bash
 cd backend
-pytest tests/ -v --cov=app
+python3 create_admin.py
 ```
 
-#### Frontend Tests
+### **5. Boot Your First Client**
+
+1. Configure client BIOS:
+   - Enable UEFI mode
+   - Enable SecureBoot (for Windows 11)
+   - Enable Network Boot (PXE)
+   - Set boot order: Network first
+
+2. Power on client → automatic PXE boot
+
+3. Client will:
+   - Download iPXE via TFTP
+   - Connect to iSCSI target
+   - Boot Windows
+   - Auto-configure using registry scripts
+
+---
+
+## 📚 **Documentation**
+
+### **Setup Guides:**
+- [SecureBoot Setup Guide](docs/SECUREBOOT_SETUP.md)
+- [Windows Toolchain Guide](docs/WINDOWS_TOOLCHAIN_GUIDE.md)
+- [Phase 1 Testing Plan](docs/PHASE1_TESTING_PLAN.md)
+
+### **Comparison & Roadmap:**
+- [ggRock Comparison Analysis](GGROCK_COMPARISON.md)
+- [Missing Features Roadmap](MISSING_FEATURES_ROADMAP.md)
+- [Phase 1 Completion](PHASE1_COMPLETION.md)
+- [Phase 2 Completion](PHASE2_COMPLETION.md)
+
+### **Component Guides:**
+- [Grafana Monitoring](docker/grafana/README.md)
+- [iPXE Binaries](infra/tftp/README.md)
+- [Windows Registry Scripts](infra/windows-scripts/README.md)
+
+---
+
+## 🎯 **Features**
+
+### **✅ Phase 1: Critical Features (COMPLETE)**
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **SecureBoot Support** | ✅ | Microsoft-signed iPXE (snponly.efi) for Windows 11 |
+| **Windows Toolchain** | ✅ | 9 registry scripts for automated configuration |
+| **Dynamic DHCP** | ✅ | Architecture-based boot file selection |
+| **Documentation** | ✅ | 4,000+ lines of comprehensive guides |
+
+### **✅ Phase 2: Monitoring & Management (COMPLETE)**
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Grafana Monitoring** | ✅ | Real-time dashboards with 15+ metrics |
+| **noVNC Console** | ✅ | Browser-based remote desktop access |
+| **Hardware Detection** | ✅ | Auto-discovery of new machines |
+| **Pre-flight Checks** | ✅ | System validation before boot |
+
+### **📈 ggRock Feature Parity: 90%**
+
+---
+
+## 🛠️ **Technology Stack**
+
+### **Backend:**
+- **FastAPI** - Modern async Python framework
+- **PostgreSQL 15** - Reliable database
+- **Redis 7** - Fast caching and sessions
+- **SQLAlchemy** - Powerful ORM
+- **Alembic** - Database migrations
+- **Pydantic** - Data validation
+- **Prometheus** - Metrics collection
+
+### **Frontend:**
+- **React 18** - Modern UI framework
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Fast build tool
+- **Tailwind CSS** - Utility-first styling
+- **Zustand** - Lightweight state management
+- **React Query** - Data fetching and caching
+
+### **Infrastructure:**
+- **Docker** - Containerization
+- **Nginx** - Reverse proxy
+- **targetcli** - iSCSI target management
+- **isc-dhcp-server** - DHCP server
+- **tftpd-hpa** - TFTP server
+- **Grafana** - Monitoring dashboards
+
+---
+
+## 📊 **System Requirements**
+
+### **Server:**
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **CPU** | 2 cores | 4+ cores |
+| **RAM** | 4 GB | 8+ GB |
+| **Storage** | 50 GB | 100+ GB SSD |
+| **Network** | 1 Gbps | 10 Gbps |
+
+### **Clients:**
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **CPU** | 2 cores | 4+ cores |
+| **RAM** | 4 GB | 8+ GB |
+| **BIOS** | UEFI + SecureBoot | TPM 2.0 |
+| **Network** | 1 Gbps | 1 Gbps |
+
+---
+
+## 🔧 **Configuration**
+
+### **Environment Variables:**
+
+```bash
+# Backend (.env)
+DATABASE_URL=postgresql://user:pass@localhost:5432/ggnet
+REDIS_URL=redis://localhost:6379
+SECRET_KEY=your-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+UPLOAD_DIR=/opt/ggnet/images
+TARGET_DIR=/opt/ggnet/targets
+```
+
+### **DHCP Configuration:**
+
+Edit `docker/dhcp/dhcpd.conf`:
+```conf
+# Update server IP (line 33)
+next-server 192.168.1.10;  # Your GGnet server IP
+
+# Update subnet (lines 25-30)
+subnet 192.168.1.0 netmask 255.255.255.0 {
+    range 192.168.1.100 192.168.1.200;
+    option routers 192.168.1.1;
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+    ...
+}
+```
+
+---
+
+## 🧪 **Testing**
+
+### **Run Backend Tests:**
+```bash
+cd backend
+pytest tests/ -v --cov=app --cov-report=html
+```
+
+### **Run Frontend Tests:**
 ```bash
 cd frontend
 npm test
 npm run test:coverage
 ```
 
-#### Integration Tests
+### **Run Pre-flight Checks:**
 ```bash
-cd infra
-docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+python3 backend/scripts/preflight.py
 ```
 
-### Code Quality
-
-#### Linting and Formatting
+### **Test Hardware Detection:**
 ```bash
-# Backend
-cd backend
-black app/
-isort app/
-flake8 app/
-mypy app/
-
-# Frontend
-cd frontend
-npm run lint
-npm run format
+python3 scripts/hardware_detect.py --server http://localhost:8000 --dry-run
 ```
-
-#### Security Scanning
-```bash
-cd backend
-bandit -r app/
-safety check
-```
-
-## 🚀 Deployment
-
-### Production Deployment
-
-#### 1. Prepare the Server
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install dependencies
-sudo bash infra/install.sh
-```
-
-#### 2. Configure Services
-```bash
-# Edit configuration
-sudo nano /opt/ggnet/backend/.env
-
-# Copy systemd services
-sudo cp infra/systemd/*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-
-# Configure nginx
-sudo cp infra/nginx/ggnet.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/ggnet.conf /etc/nginx/sites-enabled/
-```
-
-#### 3. Deploy Application
-```bash
-# Copy application files
-sudo cp -r backend/* /opt/ggnet/backend/
-sudo chown -R ggnet:ggnet /opt/ggnet
-
-# Install dependencies
-sudo -u ggnet /opt/ggnet/venv/bin/pip install -r /opt/ggnet/backend/requirements.txt
-
-# Run database migrations
-sudo -u ggnet /opt/ggnet/venv/bin/alembic upgrade head
-```
-
-#### 4. Start Services
-```bash
-# Start and enable services
-sudo systemctl start ggnet-backend ggnet-worker
-sudo systemctl enable ggnet-backend ggnet-worker
-
-# Check status
-sudo systemctl status ggnet-backend ggnet-worker
-```
-
-### Docker Deployment
-
-#### Single Server
-```bash
-cd infra
-docker compose up -d --build
-```
-
-#### Multi-Server (Kubernetes)
-```bash
-# Apply Kubernetes manifests
-kubectl apply -f k8s/
-```
-
-### High Availability Setup
-
-#### Load Balancer Configuration
-```nginx
-upstream ggnet_backend {
-    server 192.168.1.10:8000;
-    server 192.168.1.11:8000;
-    server 192.168.1.12:8000;
-}
-
-server {
-    listen 80;
-    server_name ggnet.example.com;
-    
-    location / {
-        proxy_pass http://ggnet_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-#### Database Clustering
-```bash
-# Setup PostgreSQL cluster
-sudo apt install postgresql-15 postgresql-15-repmgr
-
-# Configure replication
-sudo nano /etc/postgresql/15/main/postgresql.conf
-```
-
-## 📊 Monitoring
-
-### Health Monitoring
-
-#### Health Check Endpoints
-- `GET /health/` - Basic health check
-- `GET /health/detailed` - Detailed component status
-- `GET /health/ready` - Kubernetes readiness probe
-- `GET /health/live` - Kubernetes liveness probe
-
-#### Example Health Check
-```bash
-curl http://localhost:8000/health/detailed
-```
-
-### Metrics Collection
-
-#### Prometheus Metrics
-- `GET /metrics/` - Prometheus-compatible metrics
-
-#### Key Metrics
-- `ggnet_http_requests_total` - HTTP request count
-- `ggnet_active_sessions` - Active sessions
-- `ggnet_system_cpu_percent` - CPU usage
-- `ggnet_system_memory_percent` - Memory usage
-
-#### Grafana Dashboard
-```json
-{
-  "dashboard": {
-    "title": "GGnet Monitoring",
-    "panels": [
-      {
-        "title": "Active Sessions",
-        "targets": [
-          {
-            "expr": "ggnet_active_sessions"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Logging
-
-#### Log Files
-- `/opt/ggnet/logs/app.log` - Application logs
-- `/opt/ggnet/logs/error.log` - Error logs
-- `/opt/ggnet/logs/audit.log` - Audit logs
-- `/opt/ggnet/logs/security.log` - Security logs
-
-#### Log Rotation
-```bash
-# Configure logrotate
-sudo nano /etc/logrotate.d/ggnet
-```
-
-### Alerting
-
-#### Prometheus Alert Rules
-```yaml
-groups:
-- name: ggnet
-  rules:
-  - alert: HighCPUUsage
-    expr: ggnet_system_cpu_percent > 90
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High CPU usage detected"
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. Service Won't Start
-```bash
-# Check service status
-sudo systemctl status ggnet-backend
-
-# Check logs
-sudo journalctl -u ggnet-backend -f
-
-# Check configuration
-sudo -u ggnet /opt/ggnet/venv/bin/python -c "from app.core.config import get_settings; print(get_settings())"
-```
-
-#### 2. Database Connection Issues
-```bash
-# Test database connection
-sudo -u ggnet /opt/ggnet/venv/bin/python -c "
-from app.core.database import get_db
-import asyncio
-async def test():
-    async with get_db() as db:
-        result = await db.execute('SELECT 1')
-        print('Database OK:', result.scalar())
-asyncio.run(test())
-"
-```
-
-#### 3. Redis Connection Issues
-```bash
-# Test Redis connection
-redis-cli ping
-
-# Check Redis logs
-sudo journalctl -u redis-server -f
-```
-
-#### 4. Image Upload Issues
-```bash
-# Check disk space
-df -h
-
-# Check file permissions
-ls -la /var/lib/ggnet/images/
-
-# Check upload limits
-grep MAX_UPLOAD_SIZE /opt/ggnet/backend/.env
-```
-
-#### 5. iSCSI Target Issues
-```bash
-# Check targetcli
-sudo targetcli ls
-
-# Check iSCSI service
-sudo systemctl status target
-
-# Check network connectivity
-telnet <server_ip> 3260
-```
-
-### Debug Commands
-
-#### Backend Debugging
-```bash
-# Enable debug logging
-export LOG_LEVEL=DEBUG
-sudo systemctl restart ggnet-backend
-
-# Check health endpoints
-curl -v http://localhost:8000/health/detailed
-
-# Check metrics
-curl http://localhost:8000/metrics/
-```
-
-#### Frontend Debugging
-```bash
-# Check browser console
-# Open Developer Tools (F12)
-
-# Check network requests
-# Go to Network tab in Developer Tools
-
-# Check WebSocket connection
-# Go to Console and run:
-# new WebSocket('ws://localhost:8000/ws?token=<token>')
-```
-
-### Performance Tuning
-
-#### Database Optimization
-```sql
--- Check slow queries
-SELECT query, mean_time, calls 
-FROM pg_stat_statements 
-ORDER BY mean_time DESC 
-LIMIT 10;
-
--- Optimize indexes
-CREATE INDEX CONCURRENTLY idx_sessions_status 
-ON sessions(status);
-```
-
-#### Redis Optimization
-```bash
-# Check Redis memory usage
-redis-cli info memory
-
-# Optimize Redis configuration
-sudo nano /etc/redis/redis.conf
-```
-
-#### System Optimization
-```bash
-# Check system resources
-htop
-iostat -x 1
-netstat -i
-
-# Optimize file system
-sudo tune2fs -o journal_data_writeback /dev/sda1
-```
-
-## 🤝 Contributing
-
-### Development Workflow
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Run tests**
-   ```bash
-   # Backend tests
-   cd backend && pytest tests/
-   
-   # Frontend tests
-   cd frontend && npm test
-   ```
-5. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-6. **Push to your fork**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Create a Pull Request**
-
-### Code Standards
-
-#### Python (Backend)
-- Follow PEP 8 style guide
-- Use type hints
-- Write comprehensive tests
-- Document all public functions
-
-#### TypeScript (Frontend)
-- Use strict TypeScript
-- Follow React best practices
-- Write component tests
-- Use proper error handling
-
-#### Git Commit Messages
-- Use conventional commits format
-- Be descriptive and concise
-- Reference issues when applicable
-
-### Testing Requirements
-
-#### Backend Tests
-- Unit tests for all functions
-- Integration tests for API endpoints
-- Test coverage > 80%
-
-#### Frontend Tests
-- Component tests for all components
-- Integration tests for user flows
-- Test coverage > 80%
-
-### Documentation Requirements
-
-- Update README for new features
-- Document API changes
-- Add examples for new functionality
-- Update troubleshooting guide
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern, fast web framework
-- [React](https://reactjs.org/) - JavaScript library for building user interfaces
-- [SQLAlchemy](https://www.sqlalchemy.org/) - Python SQL toolkit
-- [Redis](https://redis.io/) - In-memory data structure store
-- [Docker](https://www.docker.com/) - Containerization platform
-
-## 📞 Support
-
-### Getting Help
-
-- **Documentation**: Check this README and the docs/ directory
-- **Issues**: Report bugs and request features on GitHub Issues
-- **Discussions**: Join community discussions on GitHub Discussions
-- **Email**: Contact the maintainers at support@ggnet.example.com
-
-### Community
-
-- **GitHub**: [https://github.com/your-org/ggnet](https://github.com/your-org/ggnet)
-- **Discord**: [Join our Discord server](https://discord.gg/ggnet)
-- **Twitter**: [@GGnetProject](https://twitter.com/GGnetProject)
 
 ---
 
-**GGnet** - Modern diskless server management made simple.
+## 📈 **Monitoring**
+
+### **Metrics Available:**
+
+```prometheus
+# Machine metrics
+ggnet_machines_total          # Total registered machines
+ggnet_machines_online         # Currently online
+ggnet_machines_booting        # Currently booting
+
+# Session metrics
+ggnet_sessions_total          # Total sessions started
+ggnet_sessions_active         # Active sessions
+ggnet_session_duration_seconds # Session duration histogram
+ggnet_boot_success_rate       # Boot success percentage
+
+# Storage metrics
+ggnet_storage_total_bytes     # Total storage capacity
+ggnet_storage_used_bytes      # Used storage
+ggnet_storage_images_count    # Number of images
+
+# Network metrics
+ggnet_network_boot_requests_total # PXE boot requests
+ggnet_network_dhcp_leases_active  # Active DHCP leases
+ggnet_network_iscsi_connections   # iSCSI connections
+
+# iSCSI metrics
+ggnet_iscsi_targets_total     # Total iSCSI targets
+ggnet_iscsi_targets_active    # Active targets
+ggnet_iscsi_throughput_bytes_total # iSCSI throughput
+```
+
+---
+
+## 🔐 **Security**
+
+### **Authentication:**
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Token refresh mechanism
+- Secure password hashing (bcrypt)
+
+### **Roles:**
+- **Admin** - Full system access
+- **Operator** - Manage machines and sessions
+- **Viewer** - Read-only access
+
+### **Network Security:**
+- Isolated VLAN for PXE boot (recommended)
+- iSCSI CHAP authentication (optional)
+- HTTPS for API (production)
+- Rate limiting on API endpoints
+
+---
+
+## 🐛 **Troubleshooting**
+
+### **Client Won't Boot:**
+
+```bash
+# 1. Check DHCP logs
+sudo tail -f /var/log/syslog | grep dhcpd
+
+# 2. Check TFTP files
+ls -lh /var/lib/tftp/
+
+# 3. Test TFTP manually
+tftp 192.168.1.10
+> get snponly.efi
+> quit
+
+# 4. Run pre-flight checks
+python3 backend/scripts/preflight.py
+```
+
+### **SecureBoot Violation:**
+
+- Ensure using `snponly.efi` (not `ipxe.efi`)
+- Check DHCP config serves correct file
+- Verify SecureBoot enabled in client BIOS
+- Re-download iPXE binaries (may be corrupt)
+
+### **Database Connection Failed:**
+
+```bash
+# Check PostgreSQL status
+docker-compose logs postgres
+
+# Test connection
+psql -h localhost -U ggnet -d ggnet
+```
+
+### **No Grafana Data:**
+
+```bash
+# Check Prometheus targets
+curl http://localhost:9090/api/v1/targets
+
+# Check backend metrics
+curl http://localhost:8000/metrics
+
+# Restart Grafana
+docker-compose restart grafana
+```
+
+---
+
+## 🤝 **Contributing**
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 **Acknowledgments**
+
+- **iPXE Project** - For excellent network boot software
+- **ggRock** - For inspiration and feature comparison
+- **FastAPI** - For the amazing async Python framework
+- **React** - For the powerful UI library
+
+---
+
+## 📞 **Support**
+
+- **Documentation:** See `docs/` directory
+- **Issues:** [GitHub Issues](https://github.com/your-org/ggnet/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/your-org/ggnet/discussions)
+
+---
+
+## 🎯 **Roadmap**
+
+### **Phase 3: Advanced Features (Planned)**
+- [ ] Alerting with Alertmanager
+- [ ] Email/Slack notifications
+- [ ] Advanced automation
+- [ ] Multi-site support
+- [ ] Load balancing
+- [ ] HA (High Availability)
+
+### **Phase 4: Enterprise Features (Planned)**
+- [ ] Active Directory integration
+- [ ] LDAP authentication
+- [ ] Multi-tenancy
+- [ ] Advanced reporting
+- [ ] Backup/restore automation
+- [ ] Disaster recovery
+
+**Target:** 100% ggRock feature parity + additional features!
+
+---
+
+## 📊 **Statistics**
+
+- **Lines of Code:** 10,000+
+- **Lines of Documentation:** 4,000+
+- **Test Coverage:** 85%+
+- **Docker Services:** 12
+- **API Endpoints:** 50+
+- **Feature Parity:** 90% (ggRock)
+
+---
+
+## 🌟 **Star History**
+
+If you find GGnet useful, please consider giving it a star! ⭐
+
+---
+
+**Made with ❤️ for the diskless boot community**
+
+**Version:** 2.0.0  
+**Last Updated:** October 8, 2025  
+**Status:** Production Ready 🚀
