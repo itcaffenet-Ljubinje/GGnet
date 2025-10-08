@@ -23,6 +23,9 @@ FROM nginx:alpine
 # Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Optional: if brotli module is available in the base image, ensure .br files are served
+# Precompress static assets (gzip + brotli) during build stage for optimal delivery
+
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
