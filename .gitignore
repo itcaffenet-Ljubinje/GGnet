@@ -290,10 +290,15 @@ uploads/
 images/
 logs/
 backups/
+cache/
 *.db
 *.sqlite
 *.sqlite3
 test.db
+
+# GGnet cache files
+backend/cache/*.cache
+*.cache
 
 # Docker
 .dockerignore
