@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -27,7 +28,9 @@ function App() {
     <NotificationProvider>
       <ErrorBoundary>
         {!isAuthenticated ? (
-          <LoginPage />
+          <Suspense fallback={<div className="p-4 text-gray-500">Loading...</div>}>
+            <LoginPage />
+          </Suspense>
         ) : (
           <Layout>
             <Suspense fallback={<LoadingSpinner />}>

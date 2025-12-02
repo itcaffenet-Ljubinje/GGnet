@@ -1,8 +1,9 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, splitVendorChunkPlugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import viteCompression from 'vite-plugin-compression'
 import path from 'path'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
@@ -158,4 +159,4 @@ export default defineConfig({
       ]
     }
   }
-})
+}))

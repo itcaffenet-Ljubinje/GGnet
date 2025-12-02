@@ -3,7 +3,7 @@
  * Advanced image management with conversion, validation, and storage optimization
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Upload, 
@@ -601,4 +601,4 @@ const ImageManager: React.FC = () => {
   );
 };
 
-export default ImageManager;
+export default memo(ImageManager);
