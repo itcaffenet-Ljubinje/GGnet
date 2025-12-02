@@ -28,20 +28,12 @@ function App() {
   return (
     <NotificationProvider>
       <ErrorBoundary>
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-            <LoadingSpinner size="lg" />
-          </div>
-        }>
+        <Suspense fallback={<LoadingSpinner />}>
           {!isAuthenticated ? (
             <LoginPage />
           ) : (
             <Layout>
-              <Suspense fallback={
-                <div className="flex items-center justify-center p-8">
-                  <LoadingSpinner size="md" />
-                </div>
-              }>
+              <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
