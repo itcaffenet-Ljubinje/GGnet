@@ -33,7 +33,7 @@ httpx==0.25.2
 structlog==23.2.0
 
 # System monitoring
-psutil==5.9.6
+psutil==5.9.8
 
 # Development dependencies
 pytest==7.4.3
