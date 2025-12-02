@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.cors import CORSMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # pyright: ignore[reportMissingImports]
-from fastapi.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
+from starlette.middleware.base import BaseHTTPMiddleware  # pyright: ignore[reportMissingImports]
 from starlette.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
 import structlog  # pyright: ignore[reportMissingImports]
 import time
@@ -174,20 +174,29 @@ def create_app() -> FastAPI:
         )
     
     # Include routers
+    # Health and monitoring
     app.include_router(health.router, prefix="/health", tags=["health"])
     app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
+    app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
+    
+    # Authentication
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+    
+    # Core resources
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/api/v1/targets", tags=["targets"])
-    app.include_router(sessions_api.router, prefix="/api/v1/sessions", tags=["sessions"])
+    app.include_router(targets.router, prefix="/targets", tags=["targets"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
+    app.include_router(sessions_api.router, prefix="/session-orchestration", tags=["session-orchestration"])
+    
+    # Storage and infrastructure
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
-    app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
     app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
+    app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
+    
+    # Hardware and boot
     app.include_router(hardware.router, tags=["hardware"])
     app.include_router(winpe.router, tags=["winpe"])
-    app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
     
     # WebSocket endpoint
     @app.websocket("/ws")

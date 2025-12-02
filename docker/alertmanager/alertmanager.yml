@@ -1,0 +1,122 @@
+# Alertmanager configuration for GGnet
+# This file configures how alerts are routed and notified
+
+global:
+  # Resolve timeout - how long to wait before declaring an alert resolved
+  resolve_timeout: 5m
+  
+  # Email configuration (uncomment and configure)
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alerts@ggnet.local'
+  # smtp_auth_username: 'your-email@gmail.com'
+  # smtp_auth_password: 'your-app-password'
+  # smtp_require_tls: true
+
+  # Slack configuration (uncomment and configure)
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+# Route tree - defines how alerts are routed to receivers
+route:
+  # Default receiver
+  receiver: 'default'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'component']
+  
+  # Wait before sending first notification
+  group_wait: 10s
+  
+  # Wait before sending notification about new alerts in group
+  group_interval: 10s
+  
+  # Minimum time between two notifications for same group
+  repeat_interval: 12h
+  
+  # Child routes - more specific routing
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical'
+      continue: true
+      repeat_interval: 1h
+    
+    # Warning alerts - less frequent
+    - match:
+        severity: warning
+      receiver: 'default'
+      repeat_interval: 6h
+    
+    # Info alerts - daily summary
+    - match:
+        severity: info
+      receiver: 'default'
+      repeat_interval: 24h
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # Don't alert on high CPU/memory when backend is down
+  - source_match:
+      alertname: 'BackendDown'
+    target_match:
+      alertname: 'HighCPUUsage|HighMemoryUsage'
+    equal: ['instance']
+
+# Receivers - define notification channels
+receivers:
+  # Default receiver - email to admin
+  - name: 'default'
+    email_configs:
+      - to: 'admin@ggnet.local'
+        headers:
+          Subject: 'GGnet Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Component:</strong> {{ .CommonLabels.component }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <h3>{{ .Annotations.summary }}</h3>
+          <p>{{ .Annotations.description }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+          {{ end }}
+        send_resolved: true
+
+  # Critical receiver - immediate notification to on-call
+  - name: 'critical'
+    email_configs:
+      - to: 'oncall@ggnet.local'
+        headers:
+          Subject: '🚨 CRITICAL: GGnet Alert - {{ .GroupLabels.alertname }}'
+        html: |
+          <h1>🚨 CRITICAL ALERT</h1>
+          <h2>{{ .GroupLabels.alertname }}</h2>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Component:</strong> {{ .CommonLabels.component }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <h3>{{ .Annotations.summary }}</h3>
+          <p>{{ .Annotations.description }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+          <p><strong>Labels:</strong></p>
+          <ul>
+            {{ range .Labels.SortedPairs }}
+            <li><strong>{{ .Name }}:</strong> {{ .Value }}</li>
+            {{ end }}
+          </ul>
+          {{ end }}
+        send_resolved: true
+    
+    # Slack notification for critical alerts (uncomment to enable)
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#ggnet-alerts'
+    #     title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+    #     color: 'danger'
+
+# Templates for notification formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+

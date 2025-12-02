@@ -1,0 +1,177 @@
+groups:
+  - name: ggnet_alerts
+    interval: 30s
+    rules:
+      # Service Health Alerts
+      - alert: BackendDown
+        expr: up{job="ggnet-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: backend
+        annotations:
+          summary: "GGnet backend is down"
+          description: "Backend service has been down for more than 1 minute."
+
+      - alert: BackendHighErrorRate
+        expr: rate(ggnet_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: backend
+        annotations:
+          summary: "High error rate on backend"
+          description: "Backend error rate is above 10% for 5 minutes."
+
+      # Database Alerts
+      - alert: DatabaseDown
+        expr: up{job="ggnet-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection failed"
+          description: "Backend cannot connect to database."
+
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: ggnet_system_cpu_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 90% for 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: ggnet_system_memory_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 90% for 5 minutes."
+
+      - alert: HighDiskUsage
+        expr: ggnet_system_disk_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is above 85% for 5 minutes."
+
+      - alert: CriticalDiskUsage
+        expr: ggnet_system_disk_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Critical disk usage"
+          description: "Disk usage is above 95% - immediate action required!"
+
+      # Storage Alerts
+      - alert: StorageLowSpace
+        expr: (ggnet_storage_total_bytes - ggnet_storage_used_bytes) / ggnet_storage_total_bytes < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Low storage space"
+          description: "Storage has less than 10% free space remaining."
+
+      # Session Alerts
+      - alert: NoActiveSessions
+        expr: ggnet_active_sessions == 0
+        for: 10m
+        labels:
+          severity: info
+          component: sessions
+        annotations:
+          summary: "No active sessions"
+          description: "No active sessions for 10 minutes (may be normal)."
+
+      - alert: HighSessionFailureRate
+        expr: |
+          rate(ggnet_sessions_total{status="failed"}[5m]) / 
+          rate(ggnet_sessions_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: sessions
+        annotations:
+          summary: "High session failure rate"
+          description: "More than 20% of sessions are failing."
+
+      # Network Alerts
+      - alert: NoBootRequests
+        expr: rate(ggnet_network_boot_requests_total[10m]) == 0
+        for: 30m
+        labels:
+          severity: info
+          component: network
+        annotations:
+          summary: "No boot requests"
+          description: "No PXE boot requests received in the last 30 minutes."
+
+      # Machine Alerts
+      - alert: NoMachinesOnline
+        expr: ggnet_machines_online == 0 and ggnet_total_machines > 0
+        for: 15m
+        labels:
+          severity: warning
+          component: machines
+        annotations:
+          summary: "No machines online"
+          description: "No machines are currently online (but machines are registered)."
+
+      # Image Alerts
+      - alert: NoImagesAvailable
+        expr: ggnet_total_images == 0
+        for: 1h
+        labels:
+          severity: warning
+          component: images
+        annotations:
+          summary: "No disk images available"
+          description: "No disk images are available in the system."
+
+      # iSCSI Alerts
+      - alert: iSCSITargetDown
+        expr: ggnet_iscsi_targets_active < ggnet_iscsi_targets_total * 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: iscsi
+        annotations:
+          summary: "Some iSCSI targets are down"
+          description: "Less than 80% of iSCSI targets are active."
+
+      # Performance Alerts
+      - alert: SlowResponseTime
+        expr: ggnet_http_request_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Slow API response time"
+          description: "API response time is above 2 seconds."
+
+      # Authentication Alerts
+      - alert: HighFailedLoginRate
+        expr: rate(ggnet_auth_failed_logins_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High failed login rate"
+          description: "More than 5 failed login attempts per minute (possible attack)."
+
