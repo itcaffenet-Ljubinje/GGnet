@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ggnet
+          POSTGRES_PASSWORD: ggnet_password
+          POSTGRES_DB: ggnet_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run linting (black)
+      working-directory: ./backend
+      run: |
+        black --check app tests
+
+    - name: Run linting (isort)
+      working-directory: ./backend
+      run: |
+        isort --check-only app tests
+
+    - name: Run linting (flake8)
+      working-directory: ./backend
+      run: |
+        flake8 app tests --max-line-length=100 --extend-ignore=E203,W503
+
+    - name: Run type checking (mypy)
+      working-directory: ./backend
+      run: |
+        mypy app --ignore-missing-imports || true
+
+    - name: Run tests with coverage
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://ggnet:ggnet_password@localhost:5432/ggnet_test
+        SECRET_KEY: test-secret-key-for-ci
+        ENVIRONMENT: test
+      run: |
+        pytest --cov=app --cov-report=xml --cov-report=term
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+        fail_ci_if_error: false
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dir: ./frontend/node_modules
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run linting
+      working-directory: ./frontend
+      run: npm run lint
+
+    - name: Run type checking
+      working-directory: ./frontend
+      run: npm run type-check
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+

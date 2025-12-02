@@ -1,0 +1,22 @@
+# CodeQL configuration file
+# This file helps CodeQL analyze your codebase properly
+# For more information, see: https://docs.github.com/en/code-security/code-scanning/using-codeql-code-scanning-with-your-ci/customizing-codeql-workflows
+
+paths:
+  - backend/
+  - frontend/src/
+
+paths-ignore:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/tests/'
+  - '**/test/'
+  - '**/__tests__/'
+  - '**/node_modules/'
+  - '**/dist/'
+  - '**/build/'
+  - '**/.venv/'
+  - '**/venv/'
+

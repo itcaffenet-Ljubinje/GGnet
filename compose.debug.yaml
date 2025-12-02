@@ -1,0 +1,6 @@
+services:
+  ggnet:
+    image: ggnet
+    build:
+      context: .
+      dockerfile: ./Dockerfile
