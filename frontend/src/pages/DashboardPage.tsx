@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Activity,
@@ -37,7 +37,7 @@ interface StatsCardProps {
   isLoading?: boolean
 }
 
-function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, isLoading }: StatsCardProps) {
+const StatsCard = memo(function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, isLoading }: StatsCardProps) {
   const colorClasses = {
     blue: {
       bg: 'bg-blue-50 dark:bg-blue-900/20',
@@ -124,7 +124,7 @@ function StatsCard({ title, value, icon: Icon, trend, color = 'blue', subtitle, 
       </CardContent>
     </Card>
   )
-}
+})
 
 interface ActivityItem {
   id: string
@@ -134,7 +134,7 @@ interface ActivityItem {
   user?: string
 }
 
-function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
+const ActivityFeed = memo(function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
   const [filter, setFilter] = useState<'all' | 'success' | 'warning' | 'error' | 'info'>('all')
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -226,7 +226,7 @@ function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
       </CardContent>
     </Card>
   )
-}
+})
 
 interface SystemStatusProps {
   status: 'healthy' | 'warning' | 'error'
@@ -238,7 +238,7 @@ interface SystemStatusProps {
   }
 }
 
-function SystemStatus({ status, details }: SystemStatusProps) {
+const SystemStatus = memo(function SystemStatus({ status, details }: SystemStatusProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -308,7 +308,7 @@ function SystemStatus({ status, details }: SystemStatusProps) {
       </CardContent>
     </Card>
   )
-}
+})
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
