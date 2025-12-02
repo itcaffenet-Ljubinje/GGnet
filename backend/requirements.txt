@@ -51,4 +51,4 @@ mypy==1.7.1
 bandit==1.7.5
 
 # Production dependencies
-gunicorn==21.2.0
+gunicorn==22.0.0
