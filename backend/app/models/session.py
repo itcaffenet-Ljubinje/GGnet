@@ -45,14 +45,15 @@ class Session(Base):
     status: Mapped[SessionStatus] = mapped_column(
         SQLEnum(SessionStatus),
         default=SessionStatus.STARTING,
-        nullable=False
+        nullable=False,
+        index=True  # Index for status queries
     )
     
     # Relationships
-    machine_id: Mapped[int] = mapped_column(ForeignKey("machines.id"), nullable=False)
+    machine_id: Mapped[int] = mapped_column(ForeignKey("machines.id"), nullable=False, index=True)
     machine = relationship("Machine", back_populates="sessions")
     
-    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), nullable=False)
+    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), nullable=False, index=True)
     target = relationship("Target", back_populates="sessions")
     
     # Network information
@@ -83,10 +84,11 @@ class Session(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False
+        nullable=False,
+        index=True  # Index for time-based queries
     )
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
     
     # Error handling
     error_message: Mapped[Optional[str]] = mapped_column(Text)

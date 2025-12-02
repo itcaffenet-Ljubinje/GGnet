@@ -43,6 +43,10 @@ def get_sync_engine():
                 settings.database_url_sync,
                 echo=settings.DEBUG,
                 pool_pre_ping=True,
+                pool_size=10,  # Number of connections to maintain
+                max_overflow=20,  # Maximum number of connections to create beyond pool_size
+                pool_recycle=3600,  # Recycle connections after 1 hour
+                pool_timeout=30,  # Timeout for getting connection from pool
             )
         except Exception as e:
             logger.error(f"Failed to create sync engine: {e}")
@@ -68,6 +72,10 @@ def get_async_engine():
                 settings.database_url_async,
                 echo=settings.DEBUG,
                 pool_pre_ping=True,
+                pool_size=20,  # Number of connections to maintain (higher for async)
+                max_overflow=40,  # Maximum number of connections to create beyond pool_size
+                pool_recycle=3600,  # Recycle connections after 1 hour
+                pool_timeout=30,  # Timeout for getting connection from pool
             )
         except Exception as e:
             logger.error(f"Failed to create async engine: {e}")
