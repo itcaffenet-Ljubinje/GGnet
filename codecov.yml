@@ -2,12 +2,25 @@ coverage:
   status:
     project:
       default:
-        target: 70%
-        threshold: 5%
+        # Require coverage to not decrease
+        target: 80%
+        threshold: 1%
+        base: auto
+        branches:
+          - main
+          - develop
+        flags:
+          - backend
+          - frontend
     patch:
       default:
-        target: 60%
-        threshold: 5%
+        # Allow patch coverage to decrease slightly
+        target: 70%
+        threshold: 2%
+        base: auto
+        branches:
+          - main
+          - develop
 
 comment:
   layout: "header,diff,files,footer"
