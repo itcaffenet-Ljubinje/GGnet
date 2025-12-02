@@ -1,7 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+// import { persist } from 'zustand/middleware' // Unused for now
 import { api } from '../lib/api'
-import toast from 'react-hot-toast'
 
 export interface User {
   id: number
@@ -34,8 +33,7 @@ interface AuthActions {
 type AuthStore = AuthState & AuthActions
 
 export const useAuthStore = create<AuthStore>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       // State
       user: null,
       accessToken: null,
@@ -48,7 +46,7 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true })
         
         try {
-          const response = await api.post('/auth/login', {
+          const response = await api.post('/api/auth/login', {
             username,
             password,
           })
@@ -59,7 +57,7 @@ export const useAuthStore = create<AuthStore>()(
           api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
 
           // Get user info
-          const userResponse = await api.get('/auth/me')
+          const userResponse = await api.get('/api/auth/me')
           const user = userResponse.data
 
           set({
@@ -70,12 +68,8 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
           })
 
-          toast.success(`Welcome back, ${user.full_name || user.username}!`)
           return true
-        } catch (error: any) {
-          const message = error.response?.data?.detail || 'Login failed'
-          toast.error(message)
-          
+        } catch (error: unknown) {
           set({ isLoading: false })
           return false
         }
@@ -86,7 +80,7 @@ export const useAuthStore = create<AuthStore>()(
         
         try {
           if (accessToken) {
-            await api.post('/auth/logout')
+            await api.post('/api/auth/logout')
           }
         } catch (error) {
           // Ignore logout errors
@@ -103,8 +97,6 @@ export const useAuthStore = create<AuthStore>()(
           isAuthenticated: false,
           isLoading: false,
         })
-
-        toast.success('Logged out successfully')
       },
 
       refreshAuth: async () => {
@@ -116,7 +108,7 @@ export const useAuthStore = create<AuthStore>()(
         }
 
         try {
-          const response = await api.post('/auth/refresh', {
+          const response = await api.post('/api/auth/refresh', {
             refresh_token: refreshToken,
           })
 
@@ -153,22 +145,6 @@ export const useAuthStore = create<AuthStore>()(
           isLoading: false,
         })
       },
-    }),
-    {
-      name: 'ggnet-auth',
-      partialize: (state) => ({
-        user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
-      onRehydrateStorage: () => (state) => {
-        // Set up API token on app load
-        if (state?.accessToken) {
-          api.defaults.headers.common['Authorization'] = `Bearer ${state.accessToken}`
-        }
-      },
-    }
-  )
+    })
 )
 

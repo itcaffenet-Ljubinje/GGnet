@@ -3,23 +3,29 @@ Image management endpoints
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request, BackgroundTasks, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import structlog
 import os
 import hashlib
-import magic
+from datetime import datetime
+try:
+    import magic
+except ImportError:
+    magic = None
 from pathlib import Path
 import aiofiles
 import uuid
 
 from app.core.database import get_db
 from app.core.config import get_settings
-from app.core.dependencies import get_current_user, require_operator, log_user_activity
+from app.core.dependencies import get_current_user, require_admin, log_user_activity
+from app.core.cache import cached, invalidate_cache, CacheStrategy
 from app.models.user import User
 from app.models.image import Image, ImageFormat, ImageStatus, ImageType
+from app.models.target import Target
 from app.models.audit import AuditAction, AuditSeverity
 from app.core.exceptions import ValidationError, StorageError, NotFoundError
 
@@ -41,11 +47,10 @@ class ImageResponse(BaseModel):
     image_type: ImageType
     checksum_md5: Optional[str]
     checksum_sha256: Optional[str]
-    created_at: str
-    created_by_username: str
+    created_at: datetime
+    created_by_username: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ImageCreate(BaseModel):
@@ -70,7 +75,7 @@ def validate_image_file(file: UploadFile) -> ImageFormat:
     
     # Check file extension
     file_ext = Path(file.filename).suffix.lower().lstrip('.')
-    if file_ext not in settings.ALLOWED_IMAGE_FORMATS:
+    if file_ext not in settings.allowed_image_formats_list:
         raise ValidationError(f"Unsupported file format: {file_ext}")
     
     # Map extension to format
@@ -100,7 +105,7 @@ async def calculate_checksums(file_path: Path) -> tuple:
 
 
 async def process_image_background(image_id: int, file_path: Path, db: AsyncSession):
-    """Background task to process uploaded image"""
+    """Background task to process uploaded image and trigger conversion"""
     try:
         # Get image record
         result = await db.execute(select(Image).where(Image.id == image_id))
@@ -124,7 +129,13 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
         image.size_bytes = file_size
         image.checksum_md5 = md5_checksum
         image.checksum_sha256 = sha256_checksum
-        image.status = ImageStatus.READY
+        
+        # For VHDX files, keep status as PROCESSING to trigger conversion
+        # For other formats, mark as READY
+        if image.format == ImageFormat.VHDX:
+            image.status = ImageStatus.PROCESSING  # Will be converted by worker
+        else:
+            image.status = ImageStatus.READY
         
         await db.commit()
         
@@ -132,7 +143,8 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
             "Image processing completed",
             image_id=image_id,
             size_mb=round(file_size / 1024 / 1024, 2),
-            md5=md5_checksum[:8]
+            md5=md5_checksum[:8],
+            status=image.status.value
         )
         
     except Exception as e:
@@ -150,7 +162,8 @@ async def process_image_background(image_id: int, file_path: Path, db: AsyncSess
             logger.error("Failed to update image error status", error=str(db_error))
 
 
-@router.post("/upload", response_model=ImageResponse)
+@router.post("/upload", response_model=ImageResponse, status_code=status.HTTP_201_CREATED)
+@invalidate_cache(pattern="images:*")
 async def upload_image(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -158,7 +171,7 @@ async def upload_image(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     image_type: ImageType = Form(ImageType.SYSTEM),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Upload a new disk image"""
@@ -233,7 +246,7 @@ async def upload_image(
         )
         
         # Return response with created_by_username
-        response_data = ImageResponse.from_orm(image)
+        response_data = ImageResponse.model_validate(image)
         response_data.created_by_username = current_user.username
         
         return response_data
@@ -248,6 +261,7 @@ async def upload_image(
 
 
 @router.get("", response_model=List[ImageResponse])
+@cached(ttl=300, key_prefix="images")
 async def list_images(
     skip: int = 0,
     limit: int = 100,
@@ -285,7 +299,7 @@ async def list_images(
         creator_result = await db.execute(select(User).where(User.id == image.created_by))
         creator = creator_result.scalar_one_or_none()
         
-        response_data = ImageResponse.from_orm(image)
+        response_data = ImageResponse.model_validate(image)
         response_data.created_by_username = creator.username if creator else "Unknown"
         response_images.append(response_data)
     
@@ -293,6 +307,7 @@ async def list_images(
 
 
 @router.get("/{image_id}", response_model=ImageResponse)
+@cached(ttl=600, key_prefix="image")
 async def get_image(
     image_id: int,
     current_user: User = Depends(get_current_user),
@@ -310,18 +325,19 @@ async def get_image(
     creator_result = await db.execute(select(User).where(User.id == image.created_by))
     creator = creator_result.scalar_one_or_none()
     
-    response_data = ImageResponse.from_orm(image)
+    response_data = ImageResponse.model_validate(image)
     response_data.created_by_username = creator.username if creator else "Unknown"
     
     return response_data
 
 
 @router.put("/{image_id}", response_model=ImageResponse)
+@invalidate_cache(key="image:{image_id}")
 async def update_image(
     image_id: int,
     image_update: ImageUpdate,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Update image metadata"""
@@ -382,17 +398,18 @@ async def update_image(
     creator_result = await db.execute(select(User).where(User.id == image.created_by))
     creator = creator_result.scalar_one_or_none()
     
-    response_data = ImageResponse.from_orm(image)
+    response_data = ImageResponse.model_validate(image)
     response_data.created_by_username = creator.username if creator else "Unknown"
     
     return response_data
 
 
 @router.delete("/{image_id}")
+@invalidate_cache(pattern="images:*", key="image:{image_id}")
 async def delete_image(
     image_id: int,
     request: Request,
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete an image"""
@@ -404,7 +421,20 @@ async def delete_image(
         raise NotFoundError(f"Image with ID {image_id} not found")
     
     # Check if image is being used by any targets
-    # TODO: Add check for active targets using this image
+    # Check for active targets using this image
+    active_targets_result = await db.execute(
+        select(Target).where(
+            Target.image_id == image_id,
+            Target.is_active == True
+        )
+    )
+    active_targets = active_targets_result.scalars().all()
+    
+    if active_targets:
+        target_names = [target.name for target in active_targets]
+        raise ValidationError(
+            f"Cannot delete image '{image.name}' - it is being used by active targets: {', '.join(target_names)}"
+        )
     
     # Delete file from disk
     file_path = Path(image.file_path)
@@ -434,4 +464,79 @@ async def delete_image(
     logger.info("Image deleted", image_id=image_id, name=image.name, user_id=current_user.id)
     
     return {"message": f"Image '{image.name}' deleted successfully"}
+
+
+@router.post("/{image_id}/convert")
+async def trigger_conversion(
+    image_id: int,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Manually trigger image conversion"""
+    
+    result = await db.execute(select(Image).where(Image.id == image_id))
+    image = result.scalar_one_or_none()
+    
+    if not image:
+        raise NotFoundError(f"Image with ID {image_id} not found")
+    
+    if image.status not in [ImageStatus.READY, ImageStatus.ERROR]:
+        raise ValidationError(f"Image must be in READY or ERROR status to convert. Current status: {image.status}")
+    
+    # Update status to processing to trigger conversion
+    image.status = ImageStatus.PROCESSING
+    await db.commit()
+    
+    await log_user_activity(
+        action=AuditAction.IMAGE_UPLOADED,
+        message=f"Conversion triggered for image '{image.name}'",
+        request=request,
+        user=current_user,
+        resource_type="image",
+        resource_id=image.id,
+        resource_name=image.name,
+        db=db
+    )
+    
+    logger.info(f"Conversion triggered for image {image_id} by user {current_user.username}")
+    
+    return {"message": "Conversion triggered successfully", "image_id": image_id}
+
+
+@router.get("/{image_id}/conversion-status")
+async def get_conversion_status(
+    image_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get conversion status and progress for an image"""
+    
+    result = await db.execute(select(Image).where(Image.id == image_id))
+    image = result.scalar_one_or_none()
+    
+    if not image:
+        raise NotFoundError(f"Image with ID {image_id} not found")
+    
+    # Parse processing log if available
+    processing_info = {}
+    if image.processing_log:
+        try:
+            import json
+            processing_info = json.loads(image.processing_log)
+        except (json.JSONDecodeError, TypeError):
+            processing_info = {"raw_log": image.processing_log}
+    
+    return {
+        "image_id": image.id,
+        "name": image.name,
+        "status": image.status,
+        "format": image.format,
+        "size_bytes": image.size_bytes,
+        "virtual_size_bytes": image.virtual_size_bytes,
+        "error_message": image.error_message,
+        "processing_info": processing_info,
+        "created_at": image.created_at.isoformat(),
+        "updated_at": image.updated_at.isoformat()
+    }
 

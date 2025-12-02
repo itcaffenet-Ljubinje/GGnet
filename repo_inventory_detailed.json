@@ -1,0 +1,2746 @@
+{
+  "timestamp": "2025-10-08T02:36:32.472473",
+  "total_files": 436,
+  "categories": {
+    "python": 85,
+    "javascript": 5,
+    "typescript": 48,
+    "config": 31,
+    "docs": 73,
+    "templates": 5,
+    "cache": 74,
+    "other": 115
+  },
+  "legacy_files": {
+    "old_scripts": 0,
+    "backup_files": 4,
+    "test_files": 18,
+    "cache_files": 74,
+    "duplicate_configs": 0
+  },
+  "duplicate_groups": 12,
+  "files": [
+    {
+      "path": ".\\.bandit",
+      "size": 84,
+      "last_commit": "2025-10-06 15:17:52 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\.safety",
+      "size": 218,
+      "last_commit": "2025-10-06 15:17:52 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\ADMIN_LOGIN_GUIDE.md",
+      "size": 5196,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\BACKUP_RESTORE.md",
+      "size": 23077,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\CHANGELOG.md",
+      "size": 9242,
+      "last_commit": "2025-10-08 02:02:20 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\change_password.py",
+      "size": 2294,
+      "last_commit": "2025-10-04 20:12:09 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\change_password_linux.py",
+      "size": 2484,
+      "last_commit": "2025-10-04 20:38:54 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\check_database_status.py",
+      "size": 1858,
+      "last_commit": "2025-10-05 00:15:42 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\codecov.yml",
+      "size": 831,
+      "last_commit": "2025-10-06 17:32:35 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\CODECOV_SETUP.md",
+      "size": 3393,
+      "last_commit": "2025-10-06 17:32:35 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\DEPLOYMENT_GUIDE.md",
+      "size": 12189,
+      "last_commit": "2025-10-06 15:10:41 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\DEPLOYMENT_SUMMARY.md",
+      "size": 10965,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docker-compose.yml",
+      "size": 6654,
+      "last_commit": "2025-10-08 02:16:16 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\env.example",
+      "size": 1518,
+      "last_commit": "2025-10-04 11:51:58 +0200",
+      "extension": ".example"
+    },
+    {
+      "path": ".\\environment.yml",
+      "size": 1380,
+      "last_commit": "2025-10-03 18:33:57 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\ESLINT_CLEANUP_SUMMARY.md",
+      "size": 7668,
+      "last_commit": "2025-10-07 13:59:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\FINAL_STARTUP_GUIDE.md",
+      "size": 6227,
+      "last_commit": "2025-10-07 23:18:54 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\FULL_FRONTEND_RESET.bat",
+      "size": 844,
+      "last_commit": "2025-10-07 23:18:54 +0200",
+      "extension": ".bat"
+    },
+    {
+      "path": ".\\ggnet.db",
+      "size": 0,
+      "last_commit": "",
+      "extension": ".db"
+    },
+    {
+      "path": ".\\GGROCK_COMPARISON.md",
+      "size": 25381,
+      "last_commit": "2025-10-08 01:02:06 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\GGROCK_FULL_ANALYSIS.md",
+      "size": 12743,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\GGROCK_PARITY_FINAL.md",
+      "size": 22153,
+      "last_commit": "2025-10-08 02:16:16 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\install.sh",
+      "size": 8167,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\LICENSE",
+      "size": 1099,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\LOGIN_TROUBLESHOOTING.md",
+      "size": 2929,
+      "last_commit": "2025-10-04 20:12:09 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\MISSING_FEATURES_ROADMAP.md",
+      "size": 24702,
+      "last_commit": "2025-10-08 01:02:06 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\NEXT_STEPS.md",
+      "size": 10554,
+      "last_commit": "2025-10-06 15:02:46 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE1_COMPLETION.md",
+      "size": 15703,
+      "last_commit": "2025-10-08 01:28:13 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE2_COMPLETION.md",
+      "size": 15399,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_ASSUMPTIONS.md",
+      "size": 6798,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_CHANGES.md",
+      "size": 4847,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_CHECKLIST.md",
+      "size": 7807,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_MAPPING.md",
+      "size": 8538,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_RISKS.md",
+      "size": 7750,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_0_TESTS.md",
+      "size": 7757,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_1_ASSUMPTIONS.md",
+      "size": 10238,
+      "last_commit": "2025-10-06 14:00:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_1_CHANGES.md",
+      "size": 8920,
+      "last_commit": "2025-10-06 14:00:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_1_CHECKLIST.md",
+      "size": 4648,
+      "last_commit": "2025-10-06 14:00:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_1_TESTS.md",
+      "size": 15893,
+      "last_commit": "2025-10-06 14:00:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_2_CHANGES.md",
+      "size": 7846,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_2_CHECKLIST.md",
+      "size": 9534,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_2_TESTS.md",
+      "size": 11703,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_3_ASSUMPTIONS.md",
+      "size": 9562,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_3_CHANGES.md",
+      "size": 9981,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_3_CHECKLIST.md",
+      "size": 9213,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_3_TESTS.md",
+      "size": 11099,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_4_ASSUMPTIONS.md",
+      "size": 10609,
+      "last_commit": "2025-10-06 13:18:26 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_4_CHANGES.md",
+      "size": 9115,
+      "last_commit": "2025-10-06 13:18:26 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_4_CHECKLIST.md",
+      "size": 8992,
+      "last_commit": "2025-10-06 13:18:26 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_4_TESTS.md",
+      "size": 13186,
+      "last_commit": "2025-10-06 13:18:26 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_5_ASSUMPTIONS.md",
+      "size": 11955,
+      "last_commit": "2025-10-06 13:47:14 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_5_CHANGES.md",
+      "size": 11843,
+      "last_commit": "2025-10-06 13:47:14 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_5_CHECKLIST.md",
+      "size": 10445,
+      "last_commit": "2025-10-06 13:47:14 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_5_TESTS.md",
+      "size": 21780,
+      "last_commit": "2025-10-06 13:47:14 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_6_ASSUMPTIONS.md",
+      "size": 1129,
+      "last_commit": "2025-10-06 13:56:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_6_CHANGES.md",
+      "size": 1789,
+      "last_commit": "2025-10-06 13:56:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_6_CHECKLIST.md",
+      "size": 550,
+      "last_commit": "2025-10-06 13:56:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_6_TESTS.md",
+      "size": 1552,
+      "last_commit": "2025-10-06 13:56:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_7_ASSUMPTIONS.md",
+      "size": 11562,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_7_CHANGES.md",
+      "size": 9190,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_7_CHECKLIST.md",
+      "size": 7661,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_7_TESTS.md",
+      "size": 13079,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_8_ASSUMPTIONS.md",
+      "size": 13349,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_8_CHANGES.md",
+      "size": 12110,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_8_CHECKLIST.md",
+      "size": 14380,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PHASE_8_TESTS.md",
+      "size": 13546,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PROJECT_COMPLETION.md",
+      "size": 12367,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\PROJECT_STATUS_REPORT.md",
+      "size": 11275,
+      "last_commit": "2025-10-06 14:48:44 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\pytest.ini",
+      "size": 582,
+      "last_commit": "2025-10-04 17:10:16 +0200",
+      "extension": ".ini"
+    },
+    {
+      "path": ".\\README.md",
+      "size": 13049,
+      "last_commit": "2025-10-08 02:02:20 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\repo_inventory.json",
+      "size": 75866,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\requirements.txt",
+      "size": 914,
+      "last_commit": "2025-10-03 19:30:56 +0200",
+      "extension": ".txt"
+    },
+    {
+      "path": ".\\RESTART_FRONTEND.md",
+      "size": 2630,
+      "last_commit": "2025-10-07 23:18:54 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\RUNBOOK.md",
+      "size": 19259,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\setup_database_linux.py",
+      "size": 4140,
+      "last_commit": "2025-10-04 20:38:54 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\setup_database_postgresql.py",
+      "size": 4934,
+      "last_commit": "2025-10-05 00:15:42 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\setup_postgresql.sh",
+      "size": 2367,
+      "last_commit": "2025-10-04 21:16:32 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\START_PROJECT.md",
+      "size": 6822,
+      "last_commit": "2025-10-07 22:18:16 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\test_database_connection.py",
+      "size": 8354,
+      "last_commit": "2025-10-05 00:15:42 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\UPGRADE.md",
+      "size": 15626,
+      "last_commit": "2025-10-06 14:30:58 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\.vscode\\css_custom_data.json",
+      "size": 665,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\.vscode\\settings.json",
+      "size": 499,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\backend\\alembic.ini",
+      "size": 3378,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".ini"
+    },
+    {
+      "path": ".\\backend\\check_admin.py",
+      "size": 1691,
+      "last_commit": "2025-10-06 21:17:03 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\create_admin.py",
+      "size": 2213,
+      "last_commit": "2025-10-06 21:17:03 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\create_admin_postgres.py",
+      "size": 2525,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\debug_login.py",
+      "size": 2933,
+      "last_commit": "2025-10-06 21:17:03 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\docker-entrypoint.sh",
+      "size": 1211,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\backend\\Dockerfile",
+      "size": 1338,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\backend\\ggnet.db",
+      "size": 188416,
+      "last_commit": "",
+      "extension": ".db"
+    },
+    {
+      "path": ".\\backend\\init.sql",
+      "size": 2814,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".sql"
+    },
+    {
+      "path": ".\\backend\\init_admin.py",
+      "size": 1854,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\package-lock.json",
+      "size": 86,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\backend\\pyproject.toml",
+      "size": 1053,
+      "last_commit": "2025-10-06 14:08:40 +0200",
+      "extension": ".toml"
+    },
+    {
+      "path": ".\\backend\\pytest.ini",
+      "size": 507,
+      "last_commit": "2025-10-07 10:34:48 +0200",
+      "extension": ".ini"
+    },
+    {
+      "path": ".\\backend\\README_FIXES.md",
+      "size": 4206,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\backend\\requirements.txt",
+      "size": 791,
+      "last_commit": "2025-10-06 21:32:13 +0200",
+      "extension": ".txt"
+    },
+    {
+      "path": ".\\backend\\test.db",
+      "size": 163840,
+      "last_commit": "",
+      "extension": ".db"
+    },
+    {
+      "path": ".\\backend\\test_login_correct.py",
+      "size": 1787,
+      "last_commit": "2025-10-07 22:18:16 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\test_login_direct.py",
+      "size": 1655,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\test_password.py",
+      "size": 1666,
+      "last_commit": "2025-10-07 22:09:26 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\adapters\\targetcli.py",
+      "size": 21313,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\adapters\\__init__.py",
+      "size": 116,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\alembic\\env.py",
+      "size": 2814,
+      "last_commit": "2025-10-04 15:57:37 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\alembic\\script.py.mako",
+      "size": 536,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".mako"
+    },
+    {
+      "path": ".\\backend\\alembic\\versions\\20251006_2103_9d9e5558e847_initial_migration_create_all_tables.py",
+      "size": 17557,
+      "last_commit": "2025-10-06 21:06:06 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\main.py",
+      "size": 8170,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\__init__.py",
+      "size": 35,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\adapters\\dhcp.py",
+      "size": 12998,
+      "last_commit": "2025-10-06 16:34:00 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\adapters\\ipxe.py",
+      "size": 11388,
+      "last_commit": "2025-10-06 16:12:40 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\adapters\\targetcli.py",
+      "size": 21303,
+      "last_commit": "2025-10-06 16:34:00 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\adapters\\tftp.py",
+      "size": 12843,
+      "last_commit": "2025-10-06 16:18:30 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\adapters\\__init__.py",
+      "size": 1188,
+      "last_commit": "2025-10-06 16:06:31 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\api\\sessions.py",
+      "size": 19888,
+      "last_commit": "2025-10-06 20:03:52 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\api\\targets.py",
+      "size": 15225,
+      "last_commit": "2025-10-06 17:44:33 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\api\\__init__.py",
+      "size": 54,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\cache.py",
+      "size": 15976,
+      "last_commit": "2025-10-06 21:32:13 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\config.py",
+      "size": 6407,
+      "last_commit": "2025-10-06 21:32:13 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\database.py",
+      "size": 4722,
+      "last_commit": "2025-10-06 21:32:13 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\dependencies.py",
+      "size": 11174,
+      "last_commit": "2025-10-07 12:01:53 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\exceptions.py",
+      "size": 5013,
+      "last_commit": "2025-10-06 15:56:17 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\logging_config.py",
+      "size": 5567,
+      "last_commit": "2025-10-06 16:43:24 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\security.py",
+      "size": 14895,
+      "last_commit": "2025-10-07 12:01:53 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\serializers.py",
+      "size": 7375,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\validators.py",
+      "size": 6996,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\core\\__init__.py",
+      "size": 30,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\middleware\\logging.py",
+      "size": 3220,
+      "last_commit": "2025-10-06 14:08:40 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\middleware\\metrics.py",
+      "size": 1248,
+      "last_commit": "2025-10-06 14:08:40 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\middleware\\rate_limiting.py",
+      "size": 5357,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\middleware\\__init__.py",
+      "size": 24,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\audit.py",
+      "size": 8102,
+      "last_commit": "2025-10-04 15:57:37 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\image.py",
+      "size": 5257,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\machine.py",
+      "size": 5784,
+      "last_commit": "2025-10-04 15:57:37 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\session.py",
+      "size": 7048,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\target.py",
+      "size": 1988,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\user.py",
+      "size": 3668,
+      "last_commit": "2025-10-06 12:39:50 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\models\\__init__.py",
+      "size": 548,
+      "last_commit": "2025-10-04 02:45:08 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\auth.py",
+      "size": 24493,
+      "last_commit": "2025-10-06 17:26:29 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\file_upload.py",
+      "size": 13647,
+      "last_commit": "2025-10-06 21:17:03 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\hardware.py",
+      "size": 8308,
+      "last_commit": "2025-10-08 02:21:31 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\health.py",
+      "size": 7517,
+      "last_commit": "2025-10-06 17:04:38 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\images.py",
+      "size": 17704,
+      "last_commit": "2025-10-06 20:19:06 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\iscsi.py",
+      "size": 18564,
+      "last_commit": "2025-10-06 15:39:51 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\machines.py",
+      "size": 14668,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\metrics.py",
+      "size": 6016,
+      "last_commit": "2025-10-06 14:08:40 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\monitoring.py",
+      "size": 10093,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\sessions.py",
+      "size": 25339,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\storage.py",
+      "size": 11537,
+      "last_commit": "2025-10-06 15:39:51 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\routes\\__init__.py",
+      "size": 16,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\websocket\\manager.py",
+      "size": 5061,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\app\\websocket\\__init__.py",
+      "size": 20,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\cache\\0274ec521ce8ac91ad47a8089c32848d.cache",
+      "size": 250,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\07258bf12eef76c6eeb188eeece4e087.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\15897335a1014a049c94ca7ed92861b0.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\19546a802dc1bd556baf42e9b084a325.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\1962a11396d63dc19923d194f6e2793f.cache",
+      "size": 80,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\1b5799d6abdd96ab5211ea9807fae45a.cache",
+      "size": 250,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\1df6ebd0c215c7aaa4ac8eeef0850e56.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\24bb0c7c1f79cc5ddeeeacca8c8565ff.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\2519e627624541f1ad216fcfcaebcf1a.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\2a04393ba86be9fe0535243786274497.cache",
+      "size": 231,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\2d7221589d3cd454b07509f51768cb50.cache",
+      "size": 274,
+      "last_commit": "2025-10-07 23:56:56 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\2f9afb25ea569b90b82774aedfc93342.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\3551bc9f7bcdd9243f55acb07ee32c89.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\3ccdff5d2ad67a4a422c4d171ae7a158.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\3f4a9ed06df1fa3acc0f6cde675147f6.cache",
+      "size": 250,
+      "last_commit": "2025-10-07 23:34:13 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\40b951db9dd0def3446be23580b32bfc.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\439ad07b4b2c46b21595ebcfb4c70a7b.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\45457a7392f8b9098d43c6b1856ec60f.cache",
+      "size": 274,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\45a7cea1b17ac544466189a9cf71ede1.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\4b70933305b3b351a614a33ad2d25e80.cache",
+      "size": 231,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\4c62e8f2b6c2468354576ea7b07d1052.cache",
+      "size": 274,
+      "last_commit": "2025-10-07 23:39:19 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\4d01af3ca830c994f9de144117cddb8b.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\51a19bd2e372fc4147338a0e94df45fb.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\51cf5c5d7657b639654fecdc4ed082bd.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\539feea9bd4f9d6dfefdc0b37ee79c26.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\5727739dec19bec9b57c8877c15d7213.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\57984bd6b5cfab6fa6306ed7f7a99e37.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\5a36a191fdddc3494ae6f8da582c3bd9.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\5a4bf56e388a4774c7c3a130d72b0a2d.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\6c6037375660023a0936aea2893458f4.cache",
+      "size": 231,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\6fc7a3d3079495a4c9d7a29c9849d8fd.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\73514c7c7642f6935c8006921030ecce.cache",
+      "size": 293,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\74a129946727a7e796cacf2f664f2c9c.cache",
+      "size": 250,
+      "last_commit": "2025-10-07 23:56:56 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\7bb86862858dda4b977c3b7d21212448.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\7d113805d2ba10fe696a7ff0cef2f272.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\7f028b70bb3be3ae32b318c2f2d8dfb9.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\80036c67395dfde7a0f3e20d5a397320.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\82df6e80590e039e95c0d74aaa350e0f.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\862e3ff1e77a3561302b244ec131c831.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\8a37c971493de01583dbbe9a8e27e56a.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\911d132676010a0dbcadccb64f1d4da3.cache",
+      "size": 293,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\96568ff89fc16ee8ce36802dde637c27.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a226e44978e62f9fc80ad8717f0c155e.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a621871bcd24592e5867cff631841cce.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a711d09690d00f4252ba69180e16d1dd.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a80559c6c7b37c93bec0b95f349548c6.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a94a39976df69b2bcca60765e0373104.cache",
+      "size": 250,
+      "last_commit": "2025-10-07 23:51:39 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\a9cf83a23234481e67063f89258d540a.cache",
+      "size": 250,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\b01862738359eb1938d9ce196a2b0743.cache",
+      "size": 293,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\b0cb28ed6c687e8da2793ec93b71db9a.cache",
+      "size": 250,
+      "last_commit": "2025-10-07 23:45:43 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\b3d071d8b44d87bb28b90d865c58038e.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\b5c2a34bca0cf2688c0e60acf6f8d621.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\b9a8500bc64eb62cafcf525c4010bf0a.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\be97ec04a1c0e388d4c3964b0f4169e1.cache",
+      "size": 274,
+      "last_commit": "2025-10-07 23:34:13 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\c071d7bf1df83daf0c968065f7618209.cache",
+      "size": 293,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\c9a92280f4b00ec45f208f112debc2dc.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\ca0a97e967be5c385e971cc400799642.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\cd157aee053b110d72a308b90f78a782.cache",
+      "size": 250,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\d0fe2a7df337c0a863c4fe5b408f93fa.cache",
+      "size": 231,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\d2214c68315accf29364fc413ae7d145.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\d2590e2ca43e5916f2c1e20ebce4c0a0.cache",
+      "size": 293,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\d854257432d60c328a20cff22c2c9236.cache",
+      "size": 250,
+      "last_commit": "2025-10-07 23:39:19 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\d8976fca81e7bc15dbdd6734425b940a.cache",
+      "size": 274,
+      "last_commit": "2025-10-07 23:51:39 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\de3c931ddee28189675f509230ea1622.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\de46ef295cf4aad3ce4219fa207df93f.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\e9cefbbbe6e5f41c70e8d02d2435b0fa.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\e9e6130856c35cd00f7cdcc5cd12d5cb.cache",
+      "size": 274,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\edf270dd748b81f9a06a5e5b3ae9cbe9.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\f315686623c0f774b85ced093a793892.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\f4876c47f83e7aefddec7a3864c62f8c.cache",
+      "size": 250,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\f714bd6c19bc8276bb80e9fb6820144e.cache",
+      "size": 274,
+      "last_commit": "",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\f9e037f1bc7bd52315d4a42e1022b2fc.cache",
+      "size": 274,
+      "last_commit": "2025-10-07 23:45:43 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\fbebfdf35417c080474009a5c282fb3d.cache",
+      "size": 231,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\cache\\fc97ca90334d7a25e67181a301ef206f.cache",
+      "size": 274,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".cache"
+    },
+    {
+      "path": ".\\backend\\logs\\app.log",
+      "size": 1200933,
+      "last_commit": "",
+      "extension": ".log"
+    },
+    {
+      "path": ".\\backend\\logs\\audit.log",
+      "size": 0,
+      "last_commit": "",
+      "extension": ".log"
+    },
+    {
+      "path": ".\\backend\\logs\\error.log",
+      "size": 578,
+      "last_commit": "",
+      "extension": ".log"
+    },
+    {
+      "path": ".\\backend\\logs\\performance.log",
+      "size": 2869,
+      "last_commit": "",
+      "extension": ".log"
+    },
+    {
+      "path": ".\\backend\\logs\\security.log",
+      "size": 0,
+      "last_commit": "",
+      "extension": ".log"
+    },
+    {
+      "path": ".\\backend\\scripts\\preflight.py",
+      "size": 9098,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\scripts\\qemu_convert.py",
+      "size": 12132,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\conftest.py",
+      "size": 7374,
+      "last_commit": "2025-10-07 11:54:06 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_auth.py",
+      "size": 6432,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_health.py",
+      "size": 2111,
+      "last_commit": "2025-10-06 17:26:29 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_images.py",
+      "size": 5998,
+      "last_commit": "2025-10-04 17:30:56 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_image_conversion.py",
+      "size": 16505,
+      "last_commit": "2025-10-07 12:09:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_integration.py",
+      "size": 17335,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_machines_edge_cases.py",
+      "size": 15839,
+      "last_commit": "2025-10-06 11:46:35 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_phase4_sessions.py",
+      "size": 28645,
+      "last_commit": "2025-10-07 12:27:51 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_redis_integration.py",
+      "size": 12650,
+      "last_commit": "2025-10-07 10:34:48 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_targetcli_adapter.py",
+      "size": 18006,
+      "last_commit": "2025-10-06 20:39:02 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\test_targets_api.py",
+      "size": 21313,
+      "last_commit": "2025-10-06 20:19:06 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\tests\\__init__.py",
+      "size": 18,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\uploads\\240a1653-d4d5-4d85-870f-88316da8ccd7.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\579eb4d0-2c55-4e8f-841b-e236a83d438d.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\8e8efdc5-0387-4357-8b4a-2b18174f2b13.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\b1c63142-9201-4f7e-bd91-ec5c5cb21c30.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\d0cc3ab9-8fbb-4688-bb22-b943e0f9a835.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\e921c4c5-8160-429e-baac-994b3b9b054b.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\uploads\\f4bdb031-daff-4715-a6f9-b1b84864e953.vhd",
+      "size": 16000,
+      "last_commit": "",
+      "extension": ".vhd"
+    },
+    {
+      "path": ".\\backend\\worker\\convert.py",
+      "size": 10654,
+      "last_commit": "2025-10-06 17:08:53 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\backend\\worker\\__init__.py",
+      "size": 100,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\docker\\dhcp\\dhcpd.conf",
+      "size": 4028,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\docker\\dnsmasq\\dnsmasq.conf",
+      "size": 1701,
+      "last_commit": "2025-10-08 02:16:16 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\docker\\grafana\\README.md",
+      "size": 3343,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docker\\grafana\\dashboards\\ggnet-overview.json",
+      "size": 9963,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\docker\\grafana\\provisioning\\dashboards\\default.yml",
+      "size": 286,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\docker\\grafana\\provisioning\\datasources\\prometheus.yml",
+      "size": 266,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\docker\\nginx\\nginx.conf",
+      "size": 3699,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\docker\\prometheus\\prometheus.yml",
+      "size": 1103,
+      "last_commit": "2025-10-08 01:46:20 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\docs\\api.md",
+      "size": 13069,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docs\\installation.md",
+      "size": 11316,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docs\\PHASE1_TESTING_PLAN.md",
+      "size": 13325,
+      "last_commit": "2025-10-08 01:26:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docs\\SECUREBOOT_SETUP.md",
+      "size": 11294,
+      "last_commit": "2025-10-08 01:24:08 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\docs\\WINDOWS_TOOLCHAIN_GUIDE.md",
+      "size": 16574,
+      "last_commit": "2025-10-08 01:24:08 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\frontend\\.eslintrc.json",
+      "size": 1330,
+      "last_commit": "2025-10-06 15:45:59 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\.prettierrc",
+      "size": 189,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\frontend\\Dockerfile",
+      "size": 930,
+      "last_commit": "2025-10-07 12:41:37 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\frontend\\index.html",
+      "size": 1710,
+      "last_commit": "2025-10-07 23:34:13 +0200",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\nginx.conf",
+      "size": 2472,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\frontend\\package-lock.json",
+      "size": 284751,
+      "last_commit": "2025-10-04 01:17:16 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\package.json",
+      "size": 1847,
+      "last_commit": "2025-10-07 23:02:27 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\postcss.config.js",
+      "size": 86,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".js"
+    },
+    {
+      "path": ".\\frontend\\tailwind.config.js",
+      "size": 3608,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".js"
+    },
+    {
+      "path": ".\\frontend\\TEST_RENDER.md",
+      "size": 4268,
+      "last_commit": "2025-10-07 22:43:56 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\frontend\\tsconfig.json",
+      "size": 791,
+      "last_commit": "2025-10-06 17:08:53 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\tsconfig.node.json",
+      "size": 225,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\vite.config.ts",
+      "size": 1329,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\vitest.config.ts",
+      "size": 364,
+      "last_commit": "2025-10-06 16:18:30 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\.vscode\\css_custom_data.json",
+      "size": 2093,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\.vscode\\extensions.json",
+      "size": 140,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\.vscode\\settings.json",
+      "size": 432,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\coverage\\base.css",
+      "size": 5394,
+      "last_commit": "",
+      "extension": ".css"
+    },
+    {
+      "path": ".\\frontend\\coverage\\block-navigation.js",
+      "size": 2655,
+      "last_commit": "",
+      "extension": ".js"
+    },
+    {
+      "path": ".\\frontend\\coverage\\clover.xml",
+      "size": 444101,
+      "last_commit": "",
+      "extension": ".xml"
+    },
+    {
+      "path": ".\\frontend\\coverage\\coverage-final.json",
+      "size": 729310,
+      "last_commit": "",
+      "extension": ".json"
+    },
+    {
+      "path": ".\\frontend\\coverage\\favicon.png",
+      "size": 445,
+      "last_commit": "",
+      "extension": ".png"
+    },
+    {
+      "path": ".\\frontend\\coverage\\index.html",
+      "size": 11987,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\prettify.css",
+      "size": 676,
+      "last_commit": "",
+      "extension": ".css"
+    },
+    {
+      "path": ".\\frontend\\coverage\\prettify.js",
+      "size": 17590,
+      "last_commit": "",
+      "extension": ".js"
+    },
+    {
+      "path": ".\\frontend\\coverage\\sort-arrow-sprite.png",
+      "size": 138,
+      "last_commit": "",
+      "extension": ".png"
+    },
+    {
+      "path": ".\\frontend\\coverage\\sorter.js",
+      "size": 6731,
+      "last_commit": "",
+      "extension": ".js"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\index.html",
+      "size": 5052,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\postcss.config.js.html",
+      "size": 4188,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\tailwind.config.js.html",
+      "size": 25834,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\App.tsx.html",
+      "size": 11122,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\index.html",
+      "size": 5732,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\main.tsx.html",
+      "size": 13603,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\setupTests.ts.html",
+      "size": 16136,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ErrorBoundary.tsx.html",
+      "size": 24598,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\FileUpload.tsx.html",
+      "size": 59710,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ImageManager.tsx.html",
+      "size": 112221,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\index.html",
+      "size": 10571,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\Layout.tsx.html",
+      "size": 52185,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\LoadingSpinner.tsx.html",
+      "size": 16321,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\MachineModal.tsx.html",
+      "size": 63138,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\NetworkBootMonitor.tsx.html",
+      "size": 80773,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\SessionManager.tsx.html",
+      "size": 91417,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\SystemMonitor.tsx.html",
+      "size": 110417,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\TargetManager.tsx.html",
+      "size": 99296,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\charts\\index.html",
+      "size": 5129,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\charts\\index.ts.html",
+      "size": 3537,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\charts\\UsageChart.tsx.html",
+      "size": 28456,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\notifications\\index.html",
+      "size": 4503,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\notifications\\index.tsx.html",
+      "size": 33682,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\tables\\DataTable.tsx.html",
+      "size": 44476,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\tables\\index.html",
+      "size": 5126,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\tables\\index.ts.html",
+      "size": 3716,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\Button.tsx.html",
+      "size": 14829,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\Card.tsx.html",
+      "size": 23497,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\index.html",
+      "size": 8510,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\index.ts.html",
+      "size": 3989,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\Input.tsx.html",
+      "size": 17286,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\Modal.tsx.html",
+      "size": 29752,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\ProgressBar.tsx.html",
+      "size": 13472,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\components\\ui\\StatusBadge.tsx.html",
+      "size": 15838,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\hooks\\index.html",
+      "size": 5131,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\hooks\\useRealTimeUpdates.ts.html",
+      "size": 21741,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\hooks\\useWebSocket.ts.html",
+      "size": 29942,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\lib\\api.ts.html",
+      "size": 41949,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\lib\\index.html",
+      "size": 5101,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\lib\\index.ts.html",
+      "size": 3451,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\ArrayConfigurationPage.tsx.html",
+      "size": 171368,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\DashboardPage.tsx.html",
+      "size": 90670,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\ImagesPage.tsx.html",
+      "size": 4753,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\index.html",
+      "size": 12056,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\LoginPage.tsx.html",
+      "size": 34778,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\MachinesPage.tsx.html",
+      "size": 94729,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\MonitoringPage.tsx.html",
+      "size": 114095,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\NetworkBootPage.tsx.html",
+      "size": 5411,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\NotFoundPage.tsx.html",
+      "size": 10478,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\SessionsPage.tsx.html",
+      "size": 4767,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\SettingsPage.tsx.html",
+      "size": 64984,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\SystemMonitorPage.tsx.html",
+      "size": 5414,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\pages\\TargetsPage.tsx.html",
+      "size": 5266,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\stores\\authStore.ts.html",
+      "size": 29221,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\stores\\index.html",
+      "size": 4452,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\utils\\index.html",
+      "size": 4456,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\coverage\\frontend\\src\\utils\\statusMapping.ts.html",
+      "size": 16312,
+      "last_commit": "",
+      "extension": ".html"
+    },
+    {
+      "path": ".\\frontend\\src\\App.test.tsx",
+      "size": 709,
+      "last_commit": "2025-10-07 23:39:19 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\App.tsx",
+      "size": 2223,
+      "last_commit": "2025-10-07 23:34:13 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\index.css",
+      "size": 7397,
+      "last_commit": "2025-10-07 22:33:38 +0200",
+      "extension": ".css"
+    },
+    {
+      "path": ".\\frontend\\src\\main.tsx",
+      "size": 1604,
+      "last_commit": "2025-10-07 23:34:13 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\setupTests.ts",
+      "size": 1789,
+      "last_commit": "2025-10-07 13:39:49 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\vitest.d.ts",
+      "size": 518,
+      "last_commit": "2025-10-06 14:15:29 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ErrorBoundary.tsx",
+      "size": 3662,
+      "last_commit": "2025-10-06 21:43:57 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\FileUpload.tsx",
+      "size": 10504,
+      "last_commit": "2025-10-07 11:06:57 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ImageManager.tsx",
+      "size": 23652,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\Layout.tsx",
+      "size": 10391,
+      "last_commit": "2025-10-06 17:58:11 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\LoadingSpinner.tsx",
+      "size": 1971,
+      "last_commit": "2025-10-06 17:54:04 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\MachineModal.tsx",
+      "size": 13179,
+      "last_commit": "2025-10-07 21:18:32 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\NetworkBootMonitor.tsx",
+      "size": 16673,
+      "last_commit": "2025-10-07 13:39:49 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\SessionManager.tsx",
+      "size": 19052,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\SystemMonitor.tsx",
+      "size": 22060,
+      "last_commit": "2025-10-07 21:18:32 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\TargetManager.tsx",
+      "size": 20487,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\charts\\index.ts",
+      "size": 57,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\charts\\UsageChart.tsx",
+      "size": 4302,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\notifications\\index.tsx",
+      "size": 5365,
+      "last_commit": "2025-10-07 11:02:39 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\tables\\DataTable.tsx",
+      "size": 8013,
+      "last_commit": "2025-10-07 21:18:32 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\tables\\index.ts",
+      "size": 92,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\Button.tsx",
+      "size": 2760,
+      "last_commit": "2025-10-07 12:41:37 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\Card.tsx",
+      "size": 3459,
+      "last_commit": "2025-10-07 12:41:37 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\index.ts",
+      "size": 301,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\Input.tsx",
+      "size": 2399,
+      "last_commit": "2025-10-07 12:41:37 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\Modal.tsx",
+      "size": 4091,
+      "last_commit": "2025-10-07 12:41:37 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\ProgressBar.tsx",
+      "size": 1528,
+      "last_commit": "2025-10-06 17:54:04 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\components\\ui\\StatusBadge.tsx",
+      "size": 2283,
+      "last_commit": "2025-10-06 17:54:04 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\hooks\\useRealTimeUpdates.ts",
+      "size": 3639,
+      "last_commit": "2025-10-07 23:39:19 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\hooks\\useWebSocket.ts",
+      "size": 5099,
+      "last_commit": "2025-10-07 23:45:43 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\lib\\api.ts",
+      "size": 8567,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\lib\\index.ts",
+      "size": 23,
+      "last_commit": "2025-10-04 01:01:58 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\ArrayConfigurationPage.tsx",
+      "size": 36870,
+      "last_commit": "2025-10-06 18:09:24 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\DashboardPage.tsx",
+      "size": 17209,
+      "last_commit": "2025-10-07 21:18:32 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\ImagesPage.tsx",
+      "size": 221,
+      "last_commit": "2025-10-06 17:56:29 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\LoginPage.tsx",
+      "size": 6266,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\MachinesPage.tsx",
+      "size": 19742,
+      "last_commit": "2025-10-07 13:39:49 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\MonitoringPage.tsx",
+      "size": 22494,
+      "last_commit": "2025-10-07 13:39:49 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\NetworkBootPage.tsx",
+      "size": 345,
+      "last_commit": "2025-10-06 17:56:29 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\NotFoundPage.tsx",
+      "size": 1466,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\SessionsPage.tsx",
+      "size": 231,
+      "last_commit": "2025-10-06 17:56:29 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\SettingsPage.tsx",
+      "size": 13753,
+      "last_commit": "2025-10-05 00:15:42 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\SystemMonitorPage.tsx",
+      "size": 344,
+      "last_commit": "2025-10-06 17:56:29 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\pages\\TargetsPage.tsx",
+      "size": 305,
+      "last_commit": "2025-10-06 17:56:29 +0200",
+      "extension": ".tsx"
+    },
+    {
+      "path": ".\\frontend\\src\\stores\\authStore.ts",
+      "size": 3752,
+      "last_commit": "2025-10-08 00:14:19 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\test\\setup.ts",
+      "size": 966,
+      "last_commit": "2025-10-07 13:39:49 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\frontend\\src\\utils\\statusMapping.ts",
+      "size": 1858,
+      "last_commit": "2025-10-06 17:22:55 +0200",
+      "extension": ".ts"
+    },
+    {
+      "path": ".\\infra\\docker-compose.yml",
+      "size": 933,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".yml"
+    },
+    {
+      "path": ".\\infra\\install.sh",
+      "size": 2933,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\infra\\README.md",
+      "size": 1231,
+      "last_commit": "2025-10-06 13:56:01 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\infra\\examples\\dhcpd.conf",
+      "size": 2501,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\infra\\examples\\tftp\\boot.ipxe",
+      "size": 1605,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".ipxe"
+    },
+    {
+      "path": ".\\infra\\examples\\tftp\\pxelinux.cfg\\default",
+      "size": 606,
+      "last_commit": "2025-10-06 13:18:26 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\infra\\nginx\\ggnet.conf",
+      "size": 906,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".conf"
+    },
+    {
+      "path": ".\\infra\\systemd\\ggnet-backend.service",
+      "size": 394,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".service"
+    },
+    {
+      "path": ".\\infra\\systemd\\ggnet-worker.service",
+      "size": 373,
+      "last_commit": "2025-10-06 13:53:12 +0200",
+      "extension": ".service"
+    },
+    {
+      "path": ".\\infra\\tftp\\boot.ipxe.example",
+      "size": 2550,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".example"
+    },
+    {
+      "path": ".\\infra\\tftp\\download-ipxe.ps1",
+      "size": 4049,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".ps1"
+    },
+    {
+      "path": ".\\infra\\tftp\\download-ipxe.sh",
+      "size": 2871,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\infra\\tftp\\README.md",
+      "size": 5977,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\01-disable-uac.reg",
+      "size": 1051,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\02-disable-firewall.reg",
+      "size": 1353,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\03-enable-autologon.reg.template",
+      "size": 1402,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".template"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\04-rename-computer.reg.template",
+      "size": 1062,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".template"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\05-ggnet-client-install.reg",
+      "size": 2184,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\06-inject-environment-vars.reg.template",
+      "size": 1189,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".template"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\07-enable-rdp.reg",
+      "size": 1428,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\08-optimize-performance.reg",
+      "size": 2305,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\09-disable-telemetry.reg",
+      "size": 2383,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".reg"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\apply-all.bat",
+      "size": 1762,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".bat"
+    },
+    {
+      "path": ".\\infra\\windows-scripts\\README.md",
+      "size": 9395,
+      "last_commit": "2025-10-08 01:18:11 +0200",
+      "extension": ".md"
+    },
+    {
+      "path": ".\\scripts\\analyze_repo.py",
+      "size": 8301,
+      "last_commit": "",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\scripts\\dhcp_config.sh",
+      "size": 5655,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\scripts\\ggnet",
+      "size": 6341,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\scripts\\ggnet-iscsi",
+      "size": 4789,
+      "last_commit": "2025-10-08 02:12:49 +0200",
+      "extension": ""
+    },
+    {
+      "path": ".\\scripts\\hardware_detect.py",
+      "size": 10236,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\scripts\\image_converter.py",
+      "size": 14654,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\scripts\\install.sh",
+      "size": 25784,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\scripts\\iscsi_config.sh",
+      "size": 10448,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\scripts\\iscsi_manager.py",
+      "size": 15397,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\scripts\\tftp_config.sh",
+      "size": 10110,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".sh"
+    },
+    {
+      "path": ".\\scripts\\uefi_boot_manager.py",
+      "size": 18507,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\scripts\\__init__.py",
+      "size": 28,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".py"
+    },
+    {
+      "path": ".\\systemd\\ggnet-backend.service",
+      "size": 1236,
+      "last_commit": "2025-10-02 14:45:07 +0200",
+      "extension": ".service"
+    },
+    {
+      "path": ".\\systemd\\ggnet-preflight.service",
+      "size": 475,
+      "last_commit": "2025-10-08 01:54:46 +0200",
+      "extension": ".service"
+    },
+    {
+      "path": ".\\systemd\\ggnet-worker.service",
+      "size": 764,
+      "last_commit": "2025-10-06 12:02:43 +0200",
+      "extension": ".service"
+    }
+  ],
+  "legacy_details": {
+    "old_scripts": [],
+    "backup_files": [
+      ".\\BACKUP_RESTORE.md",
+      ".\\infra\\windows-scripts\\03-enable-autologon.reg.template",
+      ".\\infra\\windows-scripts\\04-rename-computer.reg.template",
+      ".\\infra\\windows-scripts\\06-inject-environment-vars.reg.template"
+    ],
+    "test_files": [
+      ".\\check_database_status.py",
+      ".\\test_database_connection.py",
+      ".\\backend\\check_admin.py",
+      ".\\backend\\debug_login.py",
+      ".\\backend\\test_login_correct.py",
+      ".\\backend\\test_login_direct.py",
+      ".\\backend\\test_password.py",
+      ".\\backend\\tests\\test_auth.py",
+      ".\\backend\\tests\\test_health.py",
+      ".\\backend\\tests\\test_images.py",
+      ".\\backend\\tests\\test_image_conversion.py",
+      ".\\backend\\tests\\test_integration.py",
+      ".\\backend\\tests\\test_machines_edge_cases.py",
+      ".\\backend\\tests\\test_phase4_sessions.py",
+      ".\\backend\\tests\\test_redis_integration.py",
+      ".\\backend\\tests\\test_targetcli_adapter.py",
+      ".\\backend\\tests\\test_targets_api.py",
+      ".\\frontend\\TEST_RENDER.md"
+    ],
+    "cache_files": [
+      ".\\backend\\cache\\0274ec521ce8ac91ad47a8089c32848d.cache",
+      ".\\backend\\cache\\07258bf12eef76c6eeb188eeece4e087.cache",
+      ".\\backend\\cache\\15897335a1014a049c94ca7ed92861b0.cache",
+      ".\\backend\\cache\\19546a802dc1bd556baf42e9b084a325.cache",
+      ".\\backend\\cache\\1962a11396d63dc19923d194f6e2793f.cache",
+      ".\\backend\\cache\\1b5799d6abdd96ab5211ea9807fae45a.cache",
+      ".\\backend\\cache\\1df6ebd0c215c7aaa4ac8eeef0850e56.cache",
+      ".\\backend\\cache\\24bb0c7c1f79cc5ddeeeacca8c8565ff.cache",
+      ".\\backend\\cache\\2519e627624541f1ad216fcfcaebcf1a.cache",
+      ".\\backend\\cache\\2a04393ba86be9fe0535243786274497.cache",
+      ".\\backend\\cache\\2d7221589d3cd454b07509f51768cb50.cache",
+      ".\\backend\\cache\\2f9afb25ea569b90b82774aedfc93342.cache",
+      ".\\backend\\cache\\3551bc9f7bcdd9243f55acb07ee32c89.cache",
+      ".\\backend\\cache\\3ccdff5d2ad67a4a422c4d171ae7a158.cache",
+      ".\\backend\\cache\\3f4a9ed06df1fa3acc0f6cde675147f6.cache",
+      ".\\backend\\cache\\40b951db9dd0def3446be23580b32bfc.cache",
+      ".\\backend\\cache\\439ad07b4b2c46b21595ebcfb4c70a7b.cache",
+      ".\\backend\\cache\\45457a7392f8b9098d43c6b1856ec60f.cache",
+      ".\\backend\\cache\\45a7cea1b17ac544466189a9cf71ede1.cache",
+      ".\\backend\\cache\\4b70933305b3b351a614a33ad2d25e80.cache",
+      ".\\backend\\cache\\4c62e8f2b6c2468354576ea7b07d1052.cache",
+      ".\\backend\\cache\\4d01af3ca830c994f9de144117cddb8b.cache",
+      ".\\backend\\cache\\51a19bd2e372fc4147338a0e94df45fb.cache",
+      ".\\backend\\cache\\51cf5c5d7657b639654fecdc4ed082bd.cache",
+      ".\\backend\\cache\\539feea9bd4f9d6dfefdc0b37ee79c26.cache",
+      ".\\backend\\cache\\5727739dec19bec9b57c8877c15d7213.cache",
+      ".\\backend\\cache\\57984bd6b5cfab6fa6306ed7f7a99e37.cache",
+      ".\\backend\\cache\\5a36a191fdddc3494ae6f8da582c3bd9.cache",
+      ".\\backend\\cache\\5a4bf56e388a4774c7c3a130d72b0a2d.cache",
+      ".\\backend\\cache\\6c6037375660023a0936aea2893458f4.cache",
+      ".\\backend\\cache\\6fc7a3d3079495a4c9d7a29c9849d8fd.cache",
+      ".\\backend\\cache\\73514c7c7642f6935c8006921030ecce.cache",
+      ".\\backend\\cache\\74a129946727a7e796cacf2f664f2c9c.cache",
+      ".\\backend\\cache\\7bb86862858dda4b977c3b7d21212448.cache",
+      ".\\backend\\cache\\7d113805d2ba10fe696a7ff0cef2f272.cache",
+      ".\\backend\\cache\\7f028b70bb3be3ae32b318c2f2d8dfb9.cache",
+      ".\\backend\\cache\\80036c67395dfde7a0f3e20d5a397320.cache",
+      ".\\backend\\cache\\82df6e80590e039e95c0d74aaa350e0f.cache",
+      ".\\backend\\cache\\862e3ff1e77a3561302b244ec131c831.cache",
+      ".\\backend\\cache\\8a37c971493de01583dbbe9a8e27e56a.cache",
+      ".\\backend\\cache\\911d132676010a0dbcadccb64f1d4da3.cache",
+      ".\\backend\\cache\\96568ff89fc16ee8ce36802dde637c27.cache",
+      ".\\backend\\cache\\a226e44978e62f9fc80ad8717f0c155e.cache",
+      ".\\backend\\cache\\a621871bcd24592e5867cff631841cce.cache",
+      ".\\backend\\cache\\a711d09690d00f4252ba69180e16d1dd.cache",
+      ".\\backend\\cache\\a80559c6c7b37c93bec0b95f349548c6.cache",
+      ".\\backend\\cache\\a94a39976df69b2bcca60765e0373104.cache",
+      ".\\backend\\cache\\a9cf83a23234481e67063f89258d540a.cache",
+      ".\\backend\\cache\\b01862738359eb1938d9ce196a2b0743.cache",
+      ".\\backend\\cache\\b0cb28ed6c687e8da2793ec93b71db9a.cache",
+      ".\\backend\\cache\\b3d071d8b44d87bb28b90d865c58038e.cache",
+      ".\\backend\\cache\\b5c2a34bca0cf2688c0e60acf6f8d621.cache",
+      ".\\backend\\cache\\b9a8500bc64eb62cafcf525c4010bf0a.cache",
+      ".\\backend\\cache\\be97ec04a1c0e388d4c3964b0f4169e1.cache",
+      ".\\backend\\cache\\c071d7bf1df83daf0c968065f7618209.cache",
+      ".\\backend\\cache\\c9a92280f4b00ec45f208f112debc2dc.cache",
+      ".\\backend\\cache\\ca0a97e967be5c385e971cc400799642.cache",
+      ".\\backend\\cache\\cd157aee053b110d72a308b90f78a782.cache",
+      ".\\backend\\cache\\d0fe2a7df337c0a863c4fe5b408f93fa.cache",
+      ".\\backend\\cache\\d2214c68315accf29364fc413ae7d145.cache",
+      ".\\backend\\cache\\d2590e2ca43e5916f2c1e20ebce4c0a0.cache",
+      ".\\backend\\cache\\d854257432d60c328a20cff22c2c9236.cache",
+      ".\\backend\\cache\\d8976fca81e7bc15dbdd6734425b940a.cache",
+      ".\\backend\\cache\\de3c931ddee28189675f509230ea1622.cache",
+      ".\\backend\\cache\\de46ef295cf4aad3ce4219fa207df93f.cache",
+      ".\\backend\\cache\\e9cefbbbe6e5f41c70e8d02d2435b0fa.cache",
+      ".\\backend\\cache\\e9e6130856c35cd00f7cdcc5cd12d5cb.cache",
+      ".\\backend\\cache\\edf270dd748b81f9a06a5e5b3ae9cbe9.cache",
+      ".\\backend\\cache\\f315686623c0f774b85ced093a793892.cache",
+      ".\\backend\\cache\\f4876c47f83e7aefddec7a3864c62f8c.cache",
+      ".\\backend\\cache\\f714bd6c19bc8276bb80e9fb6820144e.cache",
+      ".\\backend\\cache\\f9e037f1bc7bd52315d4a42e1022b2fc.cache",
+      ".\\backend\\cache\\fbebfdf35417c080474009a5c282fb3d.cache",
+      ".\\backend\\cache\\fc97ca90334d7a25e67181a301ef206f.cache"
+    ],
+    "duplicate_configs": []
+  }
+}

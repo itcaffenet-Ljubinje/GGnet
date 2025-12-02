@@ -1,0 +1,89 @@
+#!ipxe
+###############################################################################
+# GGnet Diskless Boot System - iPXE Boot Script
+# 
+# This script is served after initial iPXE binary loads
+# It connects to iSCSI target and boots Windows
+###############################################################################
+
+# Display banner
+echo
+echo ===============================================================================
+echo  GGnet Diskless Boot System
+echo ===============================================================================
+echo  MAC Address: ${net0/mac}
+echo  IP Address: ${net0/ip}
+echo  Gateway: ${net0/gateway}
+echo  DNS: ${net0/dns}
+echo  Hostname: ${hostname}
+echo ===============================================================================
+echo
+
+# Sanboot vs Chain - for Windows we use sanboot
+# This allows Windows to boot natively from iSCSI
+
+# Configure iSCSI
+set initiator-iqn iq
+
+n.2025-10.local.ggnet:${net0/mac:hexhyp}
+
+echo Connecting to GGnet Server...
+echo  Server: ${next-server}
+echo  Initiator IQN: ${initiator-iqn}
+echo
+
+# Get machine configuration from server
+# This would be dynamically generated per-machine
+# For now, using example values:
+
+set iscsi-server 192.168.1.10
+set iscsi-port 3260
+set iscsi-target iqn.2025-10.local.ggnet:target-${net0/mac:hexhyp}
+set iscsi-lun 0
+
+echo iSCSI Configuration:
+echo  Server: ${iscsi-server}:${iscsi-port}
+echo  Target: ${iscsi-target}
+echo  LUN: ${iscsi-lun}
+echo
+
+# In production, this would fetch from:
+# chain http://${next-server}:8000/boot/script/${net0/mac} || goto failed
+
+# Connect to iSCSI target
+echo Connecting to iSCSI target...
+sanboot iscsi:${iscsi-server}::::${iscsi-lun}:${iscsi-target} || goto failed
+
+# Should not reach here if boot successful
+echo
+echo WARNING: iSCSI sanboot returned unexpectedly
+goto failed
+
+:failed
+echo
+echo ===============================================================================
+echo  Boot Failed!
+echo ===============================================================================
+echo
+echo Possible causes:
+echo  - iSCSI target not available
+echo  - Network connectivity issue
+echo  - Invalid target configuration
+echo  - Windows image not bootable
+echo
+echo Press any key to retry...
+prompt --timeout 30000
+goto retry
+
+:retry
+echo Retrying boot process...
+echo
+sleep 3
+chain http://${next-server}:8000/boot/script/${net0/mac} || goto failed
+
+# Fallback: reboot
+echo
+echo Rebooting in 10 seconds...
+sleep 10
+reboot
+

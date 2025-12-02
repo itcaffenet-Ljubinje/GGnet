@@ -6,9 +6,9 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
+from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
 
@@ -64,12 +64,14 @@ class Image(Base):
     status: Mapped[ImageStatus] = mapped_column(
         SQLEnum(ImageStatus), 
         default=ImageStatus.UPLOADING,
-        nullable=False
+        nullable=False,
+        index=True  # Index for status queries
     )
     image_type: Mapped[ImageType] = mapped_column(
         SQLEnum(ImageType),
         default=ImageType.SYSTEM,
-        nullable=False
+        nullable=False,
+        index=True  # Index for type-based queries
     )
     
     # Security and validation
@@ -95,7 +97,8 @@ class Image(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False
+        nullable=False,
+        index=True  # Index for time-based queries
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -113,8 +116,7 @@ class Image(Base):
     converted_from = relationship("Image", remote_side=[id], backref="conversions")
     
     # Targets using this image
-    targets = relationship("Target", back_populates="system_image", foreign_keys="Target.system_image_id")
-    extra_disk_targets = relationship("Target", back_populates="extra_disk_image", foreign_keys="Target.extra_disk_image_id")
+    targets = relationship("Target", back_populates="image")
     
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, name='{self.name}', format='{self.format}', status='{self.status}')>"

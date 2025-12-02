@@ -5,9 +5,9 @@ Machine model for client computers
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
+from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
 
@@ -64,10 +64,11 @@ class Machine(Base):
     status: Mapped[MachineStatus] = mapped_column(
         SQLEnum(MachineStatus),
         default=MachineStatus.ACTIVE,
-        nullable=False
+        nullable=False,
+        index=True  # Index for status queries
     )
-    is_online: Mapped[bool] = mapped_column(Boolean, default=False)
-    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
     last_boot: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     
     # Location and organization

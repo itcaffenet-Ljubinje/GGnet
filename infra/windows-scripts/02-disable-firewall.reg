@@ -1,0 +1,31 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Disable Windows Firewall
+; ============================================================================
+; Disables firewall for diskless clients in controlled network environment
+; WARNING: Only use in isolated/trusted networks!
+; ============================================================================
+
+; Disable Domain Profile Firewall
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile]
+"EnableFirewall"=dword:00000000
+"DoNotAllowExceptions"=dword:00000000
+"DisableNotifications"=dword:00000001
+
+; Disable Standard Profile Firewall
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile]
+"EnableFirewall"=dword:00000000
+"DoNotAllowExceptions"=dword:00000000
+"DisableNotifications"=dword:00000001
+
+; Disable Public Profile Firewall
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile]
+"EnableFirewall"=dword:00000000
+"DoNotAllowExceptions"=dword:00000000
+"DisableNotifications"=dword:00000001
+
+; Disable Firewall Service
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\mpssvc]
+"Start"=dword:00000004
+

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { User, Shield, Database, Network, Bell } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { apiHelpers } from '../lib/api'
@@ -8,8 +8,14 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const { user } = useAuthStore()
 
-  const { data: storageData } = useQuery('storage', () => apiHelpers.getStorageInfo())
-  const { data: healthData } = useQuery('health', () => apiHelpers.getDetailedHealth())
+  const { data: storageData } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => apiHelpers.getStorageInfo()
+  })
+  const { data: healthData } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => apiHelpers.getDetailedHealth()
+  })
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: User },
@@ -75,7 +81,7 @@ export default function SettingsPage() {
                     <label className="form-label">Email</label>
                     <input
                       type="email"
-                      value={user?.email || ''}
+                      defaultValue={user?.email || ''}
                       className="input"
                       placeholder="Enter your email"
                     />
@@ -84,7 +90,7 @@ export default function SettingsPage() {
                     <label className="form-label">Full Name</label>
                     <input
                       type="text"
-                      value={user?.full_name || ''}
+                      defaultValue={user?.full_name || ''}
                       className="input"
                       placeholder="Enter your full name"
                     />
@@ -120,15 +126,15 @@ export default function SettingsPage() {
                 <div className="card-content space-y-4">
                   <div className="form-group">
                     <label className="form-label">Current Password</label>
-                    <input type="password" className="input" />
+                    <input type="password" className="input" defaultValue="" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">New Password</label>
-                    <input type="password" className="input" />
+                    <input type="password" className="input" defaultValue="" />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Confirm New Password</label>
-                    <input type="password" className="input" />
+                    <input type="password" className="input" defaultValue="" />
                   </div>
                   <div className="flex justify-end">
                     <button className="btn btn-primary btn-md">
@@ -155,7 +161,7 @@ export default function SettingsPage() {
                       <h4 className="text-sm font-medium text-gray-900">Session Timeout</h4>
                       <p className="text-sm text-gray-500">Automatically log out after inactivity</p>
                     </div>
-                    <select className="input w-32">
+                    <select className="input w-32" defaultValue="30 minutes">
                       <option>30 minutes</option>
                       <option>1 hour</option>
                       <option>4 hours</option>
@@ -202,7 +208,7 @@ export default function SettingsPage() {
                 <div className="card-content space-y-4">
                   <div className="form-group">
                     <label className="form-label">Default Boot Timeout</label>
-                    <select className="input">
+                    <select className="input" defaultValue="10 seconds">
                       <option>5 seconds</option>
                       <option>10 seconds</option>
                       <option>30 seconds</option>

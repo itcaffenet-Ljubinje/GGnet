@@ -1,0 +1,39 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Enable Auto-Logon
+; ============================================================================
+; This template enables automatic login for diskless Windows clients
+; 
+; TEMPLATE VARIABLES (replace before applying):
+;   {USERNAME} - Windows username (e.g., "GGUser" or "Administrator")
+;   {PASSWORD} - User password (plaintext - use with caution!)
+;   {DOMAIN} - Domain name or "." for local machine
+; 
+; Example:
+;   "DefaultUserName"="GGUser"
+;   "DefaultPassword"="ggnet123"
+;   "DefaultDomainName"="."
+; ============================================================================
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultUserName"="{USERNAME}"
+"DefaultPassword"="{PASSWORD}"
+"DefaultDomainName"="{DOMAIN}"
+"AutoLogonCount"=dword:00000000
+"ForceAutoLogon"="1"
+"IgnoreShiftOverride"="1"
+
+; Disable legal notice (speeds up boot)
+"LegalNoticeCaption"=""
+"LegalNoticeText"=""
+
+; Skip network wait
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\NetworkProvider]
+"RestoreConnection"=dword:00000000
+
+; Fast user switching (disable)
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System]
+"HideFastUserSwitching"=dword:00000001
+

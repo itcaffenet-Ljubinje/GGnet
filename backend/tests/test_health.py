@@ -9,6 +9,7 @@ from httpx import AsyncClient
 class TestHealth:
     """Test health check functionality."""
     
+    @pytest.mark.asyncio
     async def test_basic_health_check(self, client: AsyncClient):
         """Test basic health check endpoint."""
         response = await client.get("/health")
@@ -21,6 +22,7 @@ class TestHealth:
         assert data["service"] == "ggnet-diskless-server"
         assert data["version"] == "1.0.0"
     
+    @pytest.mark.asyncio
     async def test_detailed_health_check(self, client: AsyncClient, db_session):
         """Test detailed health check endpoint."""
         response = await client.get("/health/detailed")
@@ -36,9 +38,10 @@ class TestHealth:
         
         checks = data["checks"]
         assert "database" in checks
-        assert "directories" in checks
+        assert "storage" in checks
         assert "system" in checks
     
+    @pytest.mark.asyncio
     async def test_readiness_check(self, client: AsyncClient, db_session):
         """Test readiness probe endpoint."""
         response = await client.get("/health/ready")
@@ -50,6 +53,7 @@ class TestHealth:
         # Status might be "ready" or "not_ready" depending on test environment
         assert data["status"] in ["ready", "not_ready"]
     
+    @pytest.mark.asyncio
     async def test_liveness_check(self, client: AsyncClient):
         """Test liveness probe endpoint."""
         response = await client.get("/health/live")

@@ -3,17 +3,21 @@ Machine management endpoints
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from pydantic import BaseModel, validator
+from sqlalchemy import select, and_, func
+from pydantic import BaseModel, field_validator, ConfigDict
 import structlog
-import re
+from datetime import datetime
+from app.core.validators import NetworkValidators, StringValidators
+from app.core.serializers import ModelSerializer, DateTimeSerializer
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_operator, log_user_activity
 from app.models.user import User
 from app.models.machine import Machine, MachineStatus, BootMode
+from app.models.target import Target
+from app.models.session import Session, SessionStatus
 from app.models.audit import AuditAction
 from app.core.exceptions import ValidationError, NotFoundError, ConflictError
 
@@ -36,13 +40,12 @@ class MachineResponse(BaseModel):
     location: Optional[str]
     room: Optional[str]
     asset_tag: Optional[str]
-    created_at: str
-    last_seen: Optional[str]
-    last_boot: Optional[str]
+    created_at: datetime
+    last_seen: Optional[datetime]
+    last_boot: Optional[datetime]
     boot_count: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MachineCreate(BaseModel):
@@ -57,33 +60,61 @@ class MachineCreate(BaseModel):
     room: Optional[str] = None
     asset_tag: Optional[str] = None
     
-    @validator('mac_address')
+    @field_validator('mac_address')
+    @classmethod
     def validate_mac_address(cls, v):
+        if not v:
+            raise ValueError('MAC address cannot be empty')
+            
         # Remove common separators and convert to standard format
+        import re
         mac = re.sub(r'[:-]', '', v.upper())
         
         # Validate MAC address format
         if not re.match(r'^[0-9A-F]{12}$', mac):
-            raise ValueError('Invalid MAC address format')
+            raise ValueError('Invalid MAC address format. Expected 12 hexadecimal characters')
         
         # Convert to standard format with colons
         return ':'.join(mac[i:i+2] for i in range(0, 12, 2))
     
-    @validator('ip_address')
+    @field_validator('ip_address')
+    @classmethod
     def validate_ip_address(cls, v):
         if v is None:
             return v
-        
-        # Simple IP validation
-        parts = v.split('.')
-        if len(parts) != 4:
+            
+        try:
+            # Use ipaddress module for proper validation
+            import ipaddress
+            ipaddress.ip_address(v)
+            return v
+        except ValueError:
             raise ValueError('Invalid IP address format')
+    
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Name cannot be empty')
         
-        for part in parts:
-            if not part.isdigit() or not 0 <= int(part) <= 255:
-                raise ValueError('Invalid IP address format')
+        if len(v.strip()) < 2:
+            raise ValueError('Name must be at least 2 characters long')
         
-        return v
+        if len(v.strip()) > 100:
+            raise ValueError('Name cannot exceed 100 characters')
+        
+        return v.strip()
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v):
+        if v is None:
+            return v
+        
+        if len(v) > 500:
+            raise ValueError('Description cannot exceed 500 characters')
+        
+        return v.strip() if v.strip() else None
 
 
 class MachineUpdate(BaseModel):
@@ -98,23 +129,22 @@ class MachineUpdate(BaseModel):
     room: Optional[str] = None
     asset_tag: Optional[str] = None
     
-    @validator('ip_address')
+    @field_validator('ip_address')
+    @classmethod
     def validate_ip_address(cls, v):
         if v is None:
             return v
-        
-        parts = v.split('.')
-        if len(parts) != 4:
+            
+        try:
+            # Use ipaddress module for proper validation
+            import ipaddress
+            ipaddress.ip_address(v)
+            return v
+        except ValueError:
             raise ValueError('Invalid IP address format')
-        
-        for part in parts:
-            if not part.isdigit() or not 0 <= int(part) <= 255:
-                raise ValueError('Invalid IP address format')
-        
-        return v
 
 
-@router.post("", response_model=MachineResponse)
+@router.post("", response_model=MachineResponse, status_code=201)
 async def create_machine(
     machine_data: MachineCreate,
     request: Request,
@@ -176,20 +206,22 @@ async def create_machine(
         user_id=current_user.id
     )
     
-    return machine
+    return ModelSerializer.serialize_model(machine, MachineResponse)
 
 
 @router.get("", response_model=List[MachineResponse])
 async def list_machines(
-    skip: int = 0,
-    limit: int = 100,
+    request: Request,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     status: Optional[MachineStatus] = None,
     location: Optional[str] = None,
     room: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all machines"""
+    """List all machines with filtering and search"""
     
     # Build query
     query = select(Machine)
@@ -203,6 +235,17 @@ async def list_machines(
     if room:
         filters.append(Machine.room == room)
     
+    # Add search functionality
+    if search:
+        search_filters = [
+            Machine.name.ilike(f"%{search}%"),
+            Machine.mac_address.ilike(f"%{search}%"),
+            Machine.hostname.ilike(f"%{search}%"),
+            Machine.location.ilike(f"%{search}%"),
+            Machine.asset_tag.ilike(f"%{search}%")
+        ]
+        filters.append(and_(*search_filters))
+    
     if filters:
         query = query.where(and_(*filters))
     
@@ -213,7 +256,17 @@ async def list_machines(
     result = await db.execute(query)
     machines = result.scalars().all()
     
-    return machines
+    # Log activity
+    await log_user_activity(
+        action=AuditAction.MACHINE_UPDATED,  # Using closest available action
+        message=f"Listed {len(machines)} machines",
+        request=request,
+        user=current_user,
+        resource_type="machines",
+        db=db
+    )
+    
+    return ModelSerializer.serialize_model_list(machines, MachineResponse)
 
 
 @router.get("/{machine_id}", response_model=MachineResponse)
@@ -230,7 +283,7 @@ async def get_machine(
     if not machine:
         raise NotFoundError(f"Machine with ID {machine_id} not found")
     
-    return machine
+    return ModelSerializer.serialize_model(machine, MachineResponse)
 
 
 @router.put("/{machine_id}", response_model=MachineResponse)
@@ -349,7 +402,32 @@ async def delete_machine(
         raise NotFoundError(f"Machine with ID {machine_id} not found")
     
     # Check if machine has active sessions or targets
-    # TODO: Add checks for active sessions and targets
+    # Check for active sessions and targets
+    active_sessions_result = await db.execute(
+        select(Session).where(
+            Session.machine_id == machine_id,
+            Session.status.in_([SessionStatus.STARTING, SessionStatus.ACTIVE])
+        )
+    )
+    active_sessions = active_sessions_result.scalars().all()
+    
+    if active_sessions:
+        session_ids = [session.session_id for session in active_sessions]
+        raise ValidationError(
+            f"Cannot delete machine '{machine.name}' - it has active sessions: {', '.join(session_ids)}"
+        )
+    
+    # Check for targets associated with this machine
+    targets_result = await db.execute(
+        select(Target).where(Target.machine_id == machine_id)
+    )
+    targets = targets_result.scalars().all()
+    
+    if targets:
+        target_names = [target.name for target in targets]
+        raise ValidationError(
+            f"Cannot delete machine '{machine.name}' - it has associated targets: {', '.join(target_names)}"
+        )
     
     # Soft delete - set status to retired
     machine.status = MachineStatus.RETIRED

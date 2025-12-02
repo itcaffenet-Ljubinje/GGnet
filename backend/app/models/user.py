@@ -5,9 +5,9 @@ User model for authentication and authorization
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String, Text  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
+from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
 
@@ -76,6 +76,7 @@ class User(Base):
     # Relationships
     created_images = relationship("Image", back_populates="created_by_user", foreign_keys="Image.created_by")
     created_machines = relationship("Machine", back_populates="created_by_user", foreign_keys="Machine.created_by")
+    created_targets = relationship("Target", back_populates="creator")
     audit_logs = relationship("AuditLog", back_populates="user")
     
     def __repr__(self) -> str:

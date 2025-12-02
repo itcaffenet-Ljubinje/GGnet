@@ -3,19 +3,25 @@ GGnet Diskless Server - Main FastAPI Application
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-import structlog
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect  # pyright: ignore[reportMissingImports]
+from fastapi.middleware.cors import CORSMiddleware  # pyright: ignore[reportMissingImports]
+from fastapi.middleware.trustedhost import TrustedHostMiddleware  # pyright: ignore[reportMissingImports]
+from fastapi.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
+from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
+from starlette.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
+import structlog  # pyright: ignore[reportMissingImports]
 import time
 
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, targets, storage, health
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe
+from app.api import targets, sessions as sessions_api
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
+from app.middleware.metrics import MetricsMiddleware
+from app.core.logging_config import setup_logging
+from app.websocket.manager import WebSocketManager
 
 # Configure structured logging
 structlog.configure(
@@ -38,6 +44,27 @@ structlog.configure(
 logger = structlog.get_logger()
 
 
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    """Middleware to add cache control headers to responses"""
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Don't cache API responses by default
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        # Cache static endpoints
+        elif request.url.path.startswith("/health") or request.url.path.startswith("/metrics"):
+            response.headers["Cache-Control"] = "public, max-age=60"
+        # Cache images metadata
+        elif request.url.path.startswith("/images") and request.method == "GET":
+            response.headers["Cache-Control"] = "public, max-age=300"
+        
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
@@ -45,14 +72,25 @@ async def lifespan(app: FastAPI):
     logger.info("Starting GGnet Diskless Server")
     settings = get_settings()
     
+    # Setup logging
+    setup_logging()
+    logger.info("Logging configured")
+    
     # Initialize database
     await init_db()
     logger.info("Database initialized")
+    
+    # Initialize WebSocket manager
+    app.state.websocket_manager = WebSocketManager()
+    logger.info("WebSocket manager initialized")
     
     yield
     
     # Shutdown
     logger.info("Shutting down GGnet Diskless Server")
+    if hasattr(app.state, 'websocket_manager'):
+        await app.state.websocket_manager.disconnect_all()
+        logger.info("WebSocket connections closed")
 
 
 def create_app() -> FastAPI:
@@ -77,15 +115,26 @@ def create_app() -> FastAPI:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"] if settings.DEBUG else [],
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",  # Vite default port
+            "http://127.0.0.1:5173"
+        ] if settings.DEBUG else [],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     
+    # Compression middleware (should be first to compress all responses)
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
+    
     # Custom middleware
+    app.add_middleware(CacheControlMiddleware)
     app.add_middleware(LoggingMiddleware)
+    app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     
     # Exception handlers
     @app.exception_handler(GGnetException)
@@ -126,12 +175,63 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(health.router, prefix="/health", tags=["health"])
+    app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/targets", tags=["targets"])
+    app.include_router(targets.router, prefix="/api/v1/targets", tags=["targets"])
+    app.include_router(sessions_api.router, prefix="/api/v1/sessions", tags=["sessions"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
+    app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
+    app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
+    app.include_router(hardware.router, tags=["hardware"])
+    app.include_router(winpe.router, tags=["winpe"])
+    app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
+    
+    # WebSocket endpoint
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time updates"""
+        await websocket.accept()
+        
+        connection_id = None
+        try:
+            # Get token from query parameters
+            token = websocket.query_params.get("token")
+            
+            # Connect to WebSocket manager
+            connection_id = await app.state.websocket_manager.connect(websocket, token)
+            
+            # Keep connection alive and handle messages
+            while True:
+                try:
+                    # Wait for messages from client
+                    data = await websocket.receive_text()
+                    
+                    # Process message through manager
+                    try:
+                        import json
+                        message = json.loads(data)
+                        await app.state.websocket_manager.handle_client_message(connection_id, message)
+                    except json.JSONDecodeError:
+                        logger.warning("Invalid JSON received", connection_id=connection_id, data=data)
+                        
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.error(f"WebSocket error: {e}")
+                    break
+                    
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {e}")
+        finally:
+            # Clean up connection
+            if connection_id:
+                try:
+                    await app.state.websocket_manager.disconnect(connection_id)
+                except Exception as e:
+                    logger.error(f"WebSocket cleanup error: {e}")
     
     return app
 

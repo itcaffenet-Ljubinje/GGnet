@@ -1,87 +1,94 @@
 """
-Logging middleware for request/response tracking
+Enhanced logging middleware
 """
 
 import time
 import uuid
-from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 import structlog
+
+from app.core.logging_config import log_performance_event
 
 logger = structlog.get_logger()
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware for logging HTTP requests and responses"""
+    """Enhanced logging middleware with request tracking"""
     
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next):
         # Generate request ID
         request_id = str(uuid.uuid4())
         
         # Add request ID to request state
         request.state.request_id = request_id
         
-        # Get client info
-        client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
-        user_agent = request.headers.get("User-Agent", "unknown")
-        
-        # Start timing
+        # Record start time
         start_time = time.time()
         
-        # Log request
+        # Log request start
         logger.info(
             "HTTP request started",
             request_id=request_id,
             method=request.method,
-            url=str(request.url),
             path=request.url.path,
             query_params=dict(request.query_params),
-            client_ip=client_ip,
-            user_agent=user_agent,
-            headers={k: v for k, v in request.headers.items() if k.lower() not in ["authorization", "cookie"]}
+            client_ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent", ""),
+            content_length=request.headers.get("content-length", "0")
         )
         
         try:
             # Process request
             response = await call_next(request)
             
-            # Calculate response time
-            process_time = time.time() - start_time
+            # Calculate duration
+            duration = time.time() - start_time
+            duration_ms = round(duration * 1000, 2)
             
-            # Log response
+            # Log request completion
             logger.info(
                 "HTTP request completed",
                 request_id=request_id,
                 method=request.method,
                 path=request.url.path,
                 status_code=response.status_code,
-                process_time_ms=round(process_time * 1000, 2),
-                client_ip=client_ip
+                duration_ms=duration_ms,
+                response_size=response.headers.get("content-length", "0")
             )
             
-            # Add headers
+            # Log performance event for slow requests
+            if duration_ms > 1000:  # Log requests taking more than 1 second
+                log_performance_event(
+                    operation=f"{request.method} {request.url.path}",
+                    duration_ms=duration_ms,
+                    details={
+                        "request_id": request_id,
+                        "status_code": response.status_code,
+                        "client_ip": request.client.host if request.client else None
+                    }
+                )
+            
+            # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
-            response.headers["X-Process-Time"] = str(round(process_time * 1000, 2))
             
             return response
             
         except Exception as e:
-            # Calculate response time
-            process_time = time.time() - start_time
+            # Calculate duration for failed requests
+            duration = time.time() - start_time
+            duration_ms = round(duration * 1000, 2)
             
-            # Log error
+            # Log request error
             logger.error(
                 "HTTP request failed",
                 request_id=request_id,
                 method=request.method,
                 path=request.url.path,
+                duration_ms=duration_ms,
                 error=str(e),
-                process_time_ms=round(process_time * 1000, 2),
-                client_ip=client_ip,
                 exc_info=True
             )
             
             # Re-raise the exception
             raise
-

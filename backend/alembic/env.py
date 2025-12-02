@@ -3,7 +3,7 @@ Alembic environment configuration
 """
 
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool  # pyright: ignore[reportMissingImports]
 from alembic import context
 import os
 import sys

@@ -1,0 +1,6 @@
+# Safety configuration file
+# Skip specific vulnerabilities if they are false positives
+# Format: vulnerability_id:reason
+
+# Example:
+# 12345:This is a false positive because we don't use the vulnerable function

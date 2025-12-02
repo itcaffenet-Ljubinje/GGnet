@@ -1,0 +1,63 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Performance Optimizations
+; ============================================================================
+; Optimizes Windows for diskless/gaming environment
+; ============================================================================
+
+; Disable visual effects for better performance
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects]
+"VisualFXSetting"=dword:00000002
+
+; Disable animations
+[HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics]
+"MinAnimate"="0"
+
+[HKEY_CURRENT_USER\Control Panel\Desktop]
+"UserPreferencesMask"=hex:90,12,03,80,10,00,00,00
+
+; Disable Superfetch/Prefetch (not useful for diskless)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters]
+"EnableSuperfetch"=dword:00000000
+"EnablePrefetcher"=dword:00000000
+
+; Disable Windows Search Indexing (save iSCSI I/O)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WSearch]
+"Start"=dword:00000004
+
+; Disable Scheduled Defragmentation (iSCSI is already on server)
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout]
+"EnableAutoLayout"=dword:00000000
+
+; Disable System Sounds (minor speedup)
+[HKEY_CURRENT_USER\AppEvents\Schemes]
+@=".None"
+
+; Disable Sticky Keys, Filter Keys, Toggle Keys
+[HKEY_CURRENT_USER\Control Panel\Accessibility\StickyKeys]
+"Flags"="506"
+
+[HKEY_CURRENT_USER\Control Panel\Accessibility\Keyboard Response]
+"Flags"="122"
+
+[HKEY_CURRENT_USER\Control Panel\Accessibility\ToggleKeys]
+"Flags"="58"
+
+; Game Mode ON (for gaming centers)
+[HKEY_CURRENT_USER\Software\Microsoft\GameBar]
+"AutoGameModeEnabled"=dword:00000001
+"AllowAutoGameMode"=dword:00000001
+
+; Disable Background Apps
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications]
+"GlobalUserDisabled"=dword:00000001
+
+; High Performance Power Plan
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power]
+"CsEnabled"=dword:00000000
+
+; Disable Fast Startup (can cause issues with diskless)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power]
+"HiberbootEnabled"=dword:00000000
+

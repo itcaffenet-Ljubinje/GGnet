@@ -3,6 +3,7 @@ FastAPI dependencies for authentication and authorization
 """
 
 from typing import Optional
+from datetime import datetime
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +26,7 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
-    """Get current authenticated user"""
+    """Get current authenticated user with token refresh support"""
     
     if not credentials:
         logger.warning("No credentials provided", ip=request.client.host)
@@ -33,11 +34,17 @@ async def get_current_user(
     
     try:
         # Verify token
-        payload = verify_token(credentials.credentials, "access")
-        user_id: int = payload.get("sub")
+        payload = await verify_token(credentials.credentials, "access")
+        user_id_str = payload.get("sub")
         
-        if user_id is None:
+        if user_id_str is None:
             raise create_credentials_exception("Invalid token payload")
+        
+        # Convert user_id to integer (JWT stores it as string)
+        try:
+            user_id = int(user_id_str)
+        except (ValueError, TypeError):
+            raise create_credentials_exception("Invalid user ID in token")
         
         # Get user from database
         result = await db.execute(select(User).where(User.id == user_id))
@@ -51,7 +58,7 @@ async def get_current_user(
             logger.warning("Inactive user attempted access", user_id=user_id, ip=request.client.host)
             raise create_credentials_exception("Inactive user")
         
-        if user.is_locked:
+        if user.locked_until and user.locked_until > datetime.utcnow():
             logger.warning("Locked user attempted access", user_id=user_id, ip=request.client.host)
             raise create_credentials_exception("Account is locked")
         
@@ -61,7 +68,15 @@ async def get_current_user(
         
         return user
         
-    except HTTPException:
+    except HTTPException as e:
+        # Check if it's a token expiration error
+        if "expired" in str(e.detail).lower() or "invalid token" in str(e.detail).lower():
+            logger.warning("Token expired or invalid", ip=request.client.host)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired. Please refresh your token.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         raise
     except Exception as e:
         logger.error("Authentication failed", error=str(e), ip=request.client.host)
@@ -168,8 +183,11 @@ async def get_optional_user(
         return None
 
 
-def get_client_ip(request: Request) -> str:
+def get_client_ip(request: Optional[Request]) -> str:
     """Get client IP address from request"""
+    if request is None:
+        return "127.0.0.1"  # Default for test/system calls
+    
     # Check for forwarded headers first (reverse proxy)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -183,8 +201,10 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def get_user_agent(request: Request) -> str:
+def get_user_agent(request: Optional[Request]) -> str:
     """Get user agent from request"""
+    if request is None:
+        return "system"  # Default for test/system calls
     return request.headers.get("User-Agent", "unknown")
 
 
@@ -197,27 +217,81 @@ async def log_user_activity(
     resource_type: Optional[str] = None,
     resource_id: Optional[int] = None,
     resource_name: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = None
 ):
-    """Log user activity for audit purposes"""
+    """Log user activity for audit purposes
     
-    audit_log = AuditLog.create_log(
-        action=action,
-        message=message,
-        user_id=user.id if user else None,
-        username=user.username if user else None,
-        severity=severity,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        resource_name=resource_name,
-        ip_address=get_client_ip(request),
-        user_agent=get_user_agent(request),
-        endpoint=str(request.url.path),
-        http_method=request.method
-    )
+    If db session is provided, it will be used (and not committed).
+    If db session is not provided, a new session will be created and committed.
+    """
     
-    db.add(audit_log)
-    await db.commit()
+    try:
+        if db is not None:
+            # Use existing session without committing
+            await _log_audit_entry(
+                action, message, request, user, severity, 
+                resource_type, resource_id, resource_name, db, should_commit=False
+            )
+        else:
+            # Create a new session and commit
+            # Using async context manager directly instead of generator
+            from app.core.database import get_async_engine
+            from sqlalchemy.ext.asyncio import AsyncSession
+            
+            async_engine = get_async_engine()
+            async with AsyncSession(async_engine) as session:
+                async with session.begin():
+                    await _log_audit_entry(
+                        action, message, request, user, severity, 
+                        resource_type, resource_id, resource_name, session, should_commit=False
+                    )
+                    # Commit is handled by session.begin() context manager
+    except Exception as e:
+        # Don't let audit logging break the main flow
+        logger.error("Failed to log user activity", error=str(e), action=action)
+
+
+async def _log_audit_entry(
+    action: AuditAction,
+    message: str,
+    request: Request,
+    user: Optional[User],
+    severity: AuditSeverity,
+    resource_type: Optional[str],
+    resource_id: Optional[int],
+    resource_name: Optional[str],
+    db: AsyncSession,
+    should_commit: bool = False
+):
+    """Helper function to log audit entry"""
+    try:
+        audit_log = AuditLog.create_log(
+            action=action,
+            message=message,
+            user_id=user.id if user else None,
+            username=user.username if user else None,
+            severity=severity,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            resource_name=resource_name,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+            endpoint=str(request.url.path) if request else "system",
+            http_method=request.method if request else "SYSTEM"
+        )
+        
+        db.add(audit_log)
+        if should_commit:
+            await db.commit()
+            await db.refresh(audit_log)
+        else:
+            await db.flush()  # Flush but don't commit - parent will commit
+    except Exception as e:
+        logger.error("Failed to log audit entry", error=str(e))
+        if should_commit and db:
+            await db.rollback()
+        # Don't raise - logging should never break the main flow
+        pass
     
     logger.info(
         "User activity logged",

@@ -1,0 +1,55 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================================
+; GGnet Diskless System - Client Installation Settings
+; ============================================================================
+; Configures Windows for optimal diskless operation
+; ============================================================================
+
+; Disable Windows Update (critical for diskless - changes are volatile!)
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU]
+"NoAutoUpdate"=dword:00000001
+"AUOptions"=dword:00000001
+"NoAutoRebootWithLoggedOnUsers"=dword:00000001
+
+; Disable Windows Defender (performance)
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender]
+"DisableAntiSpyware"=dword:00000001
+"DisableAntiVirus"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableBehaviorMonitoring"=dword:00000001
+"DisableOnAccessProtection"=dword:00000001
+"DisableScanOnRealtimeEnable"=dword:00000001
+
+; Disable System Restore (no persistent storage)
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore]
+"DisableSR"=dword:00000001
+
+; Disable Hibernation (not useful for diskless)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power]
+"HibernateEnabled"=dword:00000000
+"HibernateEnabledDefault"=dword:00000000
+
+; Disable Page File (use RAM only or iSCSI)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management]
+"PagingFiles"=""
+
+; Disable Crash Dumps (save iSCSI bandwidth)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl]
+"CrashDumpEnabled"=dword:00000000
+"LogEvent"=dword:00000000
+"SendAlert"=dword:00000000
+
+; Fast Startup (Skip BIOS re-POST on reboot)
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power]
+"HiberbootEnabled"=dword:00000001
+
+; Disable Telemetry
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection]
+"AllowTelemetry"=dword:00000000
+
+; Disable Error Reporting
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting]
+"Disabled"=dword:00000001
+

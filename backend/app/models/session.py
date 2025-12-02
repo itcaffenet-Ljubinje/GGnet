@@ -5,9 +5,9 @@ Session model for tracking diskless boot sessions
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from sqlalchemy import BigInteger, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, JSON  # pyright: ignore[reportMissingImports]
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
+from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
 
@@ -45,14 +45,15 @@ class Session(Base):
     status: Mapped[SessionStatus] = mapped_column(
         SQLEnum(SessionStatus),
         default=SessionStatus.STARTING,
-        nullable=False
+        nullable=False,
+        index=True  # Index for status queries
     )
     
     # Relationships
-    machine_id: Mapped[int] = mapped_column(ForeignKey("machines.id"), nullable=False)
+    machine_id: Mapped[int] = mapped_column(ForeignKey("machines.id"), nullable=False, index=True)
     machine = relationship("Machine", back_populates="sessions")
     
-    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), nullable=False)
+    target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), nullable=False, index=True)
     target = relationship("Target", back_populates="sessions")
     
     # Network information
@@ -83,10 +84,11 @@ class Session(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False
+        nullable=False,
+        index=True  # Index for time-based queries
     )
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
     
     # Error handling
     error_message: Mapped[Optional[str]] = mapped_column(Text)
@@ -96,6 +98,10 @@ class Session(Base):
     # Configuration snapshot (JSON)
     boot_config: Mapped[Optional[dict]] = mapped_column(JSON)
     environment_vars: Mapped[Optional[dict]] = mapped_column(JSON)
+    
+    # iSCSI target information
+    target_iqn: Mapped[Optional[str]] = mapped_column(String(255))
+    target_portal: Mapped[Optional[str]] = mapped_column(String(255))
     
     # User context
     initiated_by: Mapped[Optional[str]] = mapped_column(String(100))  # username or system
