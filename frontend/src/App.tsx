@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'

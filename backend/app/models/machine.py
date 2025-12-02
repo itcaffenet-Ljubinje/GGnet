@@ -64,10 +64,11 @@ class Machine(Base):
     status: Mapped[MachineStatus] = mapped_column(
         SQLEnum(MachineStatus),
         default=MachineStatus.ACTIVE,
-        nullable=False
+        nullable=False,
+        index=True  # Index for status queries
     )
-    is_online: Mapped[bool] = mapped_column(Boolean, default=False)
-    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
     last_boot: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     
     # Location and organization
