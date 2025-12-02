@@ -3,16 +3,16 @@
  * Page for system monitoring and performance metrics
  */
 
-import { Suspense, lazy } from 'react';
+import { lazy, Suspense } from 'react';
 const SystemMonitor = lazy(() => import('../components/SystemMonitor'));
 
 const SystemMonitorPage: React.FC = () => {
   return (
-    <Suspense fallback={<div className="h-[200px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />}> 
-      <div>
+    <div>
+      <Suspense fallback={<div className="h-64 rounded-md bg-gray-100 dark:bg-gray-800 animate-pulse" /> }>
         <SystemMonitor />
-      </div>
-    </Suspense>
+      </Suspense>
+    </div>
   );
 };
 

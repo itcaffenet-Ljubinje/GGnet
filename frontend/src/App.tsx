@@ -1,13 +1,11 @@
-import { lazy, Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { NotificationProvider } from './components/notifications'
-import { LoadingSpinner } from './components/LoadingSpinner'
 
-// Lazy-load routes to reduce initial bundle size
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const ImagesPage = lazy(() => import('./pages/ImagesPage'))
@@ -27,11 +25,13 @@ function App() {
   return (
     <NotificationProvider>
       <ErrorBoundary>
-        <Suspense fallback={<div className="py-10 flex justify-center"><LoadingSpinner /></div>}>
-          {!isAuthenticated ? (
+        {!isAuthenticated ? (
+          <Suspense fallback={<div className="p-4 text-gray-500">Loading...</div>}>
             <LoginPage />
-          ) : (
-            <Layout>
+          </Suspense>
+        ) : (
+          <Layout>
+            <Suspense fallback={<div className="p-4 text-gray-500">Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
@@ -46,9 +46,9 @@ function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </Layout>
-          )}
-        </Suspense>
+            </Suspense>
+          </Layout>
+        )}
       </ErrorBoundary>
     </NotificationProvider>
   )

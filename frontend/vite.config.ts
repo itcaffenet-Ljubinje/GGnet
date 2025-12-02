@@ -4,23 +4,21 @@ import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
-import viteCompression from 'vite-plugin-compression'
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   plugins: [
     react(),
-    splitVendorChunkPlugin(),
-    // Precompress static assets for optimal delivery via nginx gzip_static
-    viteCompression({ algorithm: 'gzip', ext: '.gz', deleteOriginFile: false, threshold: 1024 }),
-    ...(process.env.ANALYZE ? [
-      visualizer({
-        filename: 'bundle-stats.html',
-        open: true,
-        gzipSize: true,
-        brotliSize: true,
-        template: 'treemap'
-      })
-    ] : [])
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: 'stats.html',
+            template: 'treemap',
+            gzipSize: true,
+            brotliSize: true,
+            open: false,
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: {
@@ -28,28 +26,21 @@ export default defineConfig(({ mode }) => ({
     }
   },
   build: {
-    target: 'es2019',
-    cssCodeSplit: true,
     sourcemap: false,
-    chunkSizeWarningLimit: 700,
+    cssCodeSplit: true,
+    reportCompressedSize: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          react: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          query: ['@tanstack/react-query'],
+          react: ['react', 'react-dom', 'react-router-dom'],
           charts: ['recharts'],
-          icons: ['lucide-react']
-        }
-      }
+          icons: ['lucide-react'],
+        },
+      },
     },
-    // Drop debug statements in production bundles
-    minify: 'esbuild',
-    // Configure esbuild to drop console/debugger in production
-    esbuild: {
-      drop: ['console', 'debugger']
-    },
-    assetsInlineLimit: 4096
+  },
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
   },
   server: {
     port: 3000,

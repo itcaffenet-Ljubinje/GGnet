@@ -8,8 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware  # pyright: ignore[reportMiss
 from fastapi.middleware.trustedhost import TrustedHostMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
 from fastapi.responses import JSONResponse  # pyright: ignore[reportMissingImports]
-from starlette.middleware.base import BaseHTTPMiddleware  # pyright: ignore[reportMissingImports]
-from starlette.responses import Response  # pyright: ignore[reportMissingImports]
+from starlette.middleware.gzip import GZipMiddleware  # pyright: ignore[reportMissingImports]
 import structlog  # pyright: ignore[reportMissingImports]
 import time
 
@@ -135,6 +134,7 @@ def create_app() -> FastAPI:
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     
     # Exception handlers
     @app.exception_handler(GGnetException)
