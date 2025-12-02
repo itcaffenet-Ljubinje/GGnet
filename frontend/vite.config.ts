@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, splitVendorChunkPlugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
@@ -9,86 +9,47 @@ import viteCompression from 'vite-plugin-compression'
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
-    // Gzip compression for production builds
-    viteCompression({
-      algorithm: 'gzip',
-      ext: '.gz',
-      threshold: 10240, // Only compress files larger than 10kb
-      deleteOriginFile: false
-    }),
-    // Brotli compression for production builds (better compression than gzip)
-    viteCompression({
-      algorithm: 'brotliCompress',
-      ext: '.br',
-      threshold: 10240,
-      deleteOriginFile: false
-    }),
-    // Bundle analyzer (only in analyze mode)
-    mode === 'analyze' && visualizer({
-      open: true,
-      filename: 'dist/stats.html',
-      gzipSize: true,
-      brotliSize: true,
-    })
-  ].filter(Boolean),
+    splitVendorChunkPlugin(),
+    // Precompress static assets for optimal delivery via nginx gzip_static
+    viteCompression({ algorithm: 'gzip', ext: '.gz', deleteOriginFile: false, threshold: 1024 }),
+    ...(process.env.ANALYZE ? [
+      visualizer({
+        filename: 'bundle-stats.html',
+        open: true,
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap'
+      })
+    ] : [])
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
   },
   build: {
-    // Enable minification
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console logs in production
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug']
-      }
-    },
-    // Optimize chunk splitting
+    target: 'es2019',
+    cssCodeSplit: true,
+    sourcemap: false,
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
         manualChunks: {
-          // Vendor chunks for better caching
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'clsx', 'react-hot-toast'],
-          'query-vendor': ['@tanstack/react-query', 'axios'],
-          'form-vendor': ['react-hook-form', 'react-dropzone'],
-          'chart-vendor': ['recharts'],
-          'state-vendor': ['zustand']
-        },
-        // Optimize chunk file names for better caching
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId ? chunkInfo.facadeModuleId.split('/').slice(-1)[0] : 'chunk';
-          return `assets/js/[name]-[hash].js`;
-        },
-        entryFileNames: 'assets/js/[name]-[hash].js',
-        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]'
+          react: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          query: ['@tanstack/react-query'],
+          charts: ['recharts'],
+          icons: ['lucide-react']
+        }
       }
     },
-    // Increase chunk size warning limit for better optimization
-    chunkSizeWarningLimit: 1000,
-    // Enable source maps for production debugging (optional, remove if not needed)
-    sourcemap: false,
-    // Target modern browsers for smaller bundles
-    target: 'es2020',
-    // Enable CSS code splitting
-    cssCodeSplit: true,
-    // Optimize assets
-    assetsInlineLimit: 4096, // inline assets smaller than 4kb
-  },
-  // Optimize dependencies
-  optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      '@tanstack/react-query',
-      'axios',
-      'zustand'
-    ],
-    exclude: ['recharts'] // Don't pre-bundle recharts, let it be lazy loaded
+    // Drop debug statements in production bundles
+    minify: 'esbuild',
+    // Configure esbuild to drop console/debugger in production
+    esbuild: {
+      drop: ['console', 'debugger']
+    },
+    assetsInlineLimit: 4096
   },
   server: {
     port: 3000,
