@@ -34,7 +34,7 @@ slowapi==0.1.9
 
 # File handling
 python-magic==0.4.27
-pillow==10.1.0
+pillow==10.3.0
 
 # Utilities
 click==8.1.7
