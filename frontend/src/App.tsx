@@ -1,12 +1,14 @@
-import { Suspense, lazy } from 'react'
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { NotificationProvider } from './components/notifications'
+import LoginPage from './pages/LoginPage'
+import { LoadingSpinner } from './components/LoadingSpinner'
 
-const LoginPage = lazy(() => import('./pages/LoginPage'))
+// Lazy load all non-critical pages
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const ImagesPage = lazy(() => import('./pages/ImagesPage'))
 const MachinesPage = lazy(() => import('./pages/MachinesPage'))
@@ -31,7 +33,7 @@ function App() {
           </Suspense>
         ) : (
           <Layout>
-            <Suspense fallback={<div className="p-4 text-gray-500">Loading...</div>}>
+            <Suspense fallback={<LoadingSpinner />}>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
@@ -55,4 +57,3 @@ function App() {
 }
 
 export default App
-

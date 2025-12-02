@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import App from './App.tsx'
 import './index.css'
-import { initPerformanceMonitoring } from './utils/performance'
+import { registerServiceWorker } from './utils/serviceWorker'
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -21,8 +21,10 @@ const queryClient = new QueryClient({
 // Add dark class to HTML element for proper dark mode
 document.documentElement.classList.add('dark')
 
-// Initialize performance monitoring
-initPerformanceMonitoring()
+// Register service worker for offline support and caching
+if (process.env.NODE_ENV === 'production') {
+  registerServiceWorker()
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
