@@ -339,6 +339,8 @@ jobs:
           DATABASE_URL: "postgresql+asyncpg://ggnet:test_password@localhost:5432/ggnet"
           REDIS_URL: "redis://localhost:6379"
           SECRET_KEY: "test-secret-key-for-ci"
+        # Playwright's webServer will start both frontend and backend servers
+        # The backend will stay running for the duration of the E2E tests
         run: npm run test:e2e
       
       - name: Upload E2E test results

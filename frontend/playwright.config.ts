@@ -61,7 +61,9 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'npm run dev',
+      // In CI, use preview mode to serve the built frontend (on port 3000)
+      // In local development, use dev mode
+      command: process.env.CI ? 'npm run preview -- --port 3000' : 'npm run dev',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
@@ -71,8 +73,12 @@ export default defineConfig({
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      // The backend server will stay running for the duration of all E2E tests
       env: {
-        DATABASE_URL: 'sqlite:///./test.db',
+        // Use CI environment variables if available, otherwise fallback to SQLite for local development
+        DATABASE_URL: process.env.DATABASE_URL || 'sqlite:///./test.db',
+        REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+        SECRET_KEY: process.env.SECRET_KEY || 'test-secret-key',
       },
     },
   ],
