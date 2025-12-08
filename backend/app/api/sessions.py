@@ -139,8 +139,7 @@ async def start_session(
         # 3. Check if machine already has an active session
         active_session_result = await db.execute(
             select(Session).where(
-                Session.machine_id == session_data.machine_id,
-                Session.status == SessionStatus.ACTIVE
+                (Session.machine_id == session_data.machine_id) & (Session.status == SessionStatus.ACTIVE)
             )
         )
         if active_session_result.scalar_one_or_none():
@@ -612,8 +611,7 @@ async def get_machine_boot_script(
         # Get active session for machine
         session_result = await db.execute(
             select(Session).where(
-                Session.machine_id == machine_id,
-                Session.status == SessionStatus.ACTIVE
+                (Session.machine_id == machine_id) & (Session.status == SessionStatus.ACTIVE)
             )
         )
         session = session_result.scalar_one_or_none()
@@ -678,8 +676,7 @@ async def get_active_session_for_machine(
     
     result = await db.execute(
         select(Session).where(
-            Session.machine_id == machine_id,
-            Session.status == SessionStatus.ACTIVE
+            (Session.machine_id == machine_id) & (Session.status == SessionStatus.ACTIVE)
         )
     )
     session = result.scalar_one_or_none()
