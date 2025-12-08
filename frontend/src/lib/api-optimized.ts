@@ -191,12 +191,12 @@ function createOptimizedRequest<T>(
     // Check if request is already pending
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
-      return pending;
+      return pending as Promise<T>;
     }
     
     // Create new request and store as pending
     const request = api.request<T>(requestConfig).then(response => response.data);
-    pendingRequests.set(cacheKey, request);
+    pendingRequests.set(cacheKey, request as Promise<unknown>);
     
     // Clean up pending request after completion
     request.finally(() => {
