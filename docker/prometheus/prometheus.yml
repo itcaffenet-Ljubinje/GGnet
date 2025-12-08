@@ -7,11 +7,16 @@ global:
     cluster: 'ggnet'
     environment: 'production'
 
-# Alertmanager configuration (optional)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets: ['alertmanager:9093']
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - 'alertmanager:9093'  # Uncomment when Alertmanager is added
+
+# Load alerting rules
+rule_files:
+  - '/etc/prometheus/alerts.yml'
 
 # Scrape configurations
 scrape_configs:

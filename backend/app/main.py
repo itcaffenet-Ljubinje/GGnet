@@ -15,7 +15,7 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe, zfs, writebacks, snapshots, scheduler, activities, batch_operations, vms, clients, image_import_export, network_boot, preflight, hardware_detection, windows_registry, ipxe_binaries, vnc_console
 from app.api import targets, sessions as sessions_api
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -191,12 +191,28 @@ def create_app() -> FastAPI:
     
     # Storage and infrastructure
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
+    app.include_router(zfs.router, prefix="/zfs", tags=["zfs"])
+    app.include_router(writebacks.router, prefix="/v1", tags=["writebacks"])
+    app.include_router(snapshots.router, prefix="/v1", tags=["snapshots"])
+    app.include_router(scheduler.router, prefix="/v1", tags=["scheduler"])
+    app.include_router(activities.router, prefix="/v1", tags=["activities"])
+    app.include_router(batch_operations.router, prefix="/v1", tags=["batch-operations"])
+    app.include_router(vms.router, prefix="/v1", tags=["vms"])
+    app.include_router(clients.router, prefix="/v1", tags=["clients"])
+    app.include_router(image_import_export.router, prefix="/v1", tags=["image-import-export"])
+    app.include_router(network_boot.monitoring_router, prefix="/v1", tags=["network-boot-monitoring"])
+    app.include_router(network_boot.network_boot_router, prefix="/v1", tags=["network-boot"])
     app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
     app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
     
     # Hardware and boot
     app.include_router(hardware.router, tags=["hardware"])
     app.include_router(winpe.router, tags=["winpe"])
+    app.include_router(preflight.router, prefix="/preflight", tags=["preflight"])
+    app.include_router(hardware_detection.router, prefix="/v1", tags=["hardware-detection"])
+    app.include_router(windows_registry.router, prefix="/v1", tags=["windows-registry"])
+    app.include_router(ipxe_binaries.router, prefix="/v1", tags=["ipxe-binaries"])
+    app.include_router(vnc_console.router, prefix="/v1", tags=["vnc-console"])
     
     # WebSocket endpoint
     @app.websocket("/ws")

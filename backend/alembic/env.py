@@ -15,7 +15,11 @@ from app.core.database import Base
 from app.core.config import get_settings
 
 # Import all models to ensure they are registered with SQLAlchemy
-from app.models import user, image, machine, target, session, audit
+from app.models import (
+    user, image, machine, target, session, audit,
+    writeback, snapshot, scheduled_job, batch_operation,
+    vm, client, boot_event
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

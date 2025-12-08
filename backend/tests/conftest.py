@@ -2,7 +2,6 @@
 Pytest fixtures for testing FastAPI app with async support
 """
 
-import asyncio
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
@@ -14,8 +13,12 @@ from app.core.database import Base, get_db
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash, create_access_token
 
-# Import all models to ensure they are registered
-from app.models import user, image, machine, target, session, audit
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models import (
+    user, image, machine, target, session, audit,
+    writeback, snapshot, scheduled_job, batch_operation,
+    vm, client, boot_event
+)
 
 import os
 

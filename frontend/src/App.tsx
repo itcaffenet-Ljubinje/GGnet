@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -19,6 +18,14 @@ const SystemMonitorPage = lazy(() => import('./pages/SystemMonitorPage'))
 const ArrayConfigurationPage = lazy(() => import('./pages/ArrayConfigurationPage'))
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const ActivitiesPage = lazy(() => import('./pages/ActivitiesPage'))
+const SnapshotsPage = lazy(() => import('./pages/SnapshotsPage'))
+const SchedulerPage = lazy(() => import('./pages/SchedulerPage'))
+const VMsPage = lazy(() => import('./pages/VMsPage'))
+const ClientsPage = lazy(() => import('./pages/ClientsPage'))
+const BatchOperationsPage = lazy(() => import('./pages/BatchOperationsPage'))
+const WritebacksPage = lazy(() => import('./pages/WritebacksPage'))
+const ImageImportExportPage = lazy(() => import('./pages/ImageImportExportPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 function App() {
@@ -45,6 +52,14 @@ function App() {
                 <Route path="/system-monitor" element={<SystemMonitorPage />} />
                 <Route path="/storage" element={<ArrayConfigurationPage />} />
                 <Route path="/monitoring" element={<MonitoringPage />} />
+                <Route path="/activities" element={<ActivitiesPage />} />
+                <Route path="/snapshots" element={<SnapshotsPage />} />
+                <Route path="/scheduler" element={<SchedulerPage />} />
+                <Route path="/vms" element={<VMsPage />} />
+                <Route path="/clients" element={<ClientsPage />} />
+                <Route path="/batch-operations" element={<BatchOperationsPage />} />
+                <Route path="/writebacks" element={<WritebacksPage />} />
+                <Route path="/image-import-export" element={<ImageImportExportPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

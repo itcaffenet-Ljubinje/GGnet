@@ -105,8 +105,19 @@ python3 backend/scripts/preflight.py
 ### **4. Create Admin User**
 
 ```bash
+# Using the unified admin script (recommended)
+# From project root:
+python backend/scripts/create_admin.py
+
+# Or from backend directory:
 cd backend
-python3 create_admin.py
+python scripts/create_admin.py
+
+# With custom credentials
+python backend/scripts/create_admin.py --username myadmin --password mypass123
+
+# Update existing admin password
+python backend/scripts/create_admin.py --update
 ```
 
 ### **5. Boot Your First Client**

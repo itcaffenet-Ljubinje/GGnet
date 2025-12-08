@@ -114,6 +114,10 @@ class Machine(Base):
     # Relationships
     targets = relationship("Target", back_populates="machine")
     sessions = relationship("Session", back_populates="machine")
+    writebacks = relationship("Writeback", back_populates="machine", cascade="all, delete-orphan")
+    snapshots = relationship("Snapshot", back_populates="machine", cascade="all, delete-orphan")
+    clients = relationship("Client", back_populates="machine", cascade="all, delete-orphan")
+    boot_events = relationship("BootEvent", back_populates="machine", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Machine(id={self.id}, name='{self.name}', mac='{self.mac_address}', status='{self.status}')>"
