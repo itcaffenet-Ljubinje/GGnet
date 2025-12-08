@@ -27,8 +27,9 @@ test.describe('Login Flow', () => {
     
     // Check default credentials hint is displayed
     await expect(page.locator('text=Default credentials')).toBeVisible();
-    await expect(page.locator('text=admin')).toBeVisible();
-    await expect(page.locator('text=admin123')).toBeVisible();
+    // Use more specific selectors to avoid strict mode violations
+    await expect(page.locator('code').filter({ hasText: 'admin' }).first()).toBeVisible();
+    await expect(page.locator('code').filter({ hasText: 'admin123' })).toBeVisible();
   });
 
   test('should show validation errors for empty fields', async ({ page }) => {
@@ -50,12 +51,12 @@ test.describe('Login Flow', () => {
     // Submit form
     await page.locator('button[type="submit"]').click();
     
-    // Wait for error message
-    await page.waitForTimeout(2000);
+    // Wait for error message - error is displayed in a div with class text-red-300
+    await expect(page.locator('.text-red-300')).toBeVisible({ timeout: 5000 });
     
-    // Check for error message (adjust selector based on actual error display)
+    // Check for error message text
     const errorMessage = page.locator('text=/invalid|error|failed/i');
-    await expect(errorMessage.first()).toBeVisible({ timeout: 5000 });
+    await expect(errorMessage.first()).toBeVisible({ timeout: 1000 });
   });
 
   test('should successfully login with valid credentials', async ({ page }) => {
@@ -79,11 +80,6 @@ test.describe('Login Flow', () => {
 
   test('should toggle password visibility', async ({ page }) => {
     const passwordInput = page.locator('input[name="password"]');
-    const toggleButton = page.locator('button').filter({ hasText: /eye|show|hide/i }).or(
-      page.locator('[aria-label*="password"]').or(
-        page.locator('svg').near(passwordInput)
-      )
-    );
     
     // Fill password
     await passwordInput.fill('testpassword');
@@ -91,13 +87,25 @@ test.describe('Login Flow', () => {
     // Check initial state (password should be hidden)
     await expect(passwordInput).toHaveAttribute('type', 'password');
     
-    // Click toggle if button exists
-    if (await toggleButton.count() > 0) {
-      await toggleButton.first().click();
-      
-      // Check password is now visible
-      await expect(passwordInput).toHaveAttribute('type', 'text');
-    }
+    // Find the toggle button - it's a button with type="button" that contains an Eye icon
+    // The button is positioned absolutely within the password input's parent div
+    // Use CSS selector to find button in the same parent as password input
+    const toggleButton = page.locator('.relative button[type="button"]');
+    
+    // Verify button exists and is visible
+    await expect(toggleButton).toBeVisible();
+    
+    // Click toggle button
+    await toggleButton.click();
+    
+    // Check password is now visible
+    await expect(passwordInput).toHaveAttribute('type', 'text');
+    
+    // Click again to hide
+    await toggleButton.click();
+    
+    // Check password is hidden again
+    await expect(passwordInput).toHaveAttribute('type', 'password');
   });
 
   test('should disable submit button during login', async ({ page }) => {

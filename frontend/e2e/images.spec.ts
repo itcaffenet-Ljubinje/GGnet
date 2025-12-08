@@ -14,38 +14,55 @@ test.describe('Images Page', () => {
   test.beforeEach(async ({ page }) => {
     // Login first
     await page.goto('/');
+    
+    // Wait for login form
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+    
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
     await page.locator('button[type="submit"]').click();
     
-    // Wait for dashboard
-    await page.waitForTimeout(2000);
+    // Wait for navigation to dashboard
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
     
     // Navigate to images page
     await page.goto('/images');
-    await page.waitForTimeout(1000);
+    
+    // Wait for images page to load
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display images page', async ({ page }) => {
     // Check URL
-    expect(page.url()).toContain('/images');
+    await expect(page).toHaveURL(/\/images/);
     
-    // Look for images page elements
-    const pageTitle = page.locator('text=/images|disk.*images/i');
-    await expect(pageTitle.first()).toBeVisible({ timeout: 5000 });
+    // Wait for page content to load - check that login form is not visible
+    await expect(page.locator('input[name="username"]')).not.toBeVisible();
+    
+    // Look for images page elements - check for navigation menu item or page heading
+    // The page might show "Images" in navigation or as a heading
+    const pageContent = page.locator('text=/images/i').or(
+      page.locator('h1, h2, h3').filter({ hasText: /images/i })
+    );
+    
+    // At least one element with "images" should be visible
+    await expect(pageContent.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should show images list', async ({ page }) => {
-    // Look for images table or list
-    const imagesList = page.locator('table, [role="table"], [data-testid="images-list"]').or(
-      page.locator('text=/image|vhd|vhdx/i')
-    );
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Should show some images content (even if empty)
-    await expect(imagesList.first()).toBeVisible({ timeout: 5000 }).catch(() => {
-      // If no images, should show empty state
-      return expect(page.locator('text=/no images|empty/i')).toBeVisible();
-    });
+    // Look for images table, list, or any content indicating the page loaded
+    // Check for common patterns: table, list, or empty state message
+    const hasContent = await Promise.race([
+      page.locator('table').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+      page.locator('text=/no.*images|empty|no data/i').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+      page.locator('[data-testid*="image"]').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+    ]);
+    
+    // Page should have loaded some content (table, empty state, or images)
+    expect(hasContent).toBeTruthy();
   });
 
   test('should allow uploading an image', async ({ page }) => {

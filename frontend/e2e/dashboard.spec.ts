@@ -13,27 +13,30 @@ test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     // Login first
     await page.goto('/');
+    
+    // Wait for login form
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+    
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
     await page.locator('button[type="submit"]').click();
     
-    // Wait for dashboard to load
-    await page.waitForTimeout(2000);
+    // Wait for navigation to dashboard (App.tsx redirects to /dashboard)
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+    
+    // Wait for dashboard content to load
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display dashboard after login', async ({ page }) => {
-    // Check that we're on dashboard or home page
-    const url = page.url();
-    expect(url).toMatch(/\/dashboard|\/$/);
-    
-    // Check for dashboard elements (adjust selectors based on actual dashboard)
-    // Look for common dashboard elements
-    page.locator('text=/dashboard|overview|statistics/i').or(
-      page.locator('[data-testid="dashboard"]')
-    );
+    // Check that we're on dashboard page
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Dashboard should be visible (or at least not showing login)
     await expect(page.locator('input[name="username"]')).not.toBeVisible();
+    
+    // Check that we're not on login page
+    expect(page.url()).not.toContain('/login');
   });
 
   test('should have navigation menu', async ({ page }) => {
