@@ -24,9 +24,24 @@ export const createMockUser = (overrides?: Partial<User>): User => ({
 })
 
 /**
+ * Mock Machine interface
+ */
+interface MockMachine {
+  id: number
+  name: string
+  hostname: string
+  ip_address: string
+  mac_address: string
+  status: string
+  boot_mode: string
+  created_at: string
+  [key: string]: unknown
+}
+
+/**
  * Create a mock machine
  */
-export const createMockMachine = (overrides?: Partial<any>) => ({
+export const createMockMachine = (overrides?: Partial<MockMachine>): MockMachine => ({
   id: 1,
   name: 'Test Machine',
   hostname: 'test-machine.local',
@@ -39,9 +54,23 @@ export const createMockMachine = (overrides?: Partial<any>) => ({
 })
 
 /**
+ * Mock Image interface
+ */
+interface MockImage {
+  id: number
+  name: string
+  filename: string
+  format: string
+  status: string
+  size_bytes: number
+  created_at: string
+  [key: string]: unknown
+}
+
+/**
  * Create a mock image
  */
-export const createMockImage = (overrides?: Partial<any>) => ({
+export const createMockImage = (overrides?: Partial<MockImage>): MockImage => ({
   id: 1,
   name: 'Test Image',
   filename: 'test.vhdx',
@@ -53,9 +82,23 @@ export const createMockImage = (overrides?: Partial<any>) => ({
 })
 
 /**
+ * Mock Session interface
+ */
+interface MockSession {
+  id: number
+  session_id: string
+  machine_id: number
+  target_id: number
+  session_type: string
+  status: string
+  started_at: string
+  [key: string]: unknown
+}
+
+/**
  * Create a mock session
  */
-export const createMockSession = (overrides?: Partial<any>) => ({
+export const createMockSession = (overrides?: Partial<MockSession>): MockSession => ({
   id: 1,
   session_id: 'test-session-1',
   machine_id: 1,
@@ -67,9 +110,23 @@ export const createMockSession = (overrides?: Partial<any>) => ({
 })
 
 /**
+ * Mock Target interface
+ */
+interface MockTarget {
+  id: number
+  target_id: string
+  iqn: string
+  machine_id: number
+  image_id: number
+  status: string
+  created_at: string
+  [key: string]: unknown
+}
+
+/**
  * Create a mock target
  */
-export const createMockTarget = (overrides?: Partial<any>) => ({
+export const createMockTarget = (overrides?: Partial<MockTarget>): MockTarget => ({
   id: 1,
   target_id: 'test-target-1',
   iqn: 'iqn.2024.test:target-1',

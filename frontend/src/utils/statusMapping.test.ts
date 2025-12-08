@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+// Vitest globals are available via globals: true in vitest.config.ts
 import { mapBackendToFrontendStatus, getStatusText, type BackendStatus } from './statusMapping'
 
 describe('statusMapping', () => {

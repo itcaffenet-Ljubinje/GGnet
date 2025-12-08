@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '../../__tests__/setup/test-utils'
+// Vitest globals are available via globals: true in vitest.config.ts
+import { render } from '../../__tests__/setup/test-utils'
 import userEvent from '@testing-library/user-event'
 import { Button } from './Button'
 
@@ -24,7 +24,7 @@ describe('Button', () => {
     })
 
     it('should render button with left icon', () => {
-      const { container } = render(
+      render(
         <Button leftIcon={<span data-testid="left-icon">←</span>}>Button</Button>
       )
       
@@ -32,7 +32,7 @@ describe('Button', () => {
     })
 
     it('should render button with right icon', () => {
-      const { container } = render(
+      render(
         <Button rightIcon={<span data-testid="right-icon">→</span>}>Button</Button>
       )
       

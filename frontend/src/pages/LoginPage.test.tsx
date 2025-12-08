@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '../__tests__/setup/test-utils'
+// Vitest globals are available via globals: true in vitest.config.ts
+import { render, waitFor } from '../__tests__/setup/test-utils'
 import userEvent from '@testing-library/user-event'
 import LoginPage from './LoginPage'
 import { useAuthStore } from '../stores/authStore'
@@ -18,7 +18,15 @@ describe('LoginPage', () => {
     vi.mocked(useAuthStore).mockReturnValue({
       login: mockLogin,
       isLoading: mockIsLoading,
-    } as any)
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      logout: vi.fn(),
+      refreshAuth: vi.fn(),
+      setUser: vi.fn(),
+      clearAuth: vi.fn(),
+    } as ReturnType<typeof useAuthStore>)
   })
 
   describe('rendering', () => {
@@ -215,7 +223,15 @@ describe('LoginPage', () => {
       vi.mocked(useAuthStore).mockReturnValue({
         login: mockLogin,
         isLoading: true,
-      } as any)
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+        logout: vi.fn(),
+        refreshAuth: vi.fn(),
+        setUser: vi.fn(),
+        clearAuth: vi.fn(),
+      } as ReturnType<typeof useAuthStore>)
 
       render(<LoginPage />)
 
@@ -232,7 +248,15 @@ describe('LoginPage', () => {
       vi.mocked(useAuthStore).mockReturnValue({
         login: mockLogin,
         isLoading: true,
-      } as any)
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+        logout: vi.fn(),
+        refreshAuth: vi.fn(),
+        setUser: vi.fn(),
+        clearAuth: vi.fn(),
+      } as ReturnType<typeof useAuthStore>)
 
       render(<LoginPage />)
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '../__tests__/setup/test-utils'
+// Vitest globals are available via globals: true in vitest.config.ts
+import { render } from '../__tests__/setup/test-utils'
 import userEvent from '@testing-library/user-event'
 import { ErrorBoundary, ErrorFallback } from './ErrorBoundary'
 

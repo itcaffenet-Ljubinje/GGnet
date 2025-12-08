@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+// Vitest globals are available via globals: true in vitest.config.ts
 import { useAuthStore } from './authStore'
 import { api } from '../lib/api'
 import type { User } from './authStore'
+import type { AxiosResponse } from 'axios'
+
+// Helper type for mocked API responses
+type MockAxiosResponse<T> = Partial<AxiosResponse<T>>
 
 // Mock the API module
 vi.mock('../lib/api', () => ({
@@ -61,11 +65,11 @@ describe('authStore', () => {
       // Mock API responses
       vi.mocked(api.post).mockResolvedValueOnce({
         data: mockTokens,
-      } as any)
+      } as MockAxiosResponse<typeof mockTokens>)
 
       vi.mocked(api.get).mockResolvedValueOnce({
         data: mockUser,
-      } as any)
+      } as MockAxiosResponse<User>)
 
       const result = await useAuthStore.getState().login('testuser', 'password123')
 
@@ -83,12 +87,12 @@ describe('authStore', () => {
 
     it('should set isLoading to true during login', async () => {
       // Create a promise that we can control
-      let resolveLogin: (value: any) => void
-      const loginPromise = new Promise((resolve) => {
+      let resolveLogin: (value: MockAxiosResponse<{ access_token: string; refresh_token: string }>) => void
+      const loginPromise = new Promise<MockAxiosResponse<{ access_token: string; refresh_token: string }>>((resolve) => {
         resolveLogin = resolve
       })
 
-      vi.mocked(api.post).mockReturnValueOnce(loginPromise as any)
+      vi.mocked(api.post).mockReturnValueOnce(loginPromise as Promise<MockAxiosResponse<unknown>>)
 
       const loginPromise2 = useAuthStore.getState().login('testuser', 'password123')
 
@@ -105,7 +109,7 @@ describe('authStore', () => {
 
       vi.mocked(api.get).mockResolvedValueOnce({
         data: { id: 1, username: 'testuser', role: 'admin', status: 'active', is_active: true, created_at: '2024-01-01' },
-      } as any)
+      } as MockAxiosResponse<User>)
 
       await loginPromise2
 
@@ -113,7 +117,7 @@ describe('authStore', () => {
     })
 
     it('should return false on login failure', async () => {
-      vi.mocked(api.post).mockRejectedValueOnce(new Error('Invalid credentials'))
+      vi.mocked(api.post).mockRejectedValueOnce(new Error('Invalid credentials') as unknown)
 
       const store = useAuthStore.getState()
       const result = await store.login('testuser', 'wrongpassword')
@@ -125,7 +129,7 @@ describe('authStore', () => {
     })
 
     it('should handle network errors during login', async () => {
-      vi.mocked(api.post).mockRejectedValueOnce(new Error('Network error'))
+      vi.mocked(api.post).mockRejectedValueOnce(new Error('Network error') as unknown)
 
       const store = useAuthStore.getState()
       const result = await store.login('testuser', 'password123')
@@ -140,9 +144,9 @@ describe('authStore', () => {
           access_token: 'token',
           refresh_token: 'refresh',
         },
-      } as any)
+      } as MockAxiosResponse<{ access_token: string; refresh_token: string }>)
 
-      vi.mocked(api.get).mockRejectedValueOnce(new Error('Failed to fetch user'))
+      vi.mocked(api.get).mockRejectedValueOnce(new Error('Failed to fetch user') as unknown)
 
       const store = useAuthStore.getState()
       const result = await store.login('testuser', 'password123')
@@ -166,11 +170,11 @@ describe('authStore', () => {
 
       vi.mocked(api.post).mockResolvedValueOnce({
         data: { access_token: 'token', refresh_token: 'refresh' },
-      } as any)
+      } as MockAxiosResponse<{ access_token: string; refresh_token: string }>)
 
       vi.mocked(api.get).mockResolvedValueOnce({
         data: mockUser,
-      } as any)
+      } as MockAxiosResponse<User>)
 
       const store = useAuthStore.getState()
       await store.login('testuser', 'password123')
@@ -181,7 +185,7 @@ describe('authStore', () => {
       // Mock logout API call
       vi.mocked(api.post).mockResolvedValueOnce({
         data: {},
-      } as any)
+      } as MockAxiosResponse<Record<string, never>>)
 
       // Logout
       await store.logout()
@@ -215,7 +219,7 @@ describe('authStore', () => {
 
       vi.mocked(api.post).mockResolvedValueOnce({
         data: {},
-      } as any)
+      } as MockAxiosResponse<Record<string, never>>)
 
       await store.logout()
 
@@ -232,7 +236,7 @@ describe('authStore', () => {
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      vi.mocked(api.post).mockRejectedValueOnce(new Error('Network error'))
+      vi.mocked(api.post).mockRejectedValueOnce(new Error('Network error') as unknown)
 
       await store.logout()
 
@@ -268,7 +272,7 @@ describe('authStore', () => {
           access_token: 'new-access-token',
           refresh_token: 'new-refresh-token',
         },
-      } as any)
+      } as MockAxiosResponse<{ access_token: string; refresh_token: string }>)
 
       const result = await useAuthStore.getState().refreshAuth()
 
@@ -302,7 +306,7 @@ describe('authStore', () => {
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      vi.mocked(api.post).mockRejectedValueOnce(new Error('Token expired'))
+      vi.mocked(api.post).mockRejectedValueOnce(new Error('Token expired') as unknown)
 
       const result = await store.refreshAuth()
 
