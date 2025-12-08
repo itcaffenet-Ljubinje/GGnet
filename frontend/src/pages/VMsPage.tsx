@@ -59,7 +59,7 @@ export default function VMsPage() {
   })
 
   const stopMutation = useMutation({
-    mutationFn: apiHelpers.stopVM,
+    mutationFn: (id: number) => apiHelpers.stopVM(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       toast.success('VM stopped successfully')
@@ -70,7 +70,7 @@ export default function VMsPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: apiHelpers.deleteVM,
+    mutationFn: (id: number) => apiHelpers.deleteVM(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       setSelectedVM(null)
