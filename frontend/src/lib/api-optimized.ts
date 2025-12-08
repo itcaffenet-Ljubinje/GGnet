@@ -4,8 +4,8 @@ import toast from 'react-hot-toast';
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const requestCache = new Map<string, { data: any; timestamp: number }>();
-const pendingRequests = new Map<string, Promise<any>>();
+const requestCache = new Map<string, { data: unknown; timestamp: number }>();
+const pendingRequests = new Map<string, Promise<unknown>>();
 
 // Create cache key from request config
 function getCacheKey(config: AxiosRequestConfig): string {
@@ -27,7 +27,7 @@ interface QueryParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-interface ImageData {
+interface ImageUploadData {
   name?: string;
   description?: string;
   format?: string;
@@ -180,7 +180,7 @@ api.interceptors.response.use(
 function createOptimizedRequest<T>(
   method: 'get' | 'post' | 'put' | 'delete',
   url: string,
-  data?: any,
+  data?: unknown,
   config?: AxiosRequestConfig
 ): Promise<T> {
   const requestConfig = { ...config, method, url, data };
@@ -238,10 +238,10 @@ export const cacheUtils = {
 export const apiHelpers = {
   // Auth
   login: (username: string, password: string) =>
-    createOptimizedRequest<any>('post', '/api/auth/login', { username, password }),
+    createOptimizedRequest<{ access_token: string; token_type: string; expires_in: number }>('post', '/api/auth/login', { username, password }),
   
   logout: () =>
-    createOptimizedRequest<any>('post', '/api/auth/logout').then(() => {
+    createOptimizedRequest<void>('post', '/api/auth/logout').then(() => {
       cacheUtils.clearCache(); // Clear all cache on logout
     }),
   
@@ -283,7 +283,7 @@ export const apiHelpers = {
       return response.data;
     }),
   
-  updateImage: (id: number, data: ImageData) =>
+  updateImage: (id: number, data: ImageUploadData) =>
     createOptimizedRequest<any>('put', `/api/images/${id}`, data).then(result => {
       cacheUtils.clearCacheForPattern('/api/images');
       return result;

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Filter, Calendar, User, AlertCircle, CheckCircle, Info, AlertTriangle, Activity } from 'lucide-react'
+import { Filter, Calendar, User, AlertCircle, CheckCircle, Info, AlertTriangle, Activity as ActivityIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Activity {
@@ -107,7 +107,7 @@ export default function ActivitiesPage() {
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Activities</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total || 0}</p>
                 </div>
-                <Activity className="h-8 w-8 text-blue-500" />
+                <ActivityIcon className="h-8 w-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>

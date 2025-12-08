@@ -11,7 +11,7 @@ interface QueryParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-interface ImageData {
+interface ImageUploadData {
   name?: string;
   description?: string;
   format?: string;
@@ -170,7 +170,7 @@ export const apiHelpers = {
       },
     }).then(response => response.data),
   
-  updateImage: (id: number, data: ImageData) =>
+  updateImage: (id: number, data: ImageUploadData) =>
     api.put(`/api/images/${id}`, data).then(response => response.data),
   
   deleteImage: (id: number) =>

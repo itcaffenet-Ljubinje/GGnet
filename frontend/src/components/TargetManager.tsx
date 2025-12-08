@@ -310,15 +310,15 @@ const TargetManager: React.FC = () => {
               <select
                 value={selectedImage?.id || ''}
                 onChange={(e) => {
-                  const image = images.find((i: any) => i.id === parseInt(e.target.value));
+                  const image = images.find((i: DiskImage) => i.id === parseInt(e.target.value));
                   setSelectedImage(image || null);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Choose an image...</option>
                 {images
-                  .filter((i: any) => i.status === 'READY')
-                  .map((image: any) => (
+                  .filter((i: DiskImage) => i.status === 'READY')
+                  .map((image: DiskImage) => (
                     <option key={image.id} value={image.id}>
                       {image.name} ({image.format}) - {formatFileSize(image.size_bytes)}
                     </option>

@@ -39,6 +39,7 @@ import {
 } from 'lucide-react'
 
 // Icon mapping for better tree shaking
+// eslint-disable-next-line react-refresh/only-export-components
 export const icons = {
   activity: Activity,
   'alert-circle': AlertCircle,

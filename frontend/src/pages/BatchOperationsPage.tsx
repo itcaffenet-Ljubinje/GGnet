@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Layers, Play, X, CheckCircle, XCircle, Clock, AlertCircle, HardDrive, Server, Upload, Download } from 'lucide-react'
+import { Layers, X, CheckCircle, XCircle, Clock, AlertCircle, HardDrive, Server, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface BatchOperation {

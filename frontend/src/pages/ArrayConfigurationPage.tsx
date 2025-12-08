@@ -150,7 +150,7 @@ export default function ArrayConfigurationPage() {
   const { addNotification } = useNotifications()
 
   // Fetch storage mounts (disks) from API
-  const { data: mountsData, refetch: refetchMounts, isLoading: mountsLoading } = useQuery({
+  const { data: mountsData, isLoading: mountsLoading } = useQuery({
     queryKey: ['storage', 'mounts'],
     queryFn: async () => {
       try {
@@ -164,14 +164,14 @@ export default function ArrayConfigurationPage() {
     refetchInterval: 30000,
   })
 
-  // Fetch ZFS pools and datasets
-  const { data: zfsPoolsData } = useQuery({
+  // Fetch ZFS pools and datasets (for future use)
+  useQuery({
     queryKey: ['zfs', 'pools'],
     queryFn: () => apiHelpers.getZfsPools(),
     refetchInterval: 30000,
   })
 
-  const { data: zfsDatasetsData } = useQuery({
+  useQuery({
     queryKey: ['zfs', 'datasets'],
     queryFn: () => apiHelpers.getZfsDatasets(),
     refetchInterval: 30000,
