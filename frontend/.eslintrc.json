@@ -49,8 +49,10 @@
         "beforeEach": "readonly",
         "afterEach": "readonly",
         "beforeAll": "readonly",
-        "afterAll": "readonly",
-        "screen": "readonly"
+        "afterAll": "readonly"
+      },
+      "rules": {
+        "no-redeclare": ["error", { "builtinGlobals": false }]
       }
     }
   ]
