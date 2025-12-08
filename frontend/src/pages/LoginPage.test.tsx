@@ -1,5 +1,5 @@
 // Vitest globals are available via globals: true in vitest.config.ts
-import { render, waitFor } from '../__tests__/setup/test-utils'
+import { render, screen, waitFor } from '../__tests__/setup/test-utils'
 import userEvent from '@testing-library/user-event'
 import LoginPage from './LoginPage'
 import { useAuthStore } from '../stores/authStore'
