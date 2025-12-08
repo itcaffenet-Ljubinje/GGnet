@@ -42,7 +42,7 @@ interface SessionData {
 
 // Create an AxiosInstance
 export const api: AxiosInstance = axios.create({
-  baseURL: "",  // No prefix - paths should include /api if needed
+  baseURL: import.meta.env.VITE_API_URL || "",  // Use VITE_API_URL from environment, fallback to empty for relative URLs
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

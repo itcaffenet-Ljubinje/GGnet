@@ -336,6 +336,7 @@ jobs:
         working-directory: ./frontend
         env:
           CI: true
+          VITE_API_URL: "http://127.0.0.1:8000"
           DATABASE_URL: "postgresql+asyncpg://ggnet:test_password@localhost:5432/ggnet"
           REDIS_URL: "redis://localhost:6379"
           SECRET_KEY: "test-secret-key-for-ci"
