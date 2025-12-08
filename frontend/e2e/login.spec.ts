@@ -129,20 +129,21 @@ test.describe('Login Flow', () => {
   });
 
   test('should redirect to dashboard after successful login', async ({ page }) => {
-    // Login
+    // Fill in valid credentials
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
     
-    // Wait for redirect
-    await page.waitForTimeout(3000);
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
     
-    // Should be redirected away from login page
-    const currentUrl = page.url();
-    expect(currentUrl).not.toContain('/login');
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Should be on dashboard or home
-    expect(currentUrl).toMatch(/\/dashboard|\/$/);
+    // Verify we're on dashboard
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 });
 
