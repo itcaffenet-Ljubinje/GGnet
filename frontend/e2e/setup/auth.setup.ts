@@ -1,5 +1,4 @@
 import { test as setup, expect } from '@playwright/test';
-import * as fs from 'fs';
 import * as path from 'path';
 
 /**

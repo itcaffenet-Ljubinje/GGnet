@@ -28,7 +28,7 @@ test.describe('Dashboard', () => {
     
     // Check for dashboard elements (adjust selectors based on actual dashboard)
     // Look for common dashboard elements
-    const dashboardContent = page.locator('text=/dashboard|overview|statistics/i').or(
+    page.locator('text=/dashboard|overview|statistics/i').or(
       page.locator('[data-testid="dashboard"]')
     );
     

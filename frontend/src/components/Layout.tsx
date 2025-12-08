@@ -21,7 +21,7 @@ import {
   Users,
   Layers,
   Import,
-  History,
+  History as HistoryIcon,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { clsx } from 'clsx'
@@ -44,7 +44,7 @@ const navigation = [
   { name: 'Batch Operations', href: '/batch-operations', icon: Layers },
   { name: 'Writebacks', href: '/writebacks', icon: FileText },
   { name: 'Import/Export', href: '/image-import-export', icon: Import },
-  { name: 'Activities', href: '/activities', icon: History },
+  { name: 'Activities', href: '/activities', icon: HistoryIcon },
   { name: 'Targets', href: '/targets', icon: Target },
   { name: 'Network Boot', href: '/network-boot', icon: Activity },
   { name: 'System Monitor', href: '/system-monitor', icon: BarChart3 },

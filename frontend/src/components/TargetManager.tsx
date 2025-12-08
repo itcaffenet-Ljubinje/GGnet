@@ -286,15 +286,15 @@ const TargetManager: React.FC = () => {
               <select
                 value={selectedMachine?.id || ''}
                 onChange={(e) => {
-                  const machine = machines.find((m: any) => m.id === parseInt(e.target.value));
+                  const machine = machines.find((m: Machine) => m.id === parseInt(e.target.value));
                   setSelectedMachine(machine || null);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Choose a machine...</option>
                 {machines
-                  .filter((m: any) => m.status === 'ACTIVE')
-                  .map((machine: any) => (
+                  .filter((m: Machine) => m.status === 'ACTIVE')
+                  .map((machine: Machine) => (
                     <option key={machine.id} value={machine.id}>
                       {machine.name} ({machine.mac_address}) - {machine.ip_address}
                     </option>
