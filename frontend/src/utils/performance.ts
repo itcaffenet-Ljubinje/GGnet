@@ -9,7 +9,7 @@ export const trackWebVitals = () => {
   // Core Web Vitals
   const observer = new PerformanceObserver((list) => {
     list.getEntries().forEach((entry) => {
-      const value = (entry as any).value || entry.duration || 0
+      const value = ('value' in entry ? (entry as { value: number }).value : undefined) || entry.duration || 0
       console.log(`${entry.name}: ${value}`)
       
       // You can send these metrics to your analytics service
@@ -46,8 +46,8 @@ export const logBundleSize = () => {
     console.log('JS Resources loaded:', jsResources.length)
     console.log('CSS Resources loaded:', cssResources.length)
     
-    const totalJSSize = jsResources.reduce((acc, r) => acc + ((r as any).transferSize || 0), 0)
-    const totalCSSSize = cssResources.reduce((acc, r) => acc + ((r as any).transferSize || 0), 0)
+    const totalJSSize = jsResources.reduce((acc, r) => acc + ('transferSize' in r ? (r as { transferSize: number }).transferSize : 0), 0)
+    const totalCSSSize = cssResources.reduce((acc, r) => acc + ('transferSize' in r ? (r as { transferSize: number }).transferSize : 0), 0)
     
     console.log(`Total JS size: ${(totalJSSize / 1024).toFixed(2)} KB`)
     console.log(`Total CSS size: ${(totalCSSSize / 1024).toFixed(2)} KB`)
@@ -61,7 +61,7 @@ export const monitorMemoryUsage = () => {
 
   // @ts-ignore - memory API is not in all browsers
   if ('memory' in performance) {
-    const memory = (performance as any).memory
+    const memory = (performance as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory
     console.log('Memory Usage:', {
       used: `${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
       total: `${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
@@ -87,7 +87,7 @@ export const lazyLoadImage = (img: HTMLImageElement, src: string) => {
 }
 
 // Debounce utility for performance
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): ((...args: Parameters<T>) => void) => {
@@ -99,7 +99,7 @@ export const debounce = <T extends (...args: any[]) => any>(
 }
 
 // Throttle utility for performance
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): ((...args: Parameters<T>) => void) => {

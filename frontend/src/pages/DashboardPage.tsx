@@ -355,8 +355,8 @@ export default function DashboardPage() {
   
   const stats = {
     totalImages: images.length || 0,
-    activeMachines: machines.filter((m: any) => m.status === 'active')?.length || 0,
-    runningSessions: sessions.filter((s: any) => s.status === 'running')?.length || 0,
+    activeMachines: machines.filter((m: { status?: string }) => m.status === 'active')?.length || 0,
+    runningSessions: sessions.filter((s: { status?: string }) => s.status === 'running')?.length || 0,
     totalStorage: storageData?.system_storage?.total_gb ? `${(storageData.system_storage.total_gb / 1024).toFixed(1)} TB` : '0 TB',
     usedStorage: storageData?.system_storage?.used_gb ? `${(storageData.system_storage.used_gb / 1024).toFixed(1)} TB` : '0 TB',
     availableStorage: storageData?.system_storage?.free_gb ? `${(storageData.system_storage.free_gb / 1024).toFixed(1)} TB` : '0 TB'

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Layers, X, CheckCircle, XCircle, Clock, AlertCircle, HardDrive, Server, Upload, Download } from 'lucide-react'
+import { Layers, X, CheckCircle, XCircle, Clock, AlertCircle, HardDrive, Server } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface BatchOperation {
@@ -38,15 +38,6 @@ export default function BatchOperationsPage() {
     refetchInterval: 1000, // Refresh every second for active operations
   })
 
-  const { data: images } = useQuery({
-    queryKey: ['images'],
-    queryFn: () => apiHelpers.getImages(),
-  })
-
-  const { data: machines } = useQuery({
-    queryKey: ['machines'],
-    queryFn: () => apiHelpers.getMachines(),
-  })
 
   const cancelMutation = useMutation({
     mutationFn: apiHelpers.cancelBatchOperation,
@@ -155,31 +146,6 @@ export default function BatchOperationsPage() {
     }
   }
 
-  const handleImageOperation = (type: 'backup' | 'restore' | 'test', imageIds: number[], backupPath: string) => {
-    const commonData = {
-      image_ids: imageIds,
-      backup_path: backupPath,
-    }
-
-    switch (type) {
-      case 'backup':
-        backupMutation.mutate(commonData)
-        break
-      case 'restore':
-        restoreMutation.mutate(commonData)
-        break
-      case 'test':
-        testMutation.mutate(commonData)
-        break
-    }
-  }
-
-  const handleMachineOperation = (operationType: string, machineIds: number[]) => {
-    machineOpMutation.mutate({
-      machine_ids: machineIds,
-      operation_type: operationType,
-    })
-  }
 
   return (
     <div className="space-y-6 p-6">

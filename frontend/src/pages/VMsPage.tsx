@@ -36,10 +36,6 @@ export default function VMsPage() {
     queryFn: () => apiHelpers.getVMs(),
   })
 
-  const { data: images } = useQuery({
-    queryKey: ['images'],
-    queryFn: () => apiHelpers.getImages(),
-  })
 
   const { data: vmDetails } = useQuery({
     queryKey: ['vm', selectedVM],

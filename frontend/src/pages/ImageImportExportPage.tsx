@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Upload, Download, FileText, CheckCircle, Clock, AlertCircle, HardDrive } from 'lucide-react'
+import { Upload, Download, CheckCircle, Clock, AlertCircle, HardDrive } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-interface Image {
+interface DiskImage {
   id: number
   name: string
   format?: string
@@ -60,7 +60,7 @@ export default function ImageImportExportPage() {
   const exportMutation = useMutation({
     mutationFn: ({ imageId, format, compress }: { imageId: number; format: string; compress: boolean }) =>
       apiHelpers.exportImageForDownload(imageId, { format, compress }),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['export-status'] })
       toast.success('Image export started successfully')
       // The export will be available for download when complete

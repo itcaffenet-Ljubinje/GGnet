@@ -183,7 +183,7 @@ export default function ArrayConfigurationPage() {
     const mounts = Array.isArray(mountsData) ? mountsData : mountsData?.data || []
     
     if (mounts.length > 0) {
-      const apiDisks: Disk[] = mounts.map((mount: any, index: number) => ({
+      const apiDisks: Disk[] = mounts.map((mount: { device?: string; mountpoint?: string; serial?: string; filesystem?: string; total_bytes?: number; used_bytes?: number; free_bytes?: number; usage_percent?: number }, index: number) => ({
         id: mount.device || `disk-${index}`,
         path: mount.device || mount.mountpoint || '',
         serial: mount.serial || 'N/A',
@@ -208,9 +208,9 @@ export default function ArrayConfigurationPage() {
     const mounts = Array.isArray(mountsData) ? mountsData : mountsData?.data || []
     
     if (mounts.length > 0) {
-      const total = mounts.reduce((sum: number, m: any) => sum + (m.total_bytes || 0), 0)
-      const used = mounts.reduce((sum: number, m: any) => sum + (m.used_bytes || 0), 0)
-      const free = mounts.reduce((sum: number, m: any) => sum + (m.free_bytes || 0), 0)
+      const total = mounts.reduce((sum: number, m: { total_bytes?: number }) => sum + (m.total_bytes || 0), 0)
+      const used = mounts.reduce((sum: number, m: { used_bytes?: number }) => sum + (m.used_bytes || 0), 0)
+      const free = mounts.reduce((sum: number, m: { free_bytes?: number }) => sum + (m.free_bytes || 0), 0)
       
       setArrayStats({
         totalSize: `${(total / (1024 ** 3)).toFixed(1)} GB`,

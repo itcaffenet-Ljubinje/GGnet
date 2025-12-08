@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Clock, Play, Pause, Trash2, Plus, Edit, CheckCircle, XCircle, AlertCircle, Calendar } from 'lucide-react'
+import { Clock, Play, Pause, Trash2, Plus, CheckCircle, XCircle, AlertCircle, Calendar } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface ScheduledJob {
@@ -45,10 +45,6 @@ export default function SchedulerPage() {
     enabled: !!selectedJob,
   })
 
-  const { data: behaviors } = useQuery({
-    queryKey: ['behaviors'],
-    queryFn: () => apiHelpers.getBehaviors(),
-  })
 
   const pauseMutation = useMutation({
     mutationFn: apiHelpers.pauseScheduledJob,

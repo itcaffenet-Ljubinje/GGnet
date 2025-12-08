@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { FileText, Trash2, Save, HardDrive, Monitor, AlertCircle, CheckCircle } from 'lucide-react'
+import { FileText, Trash2, Save, HardDrive } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Writeback {

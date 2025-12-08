@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { Monitor, Wifi, WifiOff, Send, MessageSquare, AlertCircle, CheckCircle, Clock, Server } from 'lucide-react'
+import { Monitor, Wifi, WifiOff, Send, MessageSquare, CheckCircle, Clock, Server } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Client {
@@ -24,7 +24,6 @@ interface Client {
 export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
   const [messageText, setMessageText] = useState('')
-  const queryClient = useQueryClient()
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ['clients'],
