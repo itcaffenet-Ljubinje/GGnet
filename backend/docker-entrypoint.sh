@@ -37,9 +37,10 @@ asyncio.run(wait_for_db())
 echo "📦 Running database migrations..."
 alembic upgrade head
 
-# Initialize admin user
-echo "👤 Initializing admin user..."
-python init_admin.py
+# Initialize admin user (optional - can be done manually)
+# Note: Admin user should be created using: python scripts/create_admin.py
+# This is skipped in Docker to allow manual admin setup
+echo "ℹ️  Admin user initialization skipped in Docker. Use 'python scripts/create_admin.py' to create admin user."
 
 # Start the application
 echo "✓ Starting uvicorn server..."

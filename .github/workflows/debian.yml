@@ -58,7 +58,7 @@ jobs:
       - name: Build Docker image for Debian ${{ matrix.debian_version }}
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./backend
           file: ./backend/Dockerfile
           platforms: linux/amd64
           push: false
