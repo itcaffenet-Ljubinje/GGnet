@@ -28,7 +28,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:3000',
     
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -61,12 +61,16 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      // In CI, use preview mode to serve the built frontend (on port 3000)
-      // In local development, use dev mode
-      command: process.env.CI ? 'npm run preview -- --port 3000' : 'npm run dev',
-      url: 'http://localhost:3000',
+      // Use dev mode for E2E tests (more reliable than preview mode)
+      // The build step in CI is for build verification, but E2E tests use dev server
+      command: 'npm run dev',
+      url: 'http://127.0.0.1:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      // Pass environment variables to frontend dev server
+      env: {
+        VITE_API_URL: process.env.VITE_API_URL || 'http://127.0.0.1:8000',
+      },
     },
     {
       command: 'cd ../backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000',
