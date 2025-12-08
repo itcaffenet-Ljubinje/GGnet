@@ -233,7 +233,7 @@ export default function ImageImportExportPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="">Select an image...</option>
-                  {images?.map((image: Image) => (
+                  {images?.map((image: DiskImage) => (
                     <option key={image.id} value={image.id}>
                       {image.name} {image.format && `(${image.format})`}
                     </option>
@@ -341,7 +341,7 @@ export default function ImageImportExportPage() {
             </div>
           ) : images && images.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {images.map((image: Image) => (
+              {images.map((image: DiskImage) => (
                 <div
                   key={image.id}
                   className={`p-4 border rounded-lg transition-all hover:shadow-md cursor-pointer ${

@@ -48,9 +48,19 @@ def app_with_cache(mock_redis):
         default_ttl=300
     )
     
-    # Mock Redis connection
-    with patch('app.middleware.caching.redis.from_url', return_value=mock_redis):
-        yield app
+    # Patch _get_redis to return mock_redis directly
+    # Find the middleware instance and patch its _get_redis method
+    async def mock_get_redis(self):
+        return mock_redis
+    
+    # Patch the method on the class
+    original_get_redis = CacheMiddleware._get_redis
+    CacheMiddleware._get_redis = mock_get_redis
+    
+    yield app
+    
+    # Restore original method
+    CacheMiddleware._get_redis = original_get_redis
 
 
 @pytest.mark.asyncio
@@ -136,26 +146,38 @@ async def test_cache_middleware_expired_cache(app_with_cache, mock_redis):
 
 
 @pytest.mark.asyncio
-async def test_cache_middleware_only_caches_successful_responses(app_with_cache, mock_redis):
+async def test_cache_middleware_only_caches_successful_responses(mock_redis):
     """Test that only successful responses are cached"""
     app = FastAPI()
     
     @app.get("/api/images")
     async def get_images_error():
-        return {"error": "Not found"}, 404
+        from fastapi import Response
+        return Response(content='{"error": "Not found"}', status_code=404)
     
+    # Add cache middleware
     app.add_middleware(
         CacheMiddleware,
         redis_url="redis://localhost:6379",
         default_ttl=300
     )
     
-    with patch('app.middleware.caching.redis.from_url', return_value=mock_redis):
+    # Patch _get_redis to return mock_redis directly
+    async def mock_get_redis(self):
+        return mock_redis
+    
+    original_get_redis = CacheMiddleware._get_redis
+    CacheMiddleware._get_redis = mock_get_redis
+    
+    try:
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.get("/api/images")
             assert response.status_code == 404
             # Should not cache error responses
             mock_redis.setex.assert_not_called()
+    finally:
+        # Restore original method
+        CacheMiddleware._get_redis = original_get_redis
 
 
 @pytest.mark.asyncio

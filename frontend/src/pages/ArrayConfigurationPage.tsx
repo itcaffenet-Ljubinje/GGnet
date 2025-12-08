@@ -193,7 +193,7 @@ export default function ArrayConfigurationPage() {
         available: mount.free_bytes ? `${(mount.free_bytes / (1024 ** 3)).toFixed(2)} GB` : '0 GB',
         reserved: '0 GB', // Will be calculated from ZFS when available
         trimStatus: 'Supported' as const,
-        status: mount.usage_percent > 90 ? 'error' : mount.usage_percent > 80 ? 'warning' : 'active' as const,
+        status: (mount.usage_percent ?? 0) > 90 ? 'error' : (mount.usage_percent ?? 0) > 80 ? 'warning' : 'active' as const,
       }))
       setDisks(apiDisks)
     } else if (!mountsLoading) {

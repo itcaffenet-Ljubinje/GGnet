@@ -185,9 +185,9 @@ def create_app() -> FastAPI:
     # Core resources
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/targets", tags=["targets"])
+    app.include_router(targets.router, prefix="/api/v1/targets", tags=["targets"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
-    app.include_router(sessions_api.router, prefix="/session-orchestration", tags=["session-orchestration"])
+    app.include_router(sessions_api.router, prefix="/api/v1/sessions", tags=["session-orchestration"])
     
     # Storage and infrastructure
     app.include_router(storage.router, prefix="/storage", tags=["storage"])

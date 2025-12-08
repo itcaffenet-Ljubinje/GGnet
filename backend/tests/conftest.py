@@ -4,6 +4,8 @@ Pytest fixtures for testing FastAPI app with async support
 
 import pytest
 import pytest_asyncio
+import sys
+from pathlib import Path
 from httpx import AsyncClient  # pyright: ignore[reportMissingImports]
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # pyright: ignore[reportMissingImports]
 from sqlalchemy.orm import sessionmaker  # pyright: ignore[reportMissingImports]
@@ -21,6 +23,11 @@ from app.models import (
 )
 
 import os
+
+# Add backend directory to Python path so scripts can be imported
+backend_dir = Path(__file__).parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 # Check if Redis is available
 def is_redis_available():
@@ -43,6 +50,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "redis: mark test as requiring Redis"
     )
+    
+    # Suppress bcrypt version warning from passlib
+    import warnings
+    warnings.filterwarnings("ignore", message=".*bcrypt.*__about__.*", category=AttributeError)
 
 DATABASE_URL_TEST = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 # Convert PostgreSQL URL to async version if needed

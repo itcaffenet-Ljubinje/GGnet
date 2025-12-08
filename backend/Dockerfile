@@ -34,8 +34,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make entrypoint script executable (if it exists)
-RUN if [ -f docker-entrypoint.sh ]; then chmod +x docker-entrypoint.sh; else echo "Warning: docker-entrypoint.sh not found"; fi
+# Make entrypoint script executable (required for container startup)
+RUN if [ ! -f docker-entrypoint.sh ]; then \
+      echo "ERROR: docker-entrypoint.sh is required but not found!"; \
+      exit 1; \
+    fi && \
+    chmod +x docker-entrypoint.sh
 
 # Create necessary directories
 RUN mkdir -p /opt/ggnet/{images,targets,backstores,tftp,logs,cache} && \
