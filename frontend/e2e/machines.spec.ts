@@ -18,12 +18,18 @@ test.describe('Machines Page', () => {
     // Wait for login form
     await page.waitForSelector('input[name="username"]', { timeout: 10000 });
     
+    // Fill credentials
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
     
-    // Wait for navigation to dashboard
-    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
+    
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
     // Navigate to machines page
     await page.goto('/machines');

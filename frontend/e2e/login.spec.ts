@@ -64,15 +64,17 @@ test.describe('Login Flow', () => {
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
     
-    // Submit form
-    await page.locator('button[type="submit"]').click();
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
     
-    // Wait for navigation to dashboard
-    await page.waitForURL(/\/dashboard|\/$/, { timeout: 10000 });
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Check that we're logged in (look for dashboard or layout elements)
-    // Adjust selectors based on actual dashboard structure
-    await expect(page).toHaveURL(/\/dashboard|\/$/);
+    // Check that we're logged in
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Check that login form is no longer visible
     await expect(page.locator('input[name="username"]')).not.toBeVisible();
