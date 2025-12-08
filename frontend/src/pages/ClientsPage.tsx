@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { apiHelpers } from '../lib/api'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'

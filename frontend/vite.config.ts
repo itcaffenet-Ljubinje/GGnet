@@ -117,7 +117,7 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
-        bypass: (req, _res, _options) => {
+        bypass: (req) => {
           // Don't proxy if it's a Vite internal request
           if (req.url?.startsWith('/@')) {
             return req.url
@@ -143,13 +143,19 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // Only include test files in src directory, explicitly exclude e2e
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/e2e/**',
+      '**/e2e/**/*',
       '**/.{idea,git,cache,output,temp}/**',
       '**/playwright-report/**',
-      '**/test-results/**'
+      '**/test-results/**',
+      '**/*.e2e.{ts,tsx}',
+      'e2e/**/*.spec.ts', // Exclude Playwright spec files
+      'e2e/**/*.spec.tsx', // Exclude Playwright spec files
     ],
     coverage: {
       provider: 'v8',

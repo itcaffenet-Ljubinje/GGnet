@@ -50,53 +50,54 @@ export default function BatchOperationsPage() {
     },
   })
 
-  const backupMutation = useMutation({
-    mutationFn: apiHelpers.batchBackupImages,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
-      setShowImageModal(false)
-      toast.success(`Batch backup started: ${data.id}`)
-    },
-    onError: () => {
-      toast.error('Failed to start batch backup')
-    },
-  })
+  // Mutations for batch operations (to be used when UI is implemented)
+  // const backupMutation = useMutation({
+  //   mutationFn: apiHelpers.batchBackupImages,
+  //   onSuccess: (data) => {
+  //     queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
+  //     setShowImageModal(false)
+  //     toast.success(`Batch backup started: ${data.id}`)
+  //   },
+  //   onError: () => {
+  //     toast.error('Failed to start batch backup')
+  //   },
+  // })
 
-  const restoreMutation = useMutation({
-    mutationFn: apiHelpers.batchRestoreImages,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
-      setShowImageModal(false)
-      toast.success(`Batch restore started: ${data.id}`)
-    },
-    onError: () => {
-      toast.error('Failed to start batch restore')
-    },
-  })
+  // const restoreMutation = useMutation({
+  //   mutationFn: apiHelpers.batchRestoreImages,
+  //   onSuccess: (data) => {
+  //     queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
+  //     setShowImageModal(false)
+  //     toast.success(`Batch restore started: ${data.id}`)
+  //   },
+  //   onError: () => {
+  //     toast.error('Failed to start batch restore')
+  //   },
+  // })
 
-  const testMutation = useMutation({
-    mutationFn: apiHelpers.batchTestImages,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
-      setShowImageModal(false)
-      toast.success(`Batch test started: ${data.id}`)
-    },
-    onError: () => {
-      toast.error('Failed to start batch test')
-    },
-  })
+  // const testMutation = useMutation({
+  //   mutationFn: apiHelpers.batchTestImages,
+  //   onSuccess: (data) => {
+  //     queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
+  //     setShowImageModal(false)
+  //     toast.success(`Batch test started: ${data.id}`)
+  //   },
+  //   onError: () => {
+  //     toast.error('Failed to start batch test')
+  //   },
+  // })
 
-  const machineOpMutation = useMutation({
-    mutationFn: apiHelpers.batchOperateMachines,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
-      setShowMachineModal(false)
-      toast.success(`Batch operation started: ${data.id}`)
-    },
-    onError: () => {
-      toast.error('Failed to start batch operation')
-    },
-  })
+  // const machineOpMutation = useMutation({
+  //   mutationFn: apiHelpers.batchOperateMachines,
+  //   onSuccess: (data) => {
+  //     queryClient.invalidateQueries({ queryKey: ['batch-operations'] })
+  //     setShowMachineModal(false)
+  //     toast.success(`Batch operation started: ${data.id}`)
+  //   },
+  //   onError: () => {
+  //     toast.error('Failed to start batch operation')
+  //   },
+  // })
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
