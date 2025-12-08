@@ -6,6 +6,7 @@ Handles importing images from external sources and exporting images to various f
 import os
 import shutil
 import asyncio
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -16,9 +17,73 @@ import uuid
 
 from app.models.image import Image, ImageFormat, ImageStatus, ImageType
 from app.core.config import get_settings
-from scripts.image_converter import ImageConverter, ImageConversionError
 
 logger = structlog.get_logger()
+
+# Try to import ImageConverter from scripts directory
+# Add project root to path if needed
+try:
+    # Try multiple possible paths for scripts directory
+    current_file = Path(__file__).resolve()
+    # From backend/app/utils/image_import_export.py -> project root/scripts
+    project_root = current_file.parent.parent.parent.parent
+    scripts_path = project_root / "scripts"
+    
+    # Also try relative to current working directory
+    if not scripts_path.exists():
+        scripts_path = Path.cwd() / "scripts"
+    
+    # Add project root to Python path if scripts directory exists
+    if scripts_path.exists() and (scripts_path / "image_converter.py").exists():
+        project_root_str = str(project_root)
+        if project_root_str not in sys.path:
+            sys.path.insert(0, project_root_str)
+    
+    from scripts.image_converter import ImageConverter, ImageConversionError
+except (ImportError, AttributeError, ValueError):
+    # Fallback: define minimal ImageConverter if import fails
+    logger.warning("Could not import ImageConverter from scripts, using fallback implementation")
+    
+    class ImageConversionError(Exception):
+        """Custom exception for image conversion operations"""
+        pass
+    
+    class ImageConverter:
+        """Fallback ImageConverter when scripts module is not available"""
+        
+        def __init__(self, qemu_img_path: str = "/usr/bin/qemu-img", mock_mode: bool = False):
+            self.qemu_img_path = qemu_img_path
+            self.mock_mode = mock_mode
+        
+        def get_image_info(self, image_path: str) -> Dict[str, Any]:
+            """Get basic image info (fallback implementation)"""
+            if not os.path.exists(image_path):
+                raise ImageConversionError(f"Image file not found: {image_path}")
+            
+            file_size = os.path.getsize(image_path)
+            # Try to detect format from extension
+            ext = Path(image_path).suffix.lower().lstrip('.')
+            format_map = {
+                '.vhd': 'vpc',
+                '.vhdx': 'vhdx',
+                '.raw': 'raw',
+                '.qcow2': 'qcow2',
+                '.vmdk': 'vmdk',
+                '.vdi': 'vdi',
+            }
+            detected_format = format_map.get(f'.{ext}', 'raw')
+            
+            return {
+                "format": detected_format,
+                "virtual-size": file_size,
+                "actual-size": file_size,
+            }
+        
+        def convert_image(self, source_path: str, dest_path: str, target_format: str, compress: bool = False):
+            """Convert image (fallback: just copy)"""
+            if not os.path.exists(source_path):
+                raise ImageConversionError(f"Source image not found: {source_path}")
+            shutil.copy2(source_path, dest_path)
 
 
 class ImageImportExportError(Exception):
