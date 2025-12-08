@@ -1,6 +1,6 @@
 # Codecov Token Setup - Step-by-Step Guide
 
-**Your Codecov Token:** `8af9069a-33d3-4237-9563-765e6832b26b`
+**Keep your Codecov token secret.** Retrieve it from the Codecov dashboard (Repository Settings → General → Upload token) and only paste it into secure locations such as GitHub secrets or a local environment variable—never commit the value to this repository.
 
 ---
 
@@ -22,7 +22,7 @@
 4. **Add New Secret**
    - Click the **"New repository secret"** button
    - **Name:** `CODECOV_TOKEN`
-   - **Value:** `8af9069a-33d3-4237-9563-765e6832b26b`
+   - **Value:** Paste the upload token you copied from Codecov
    - Click **"Add secret"**
 
 5. **Verify Secret Added**
@@ -36,7 +36,9 @@
 If you have GitHub CLI installed:
 
 ```bash
-gh secret set CODECOV_TOKEN --body "8af9069a-33d3-4237-9563-765e6832b26b"
+# Paste the token when prompted (input is hidden)
+read -s CODECOV_TOKEN && gh secret set CODECOV_TOKEN --body "$CODECOV_TOKEN"
+unset CODECOV_TOKEN
 ```
 
 ---
@@ -163,7 +165,7 @@ After pushing:
 ## ✅ **Verification Checklist**
 
 - [ ] Secret added to GitHub (Name: `CODECOV_TOKEN`)
-- [ ] Token value is correct: `8af9069a-33d3-4237-9563-765e6832b26b`
+- [ ] Token value matches the Codecov dashboard and is stored only as a secret
 - [ ] Workflow file exists: `.github/workflows/ci.yml`
 - [ ] Codecov config exists: `codecov.yml`
 - [ ] Pushed code to trigger workflow

@@ -60,19 +60,19 @@ xdg-open htmlcov/index.html  # Linux
 
 ### **Method 3: Manual Upload to Codecov**
 
-You can manually upload coverage to Codecov using curl:
+You can manually upload coverage to Codecov using curl. Before running the commands, make sure the `CODECOV_TOKEN` environment variable is set locally (copy the token from the Codecov dashboard or reuse the value stored in your GitHub secret—never commit it to source control):
 
 ```bash
 # Upload coverage XML
 curl -s https://codecov.io/bash | bash -s - \
-  -t 8af9069a-33d3-4237-9563-765e6832b26b \
+  -t "${CODECOV_TOKEN:?Set CODECOV_TOKEN env var before running}" \
   -f backend/coverage.xml \
   -F backend
 
 # Upload test results
 curl -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 8af9069a-33d3-4237-9563-765e6832b26b" \
+  -H "Authorization: Bearer ${CODECOV_TOKEN:?Set CODECOV_TOKEN env var before running}" \
   -d @backend/junit.xml \
   https://codecov.io/api/v2/test-results
 ```

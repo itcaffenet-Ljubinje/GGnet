@@ -100,7 +100,7 @@ This is how you'll see `@codecov-ai-reviewer` in action:
 - [ ] **GitHub Secret Added:**
   - Go to: Repository Settings → Secrets → Actions
   - Verify `CODECOV_TOKEN` exists
-  - Value: `8af9069a-33d3-4237-9563-765e6832b26b`
+  - Value is copied from the Codecov dashboard and stored only in the secret (never in source control)
 
 - [ ] **Workflow File:**
   - File exists: `.github/workflows/ci.yml`
