@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, CardContent, CardHeader, CardTitle, Button } from '../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, ErrorState, EmptyState } from '../components/ui'
 import { 
   Monitor, 
   Plus, 
@@ -15,6 +15,7 @@ import { apiHelpers } from '../lib/api'
 import { useNotifications } from '../components/notifications'
 import { clsx } from 'clsx'
 import MachineModal from '../components/MachineModal'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 // Type for Axios error responses
 interface AxiosErrorResponse extends Error {
@@ -174,32 +175,42 @@ export default function MachinesPage() {
   }
 
   if (error) {
-  return (
-      <div className="space-y-6">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Monitor className="h-8 w-8 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-lg font-medium text-red-800 dark:text-red-200">
-                Error Loading Machines
-              </h3>
-              <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-                {error.message || 'Failed to load machines'}
-              </p>
-              <button
-                onClick={() => refetch()}
-                className="mt-2 text-sm text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
-              >
-                Try again
-              </button>
-          </div>
+    return (
+      <div className="space-y-6 p-6">
+        <ErrorState
+          title="Error Loading Machines"
+          error={error}
+          onRetry={() => refetch()}
+        />
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="lg" text="Loading machines..." />
         </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
+
+  if (machines.length === 0) {
+    return (
+      <div className="space-y-6 p-6">
+        <EmptyState
+          title="No machines found"
+          description="Get started by creating your first machine"
+          icon="monitor"
+          action={{
+            label: 'Create Machine',
+            onClick: () => setShowCreateModal(true)
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

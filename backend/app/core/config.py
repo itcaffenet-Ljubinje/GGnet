@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     AUTO_BACKUP_ENABLED: bool = True
     AUTO_BACKUP_SCHEDULE: str = "0 2 * * *"  # Daily at 2 AM
     
+    # ZFS Configuration
+    ZFS_POOL_NAME: str = "pool0"  # Default ZFS pool name
+    ZFS_DATASET_PREFIX: str = "ggnet"  # Prefix for dataset paths (e.g., pool0/ggnet/clients)
+    ZFS_CLIENTS_DATASET: str = "clients"  # Name of clients dataset
+    ZFS_IMAGES_BIN_DATASET: str = "images_bin"  # Name of images_bin dataset
+    ZFS_LSBLK_SCRIPT: str = "ggnet-lsblk"  # Name of lsblk script for zpool status
+    
     @field_validator("UPLOAD_DIR", "IMAGES_DIR", "BACKUP_DIR", mode="before")
     @classmethod
     def create_directories(cls, v):

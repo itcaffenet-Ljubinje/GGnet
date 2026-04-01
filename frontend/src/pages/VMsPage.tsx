@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { Server, Play, Square, Trash2, Plus, Power, Monitor, Cpu, HardDrive, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import VMCreateModal from '../components/VMCreateModal'
 
 interface VM {
   id: number
@@ -431,24 +432,16 @@ export default function VMsPage() {
         </div>
       </div>
 
-      {/* Create VM Modal - Placeholder */}
+      {/* Create VM Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Create Virtual Machine</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              VM creation form will be implemented here. This requires image selection, resource configuration, and network settings.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <VMCreateModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false)
+            queryClient.invalidateQueries({ queryKey: ['vms'] })
+          }}
+        />
       )}
     </div>
   )

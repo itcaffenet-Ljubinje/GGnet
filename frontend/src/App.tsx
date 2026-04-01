@@ -26,6 +26,7 @@ const ClientsPage = lazy(() => import('./pages/ClientsPage'))
 const BatchOperationsPage = lazy(() => import('./pages/BatchOperationsPage'))
 const WritebacksPage = lazy(() => import('./pages/WritebacksPage'))
 const ImageImportExportPage = lazy(() => import('./pages/ImageImportExportPage'))
+const UpdatesPage = lazy(() => import('./pages/UpdatesPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
                 <Route path="/batch-operations" element={<BatchOperationsPage />} />
                 <Route path="/writebacks" element={<WritebacksPage />} />
                 <Route path="/image-import-export" element={<ImageImportExportPage />} />
+                <Route path="/updates" element={<UpdatesPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import viteCompression from 'vite-plugin-compression'
 import path from 'path'
@@ -143,6 +143,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    testTimeout: 10000, // Increase timeout for slower tests (especially with coverage)
     // Only include test files in src directory, explicitly exclude e2e
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: [

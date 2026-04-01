@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install -y \
     qemu-utils \
     targetcli-fb \
     python3-rtslib-fb \
-    isc-dhcp-server \
-    tftpd-hpa \
+    dnsmasq \
     && rm -rf /var/lib/apt/lists/*
 
 # Create application user

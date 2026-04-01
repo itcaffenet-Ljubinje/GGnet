@@ -10,6 +10,7 @@ from pathlib import Path
 import structlog
 
 from app.core.exceptions import StorageError
+from app.core.config import get_settings
 
 logger = structlog.get_logger()
 
@@ -28,6 +29,13 @@ class ZFSUtils:
         """Initialize ZFS utilities"""
         self.zfs_cmd = "zfs"
         self.zpool_cmd = "zpool"
+        self.settings = get_settings()
+        # ZFS configuration from settings
+        self.pool_name = self.settings.ZFS_POOL_NAME
+        self.dataset_prefix = self.settings.ZFS_DATASET_PREFIX
+        self.clients_dataset = self.settings.ZFS_CLIENTS_DATASET
+        self.images_bin_dataset = self.settings.ZFS_IMAGES_BIN_DATASET
+        self.lsblk_script = self.settings.ZFS_LSBLK_SCRIPT
     
     def _run_command(
         self,
@@ -347,7 +355,328 @@ class ZFSUtils:
             logger.info("Created clone", clone_name=clone_name, snapshot=snapshot_name)
         except Exception as e:
             raise ZFSError(f"Failed to create clone: {e}") from e
-
-
-
+    
+    # GGnet-specific ZFS operations (matching ggRock functionality)
+    def list_images_bin_volumes(self, pool_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List image bin volumes: zfs list -Hp -t volume -r {pool}/{prefix}/images_bin
+        
+        Args:
+            pool_name: ZFS pool name (default: from settings)
+            
+        Returns:
+            List of volume dictionaries
+        """
+        try:
+            if pool_name is None:
+                pool_name = self.pool_name
+            dataset_path = f"{pool_name}/{self.dataset_prefix}/{self.images_bin_dataset}"
+            cmd = [
+                self.zfs_cmd, "list", "-Hp", "-t", "volume", "-r",
+                "-o", "name,creation,volsize,used,compressratio,receive_resume_token",
+                dataset_path
+            ]
+            
+            result = self._run_command(cmd, check=False)
+            
+            if result.returncode != 0:
+                # Dataset might not exist, return empty list
+                logger.debug("Images bin dataset not found or empty", dataset=dataset_path)
+                return []
+            
+            volumes = []
+            for line in result.stdout.strip().split("\n"):
+                if not line:
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 5:
+                    volumes.append({
+                        "name": parts[0],
+                        "creation": parts[1] if len(parts) > 1 else None,
+                        "volsize": int(parts[2]) if len(parts) > 2 and parts[2] != "-" else 0,
+                        "used": int(parts[3]) if len(parts) > 3 and parts[3] != "-" else 0,
+                        "compressratio": parts[4] if len(parts) > 4 and parts[4] != "-" else None,
+                        "receive_resume_token": parts[5] if len(parts) > 5 and parts[5] != "-" else None,
+                    })
+            return volumes
+        except Exception as e:
+            logger.warning("Failed to list images bin volumes", error=str(e))
+            return []
+    
+    def list_client_volumes(self, pool_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List client volumes: zfs list -Hp -r {pool}/{prefix}/clients
+        
+        Args:
+            pool_name: ZFS pool name (default: from settings)
+            
+        Returns:
+            List of client volume dictionaries
+        """
+        try:
+            if pool_name is None:
+                pool_name = self.pool_name
+            dataset_path = f"{pool_name}/{self.dataset_prefix}/{self.clients_dataset}"
+            cmd = [
+                self.zfs_cmd, "list", "-Hp", "-r",
+                "-o", "name,creation,volsize,used,compressratio,origin",
+                dataset_path
+            ]
+            
+            result = self._run_command(cmd, check=False)
+            
+            if result.returncode != 0:
+                # Dataset might not exist, return empty list
+                logger.debug("Clients dataset not found or empty", dataset=dataset_path)
+                return []
+            
+            volumes = []
+            for line in result.stdout.strip().split("\n"):
+                if not line:
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 5:
+                    volumes.append({
+                        "name": parts[0],
+                        "creation": parts[1] if len(parts) > 1 else None,
+                        "volsize": int(parts[2]) if len(parts) > 2 and parts[2] != "-" else 0,
+                        "used": int(parts[3]) if len(parts) > 3 and parts[3] != "-" else 0,
+                        "compressratio": parts[4] if len(parts) > 4 and parts[4] != "-" else None,
+                        "origin": parts[5] if len(parts) > 5 and parts[5] != "-" else None,
+                    })
+            return volumes
+        except Exception as e:
+            logger.warning("Failed to list client volumes", error=str(e))
+            return []
+    
+    def get_pool_status_with_lsblk(self, pool_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get pool status with custom lsblk script: zpool status -t -c upath,{lsblk_script}
+        
+        Args:
+            pool_name: ZFS pool name (default: from settings)
+            
+        Returns:
+            Pool status dictionary
+        """
+        try:
+            if pool_name is None:
+                pool_name = self.pool_name
+            cmd = [
+                "bash", "-c",
+                f"ZPOOL_SCRIPTS_AS_ROOT=1 {self.zpool_cmd} status -t -c upath,{self.lsblk_script} {pool_name}"
+            ]
+            
+            result = self._run_command(cmd, timeout=30, check=False)
+            
+            if result.returncode != 0:
+                return {
+                    "pool_name": pool_name,
+                    "available": False,
+                    "error": result.stderr.strip() if result.stderr else "Pool not found or unavailable"
+                }
+            
+            # Parse zpool status output
+            status = {
+                "pool_name": pool_name,
+                "available": True,
+                "status_output": result.stdout,
+                "health": "unknown",
+                "state": "unknown"
+            }
+            
+            # Basic parsing of status output
+            lines = result.stdout.split("\n")
+            for line in lines:
+                line = line.strip()
+                if "state:" in line.lower():
+                    status["state"] = line.split(":", 1)[1].strip() if ":" in line else "unknown"
+                elif "status:" in line.lower():
+                    status["health"] = line.split(":", 1)[1].strip() if ":" in line else "unknown"
+            
+            return status
+        except Exception as e:
+            logger.warning("Failed to get pool status with lsblk", pool=pool_name, error=str(e))
+            return {
+                "pool_name": pool_name,
+                "available": False,
+                "error": str(e)
+            }
+    
+    def get_pool_list_detailed(self, pool_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Get detailed pool list: zpool list -vHp -g {pool}
+        
+        Args:
+            pool_name: ZFS pool name (default: from settings)
+            
+        Returns:
+            Detailed pool information dictionary
+        """
+        try:
+            if pool_name is None:
+                pool_name = self.pool_name
+            cmd = [self.zpool_cmd, "list", "-vHp", "-g", pool_name]
+            
+            result = self._run_command(cmd, timeout=30, check=False)
+            
+            if result.returncode != 0:
+                return {
+                    "pool_name": pool_name,
+                    "available": False,
+                    "error": result.stderr.strip() if result.stderr else "Pool not found"
+                }
+            
+            # Parse detailed pool list output
+            pool_info = {
+                "pool_name": pool_name,
+                "available": True,
+                "output": result.stdout,
+                "vdevs": []
+            }
+            
+            # Parse output lines
+            lines = result.stdout.strip().split("\n")
+            for line in lines:
+                if not line.strip():
+                    continue
+                parts = line.split()
+                if len(parts) >= 2:
+                    pool_info["vdevs"].append({
+                        "name": parts[0],
+                        "size": parts[1] if len(parts) > 1 else None,
+                        "allocated": parts[2] if len(parts) > 2 else None,
+                        "free": parts[3] if len(parts) > 3 else None,
+                        "expandsz": parts[4] if len(parts) > 4 else None,
+                        "frag": parts[5] if len(parts) > 5 else None,
+                        "cap": parts[6] if len(parts) > 6 else None,
+                        "dedup": parts[7] if len(parts) > 7 else None,
+                        "health": parts[8] if len(parts) > 8 else None,
+                        "altroot": parts[9] if len(parts) > 9 else None,
+                    })
+            
+            return pool_info
+        except Exception as e:
+            logger.warning("Failed to get detailed pool list", pool=pool_name, error=str(e))
+            return {
+                "pool_name": pool_name,
+                "available": False,
+                "error": str(e)
+            }
+    
+    def ensure_dataset_exists(self, dataset_path: str, dataset_type: str = "filesystem") -> bool:
+        """
+        Ensure a ZFS dataset exists, create it if it doesn't
+        
+        Args:
+            dataset_path: Full path to dataset (e.g., pool0/ggnet/clients)
+            dataset_type: Type of dataset ("filesystem" or "volume")
+            
+        Returns:
+            True if dataset exists or was created, False otherwise
+        """
+        try:
+            # Check if dataset exists
+            cmd = [self.zfs_cmd, "list", "-H", "-o", "name", dataset_path]
+            result = self._run_command(cmd, check=False)
+            
+            if result.returncode == 0:
+                # Dataset exists
+                logger.debug("Dataset already exists", dataset=dataset_path)
+                return True
+            
+            # Dataset doesn't exist, create it
+            logger.info("Creating ZFS dataset", dataset=dataset_path, type=dataset_type)
+            self.dataset_create(dataset_path, dataset_type=dataset_type)
+            return True
+            
+        except Exception as e:
+            logger.warning("Failed to ensure dataset exists", dataset=dataset_path, error=str(e))
+            return False
+    
+    def ensure_zfs_datasets(self, pool_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Ensure required ZFS datasets exist, create them if they don't
+        
+        Args:
+            pool_name: ZFS pool name (default: from settings)
+            
+        Returns:
+            Dictionary with status of each dataset
+        """
+        if pool_name is None:
+            pool_name = self.pool_name
+        
+        result = {
+            "pool_name": pool_name,
+            "datasets": {},
+            "all_created": True,
+            "errors": []
+        }
+        
+        try:
+            # Check if pool exists first
+            pools = self.pool_list()
+            pool_exists = any(p["name"] == pool_name for p in pools)
+            
+            if not pool_exists:
+                error_msg = f"ZFS pool '{pool_name}' does not exist"
+                logger.warning(error_msg)
+                result["errors"].append(error_msg)
+                result["all_created"] = False
+                return result
+            
+            # Ensure clients dataset exists
+            clients_path = f"{pool_name}/{self.dataset_prefix}/{self.clients_dataset}"
+            try:
+                clients_created = self.ensure_dataset_exists(clients_path, dataset_type="filesystem")
+                result["datasets"]["clients"] = {
+                    "path": clients_path,
+                    "exists": clients_created,
+                    "error": None
+                }
+                if not clients_created:
+                    result["all_created"] = False
+            except Exception as e:
+                error_msg = f"Failed to ensure clients dataset: {str(e)}"
+                logger.warning(error_msg, dataset=clients_path, error=str(e))
+                result["datasets"]["clients"] = {
+                    "path": clients_path,
+                    "exists": False,
+                    "error": str(e)
+                }
+                result["errors"].append(error_msg)
+                result["all_created"] = False
+            
+            # Ensure images_bin dataset exists
+            images_bin_path = f"{pool_name}/{self.dataset_prefix}/{self.images_bin_dataset}"
+            try:
+                images_bin_created = self.ensure_dataset_exists(images_bin_path, dataset_type="filesystem")
+                result["datasets"]["images_bin"] = {
+                    "path": images_bin_path,
+                    "exists": images_bin_created,
+                    "error": None
+                }
+                if not images_bin_created:
+                    result["all_created"] = False
+            except Exception as e:
+                error_msg = f"Failed to ensure images_bin dataset: {str(e)}"
+                logger.warning(error_msg, dataset=images_bin_path, error=str(e))
+                result["datasets"]["images_bin"] = {
+                    "path": images_bin_path,
+                    "exists": False,
+                    "error": str(e)
+                }
+                result["errors"].append(error_msg)
+                result["all_created"] = False
+            
+            logger.info("ZFS datasets check completed", pool=pool_name, all_created=result["all_created"])
+            return result
+            
+        except Exception as e:
+            error_msg = f"Failed to ensure ZFS datasets: {str(e)}"
+            logger.error(error_msg, pool=pool_name, error=str(e))
+            result["errors"].append(error_msg)
+            result["all_created"] = False
+            return result
 

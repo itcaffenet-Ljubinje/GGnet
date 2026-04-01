@@ -19,6 +19,7 @@ interface ImageUploadData {
 }
 
 interface MachineData {
+  image_ids?: number[];  // List of image IDs (System + Application images)
   name: string;
   hostname: string;
   ip_address: string;
@@ -266,6 +267,10 @@ export const apiHelpers = {
   getDetailedHealth: () =>
     api.get('/api/health/detailed').then(response => response.data),
 
+  // Updates
+  getUpdates: () =>
+    api.get('/api/server/updates').then(response => response.data),
+
   // Monitoring
   getPerformanceMetrics: () =>
     api.get('/api/monitoring/metrics').then(response => response.data),
@@ -430,7 +435,7 @@ export const apiHelpers = {
   
   createVM: (data: {
     name: string;
-    image_id: number;
+    image_ids: number[]; // List of image IDs (at least 1 required)
     vcpus?: number;
     ram_mb?: number;
     drives_connection?: string;

@@ -89,7 +89,7 @@ install_dependencies() {
         open-iscsi \
         qemu-utils \
         tftpd-hpa \
-        isc-dhcp-server \
+        dnsmasq \
         git \
         curl \
         wget \

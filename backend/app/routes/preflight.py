@@ -138,33 +138,41 @@ def check_network_interfaces() -> tuple[bool, str, Dict[str, Any]]:
 
 
 def check_dhcp_config() -> tuple[bool, str, Dict[str, Any]]:
-    """Check DHCP configuration"""
+    """Check dnsmasq configuration"""
     try:
-        dhcp_conf = Path("docker/dhcp/dhcpd.conf")
-        if not dhcp_conf.exists():
-            dhcp_conf = Path("/etc/dhcp/dhcpd.conf")
+        # Check for dnsmasq config
+        dnsmasq_conf = Path("docker/dnsmasq/dnsmasq.conf")
+        if not dnsmasq_conf.exists():
+            dnsmasq_conf = Path("/etc/dnsmasq.conf")
         
-        details = {"config_path": str(dhcp_conf)}
+        details = {"config_path": str(dnsmasq_conf)}
         
-        if not dhcp_conf.exists():
-            return False, "DHCP config file not found", details
+        if not dnsmasq_conf.exists():
+            return False, "dnsmasq config file not found", details
         
-        content = dhcp_conf.read_text()
+        content = dnsmasq_conf.read_text()
         details["file_exists"] = True
         
         issues = []
-        if "option arch" not in content:
-            issues.append("missing_arch_detection")
+        # Check for dnsmasq-specific configuration
+        if "dhcp-range" not in content:
+            issues.append("missing_dhcp_range")
         
-        if "snponly.efi" not in content and "ipxe.efi" not in content:
-            issues.append("missing_ipxe_files")
+        if "dhcp-match" not in content and "dhcp-boot" not in content:
+            issues.append("missing_pxe_config")
+        
+        if "snponly.efi" not in content and "ipxe.efi" not in content and "undionly.kpxe" not in content:
+            issues.append("missing_boot_files")
+        
+        if "enable-tftp" not in content:
+            issues.append("tftp_not_enabled")
         
         if issues:
-            return False, f"DHCP config issues: {', '.join(issues)}", {**details, "issues": issues}
+            return False, f"dnsmasq config issues: {', '.join(issues)}", {**details, "issues": issues}
         
-        return True, "DHCP configuration OK", details
+        return True, "dnsmasq configuration OK", details
     except Exception as e:
-        return False, f"DHCP config check error: {str(e)}", {"error": str(e)}
+        return False, f"dnsmasq config check error: {str(e)}", {"error": str(e)}
 
 
 def check_tftp_files() -> tuple[bool, str, Dict[str, Any]]:

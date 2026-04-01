@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, CardContent, CardHeader, CardTitle, ProgressBar, StatusBadge, Button } from '../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, ProgressBar, StatusBadge, Button, StatusLED, ActionMenu, type ActionMenuItem } from '../components/ui'
 import { 
   HardDrive, 
   Plus, 
@@ -15,7 +15,12 @@ import {
   Activity,
   RefreshCw,
   Save,
-  X
+  X,
+  Eye,
+  AlertCircle,
+  RotateCcw,
+  FileText,
+  Lightbulb
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotifications } from '../components/notifications'
@@ -52,6 +57,8 @@ interface ArrayStats {
   reservedPercentage: number
   status: string
   timestamp: string
+  raidType?: string
+  healthStatus?: 'green' | 'amber' | 'red' | 'off'
 }
 
 interface RaidConfig {
@@ -219,6 +226,8 @@ export default function ArrayConfigurationPage() {
         reservedSpace: '0 GB',
         reservedPercentage: 0,
         status: 'Active',
+        healthStatus: 'green',
+        raidType: 'ZFS Pool', // TODO: Get actual RAID type from ZFS pool info
         timestamp: new Date().toLocaleString(),
       })
     } else if (!mountsLoading) {
@@ -230,6 +239,7 @@ export default function ArrayConfigurationPage() {
         reservedSpace: '0 GB',
         reservedPercentage: 0,
         status: 'No Storage',
+        healthStatus: 'off',
         timestamp: new Date().toLocaleString(),
       })
     }
@@ -413,14 +423,27 @@ export default function ArrayConfigurationPage() {
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 Status
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <div className="text-2xl font-bold text-green-600">
-                  {arrayStats?.status || 'Loading...'}
+              <div className="flex items-center gap-3">
+                <StatusLED 
+                  status={arrayStats?.healthStatus || (arrayStats?.status === 'Active' ? 'green' : arrayStats?.status === 'Degraded' ? 'amber' : 'red')}
+                  size="lg"
+                />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {arrayStats?.status || 'Loading...'}
+                    </div>
+                    {arrayStats?.raidType && (
+                      <StatusBadge 
+                        status="info" 
+                        text={arrayStats.raidType}
+                      />
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {arrayStats?.timestamp || '-'}
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {arrayStats?.timestamp || '-'}
               </div>
             </div>
           </div>
@@ -606,6 +629,9 @@ export default function ArrayConfigurationPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     TRIM STATUS
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    ACTIONS
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -654,6 +680,87 @@ export default function ArrayConfigurationPage() {
                           disk.trimStatus === 'Unsupported' ? 'error' : 'warning'
                         }
                         text={disk.trimStatus}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <ActionMenu
+                        items={[
+                          {
+                            label: 'Details',
+                            icon: <Eye className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open drive details modal
+                              addNotification({
+                                type: 'info',
+                                message: `Viewing details for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'Identify',
+                            icon: <Lightbulb className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Trigger drive identify (blink LED)
+                              addNotification({
+                                type: 'info',
+                                message: `Identifying drive ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'View SMART',
+                            icon: <FileText className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open SMART data modal
+                              addNotification({
+                                type: 'info',
+                                message: `Viewing SMART data for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            divider: true
+                          },
+                          {
+                            label: 'Mark Failed',
+                            icon: <AlertCircle className="h-4 w-4" />,
+                            onClick: () => {
+                              if (window.confirm(`Mark drive ${disk.path} as failed?`)) {
+                                // TODO: Call API to mark drive as failed
+                                addNotification({
+                                  type: 'warning',
+                                  message: `Marking drive ${disk.path} as failed`
+                                })
+                              }
+                            },
+                            danger: true
+                          },
+                          {
+                            label: 'Replace',
+                            icon: <RotateCcw className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open replace drive flow
+                              addNotification({
+                                type: 'info',
+                                message: `Starting replace flow for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'Remove',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => {
+                              if (window.confirm(`Remove drive ${disk.path} from array? This action cannot be undone.`)) {
+                                // TODO: Call API to remove drive
+                                addNotification({
+                                  type: 'warning',
+                                  message: `Removing drive ${disk.path}`
+                                })
+                              }
+                            },
+                            danger: true
+                          }
+                        ]}
                       />
                     </td>
                   </tr>

@@ -36,6 +36,7 @@ class ImageStatus(str, Enum):
 class ImageType(str, Enum):
     """Image type classification"""
     SYSTEM = "system"  # OS images
+    APPLICATION = "application"  # Application images
     GAME = "game"      # Game disk images
     DATA = "data"      # Data disk images
     TEMPLATE = "template"  # Template images
@@ -112,7 +113,9 @@ class Image(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     
     # Relationships (all relationships must be defined after all columns)
-    vms = relationship("VM", back_populates="image", cascade="all, delete-orphan")
+    vms = relationship("VM", foreign_keys="[VM.image_id]", back_populates="image", cascade="all, delete-orphan")
+    vm_instances = relationship("VM", secondary="vm_images", back_populates="images")
+    machine_instances = relationship("Machine", secondary="machine_images", back_populates="images")
     created_by_user = relationship("User", back_populates="created_images", foreign_keys=[created_by])
     converted_from = relationship("Image", remote_side=[id], backref="conversions")
     targets = relationship("Target", back_populates="image")

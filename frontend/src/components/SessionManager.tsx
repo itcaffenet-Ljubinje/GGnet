@@ -25,6 +25,7 @@ import { StatusBadge } from './ui/StatusBadge';
 // import { ProgressBar } from './ui/ProgressBar'; // Unused for now
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
+import { formatDuration, formatDateTime } from '../utils/formatters';
 
 // Type for Axios error responses
 interface AxiosErrorResponse extends Error {
@@ -220,17 +221,7 @@ const SessionManager: React.FC = () => {
     }
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours}h ${minutes}m ${secs}s`;
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // Using shared utilities from utils/formatters
 
   if (sessionsLoading || machinesLoading || imagesLoading) {
     return (

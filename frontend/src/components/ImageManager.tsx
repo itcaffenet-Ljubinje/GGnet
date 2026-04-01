@@ -17,7 +17,13 @@ import {
   FileText,
   Zap,
   Eye,
-  Copy
+  Copy,
+  Search,
+  Filter,
+  Grid3x3,
+  List,
+  Star,
+  Monitor
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-hot-toast';
@@ -26,8 +32,12 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 import { ProgressBar } from './ui/ProgressBar';
+import { Input } from './ui/Input';
+import { EmptyState } from './ui/EmptyState';
+import { CreateImageWizard } from './CreateImageWizard';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
+import { formatDateTime, formatBytes } from '../utils/formatters';
 
 // Type for Axios error responses
 interface AxiosErrorResponse extends Error {
@@ -81,6 +91,11 @@ const ImageManager: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<DiskImage | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'ALL' | 'SYSTEM' | 'APPLICATION' | 'DATA'>('ALL');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [sortBy, setSortBy] = useState<'name' | 'updated' | 'size'>('updated');
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
 
   // const { user } = useAuthStore(); // Unused for now
   const queryClient = useQueryClient();
@@ -163,7 +178,35 @@ const ImageManager: React.FC = () => {
     },
   });
 
-  const images = imagesData?.images || [];
+  // Backend returns array directly, not wrapped in object
+  const allImages = Array.isArray(imagesData) ? imagesData : imagesData?.images || imagesData?.data || [];
+  
+  // Filter and sort images
+  const filteredAndSortedImages = allImages
+    .filter((image: DiskImage) => {
+      // Search filter
+      const matchesSearch = !searchTerm || 
+        image.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        image.original_filename.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Type filter
+      const matchesType = filterType === 'ALL' || image.image_type === filterType;
+      
+      return matchesSearch && matchesType;
+    })
+    .sort((a: DiskImage, b: DiskImage) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'size':
+          return b.size_bytes - a.size_bytes;
+        case 'updated':
+        default:
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+    });
+  
+  const images = filteredAndSortedImages;
   const conversionJobs = conversionJobsData?.jobs || [];
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -232,16 +275,7 @@ const ImageManager: React.FC = () => {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // Using shared utilities from utils/formatters
 
   const getImageTypeColor = (type: string) => {
     switch (type) {
@@ -283,7 +317,15 @@ const ImageManager: React.FC = () => {
             <span>Refresh</span>
           </Button>
           <Button
+            onClick={() => setShowCreateWizard(true)}
+            className="flex items-center space-x-2"
+          >
+            <HardDrive className="w-4 h-4" />
+            <span>Create Image</span>
+          </Button>
+          <Button
             onClick={() => setShowUpload(!showUpload)}
+            variant="outline"
             className="flex items-center space-x-2"
           >
             <Upload className="w-4 h-4" />
@@ -372,14 +414,64 @@ const ImageManager: React.FC = () => {
 
       {/* Images List */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Disk Images</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Disk Images</h3>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setViewMode(viewMode === 'card' ? 'table' : 'card')}
+              variant="outline"
+              size="sm"
+            >
+              {viewMode === 'card' ? <List className="w-4 h-4" /> : <Grid3x3 className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="mb-4 flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search images by name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as typeof filterType)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="ALL">All Types</option>
+              <option value="SYSTEM">System</option>
+              <option value="APPLICATION">Application</option>
+              <option value="DATA">Data</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="updated">Last Updated</option>
+              <option value="name">Name</option>
+              <option value="size">Size</option>
+            </select>
+          </div>
+        </div>
 
         {images.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <HardDrive className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No images found</p>
-            <p className="text-sm">Upload your first disk image to get started</p>
-          </div>
+          <EmptyState
+            title={allImages.length === 0 ? "No images found" : "No images match your filters"}
+            description={allImages.length === 0 ? "Upload your first disk image to get started" : "Try adjusting your search or filter criteria"}
+            icon="folder"
+            action={allImages.length === 0 ? {
+              label: "Upload Images",
+              onClick: () => setShowUpload(true)
+            } : undefined}
+          />
         ) : (
           <div className="space-y-4">
             {images.map((image: DiskImage) => (
@@ -388,10 +480,16 @@ const ImageManager: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
                       <HardDrive className="w-5 h-5 text-blue-500" />
-                      <div>
-                        <h4 className="text-lg font-medium text-gray-900">
-                          {image.name}
-                        </h4>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-lg font-medium text-gray-900">
+                            {image.name}
+                          </h4>
+                          {/* TODO: Add default boot image badge when API supports it */}
+                          {/* {image.is_default && (
+                            <StatusBadge status="success" text="Default Boot" />
+                          )} */}
+                        </div>
                         <p className="text-sm text-gray-500">
                           {image.original_filename} • {image.format}
                         </p>
@@ -405,15 +503,34 @@ const ImageManager: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-3">
                       <div>
-                        <p className="text-sm font-medium text-gray-700">Size</p>
-                        <p className="text-sm text-gray-900">{formatFileSize(image.size_bytes)}</p>
+                        <p className="text-sm font-medium text-gray-700">Base Size</p>
+                        <p className="text-sm text-gray-900">{formatBytes(image.size_bytes)}</p>
                         {image.virtual_size_bytes && (
                           <p className="text-xs text-gray-500">
-                            Virtual: {formatFileSize(image.virtual_size_bytes)}
+                            Virtual: {formatBytes(image.virtual_size_bytes)}
                           </p>
                         )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Latest Snapshot</p>
+                        <p className="text-sm text-gray-900">-</p>
+                        <p className="text-xs text-gray-500">N/A</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Writebacks</p>
+                        <p className="text-sm text-gray-900">0</p>
+                        <p className="text-xs text-gray-500">-</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Last Modified</p>
+                        <p className="text-sm text-gray-900">{formatDateTime(image.updated_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Assigned Machines</p>
+                        <p className="text-sm text-gray-900">0</p>
+                        <p className="text-xs text-gray-500">-</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-700">Checksums</p>
@@ -575,7 +692,7 @@ const ImageManager: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700">Size</p>
-                  <p className="text-sm text-gray-900">{formatFileSize(selectedImage.size_bytes)}</p>
+                  <p className="text-sm text-gray-900">{formatBytes(selectedImage.size_bytes)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700">Type</p>
@@ -597,6 +714,16 @@ const ImageManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Create Image Wizard */}
+      <CreateImageWizard
+        isOpen={showCreateWizard}
+        onClose={() => setShowCreateWizard(false)}
+        onSuccess={() => {
+          refetchImages();
+          setShowCreateWizard(false);
+        }}
+      />
     </div>
   );
 };

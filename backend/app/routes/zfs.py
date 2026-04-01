@@ -10,6 +10,7 @@ import structlog
 from app.core.dependencies import get_current_user, require_operator
 from app.models.user import User
 from app.utils.zfs_manager import ZFSManager, ZFSPool, ZFSDataset, ZFSSnapshot
+from app.utils.zfs_enhanced import ZFSUtils
 from app.utils.arc_monitor import ARCMonitor
 from app.utils.iostat_reader import IOStatReader
 from app.core.exceptions import StorageError
@@ -271,6 +272,37 @@ async def create_zfs_dataset(
     except Exception as e:
         logger.error("Failed to create ZFS dataset", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to create dataset: {str(e)}")
+
+
+@router.post("/datasets/ensure")
+async def ensure_zfs_datasets(
+    pool_name: Optional[str] = None,
+    current_user: User = Depends(require_operator)
+):
+    """
+    Ensure required ZFS datasets exist, create them if they don't.
+    This creates the clients and images_bin datasets as configured in settings.
+    """
+    try:
+        zfs_utils = ZFSUtils()
+        result = zfs_utils.ensure_zfs_datasets(pool_name=pool_name)
+        
+        if result["all_created"]:
+            return {
+                "message": "All required ZFS datasets are ready",
+                "pool_name": result["pool_name"],
+                "datasets": result["datasets"]
+            }
+        else:
+            return {
+                "message": "Some datasets could not be created",
+                "pool_name": result["pool_name"],
+                "datasets": result["datasets"],
+                "errors": result["errors"]
+            }
+    except Exception as e:
+        logger.error("Failed to ensure ZFS datasets", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to ensure datasets: {str(e)}")
 
 
 @router.post("/snapshots")

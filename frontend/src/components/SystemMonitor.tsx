@@ -33,6 +33,7 @@ import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 import { ProgressBar } from './ui/ProgressBar';
 import { api } from '../lib/api';
+import { formatBytes, formatDateTime, formatUptime } from '../utils/formatters';
 
 // interface SystemMetrics { // Unused for now
 //   timestamp: string;
@@ -168,21 +169,7 @@ const SystemMonitor: React.FC = () => {
     return 'text-red-600';
   };
 
-  const formatBytes = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatUptime = (uptime: string) => {
-    // Parse uptime string and format it nicely
-    return uptime;
-  };
+  // Using shared utilities from utils/formatters
 
   const getCurrentMetricValue = () => {
     if (metrics.length === 0) return 0;

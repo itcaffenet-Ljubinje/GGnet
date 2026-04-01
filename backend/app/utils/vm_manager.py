@@ -178,13 +178,14 @@ class VMManager:
         self,
         db: AsyncSession,
         name: str,
-        image_id: int,
+        image_ids: List[int],
         vcpus: int = 2,
         ram_mb: int = 4096,
         drives_connection: str = "local",
         mac_address: Optional[str] = None,
         boot_mode: str = "uefi",
         created_by: int = 1,
+        description: Optional[str] = None,
     ) -> VM:
         """
         Create new virtual machine
@@ -192,13 +193,14 @@ class VMManager:
         Args:
             db: Async database session
             name: VM name
-            image_id: Image ID to use
+            image_ids: List of Image IDs to use (at least 1 required)
             vcpus: Number of vCPUs
             ram_mb: RAM in MB
             drives_connection: "local" or "network"
             mac_address: MAC address (required for network boot)
             boot_mode: Boot mode ("uefi" or "legacy")
             created_by: User ID who created the VM
+            description: Optional VM description
             
         Returns:
             Created VM model
@@ -206,13 +208,21 @@ class VMManager:
         Raises:
             VMError: If VM creation fails
         """
-        # Get image
-        stmt = select(Image).where(Image.id == image_id)
-        result = await db.execute(stmt)
-        image = result.scalar_one_or_none()
+        if not image_ids or len(image_ids) == 0:
+            raise VMError("At least one image ID is required")
         
-        if not image:
-            raise VMError(f"Image with ID {image_id} not found")
+        # Get images
+        stmt = select(Image).where(Image.id.in_(image_ids))
+        result = await db.execute(stmt)
+        images = result.scalars().all()
+        
+        if len(images) != len(image_ids):
+            found_ids = {img.id for img in images}
+            missing_ids = set(image_ids) - found_ids
+            raise VMError(f"Images with IDs {missing_ids} not found")
+        
+        # Use first image as primary (for backward compatibility)
+        image = images[0]
         
         # Check if VM already exists
         stmt = select(VM).where(VM.name == name)
@@ -265,7 +275,7 @@ class VMManager:
             vm = VM(
                 name=name,
                 vm_id=vm_uuid,
-                image_id=image_id,
+                image_id=image.id,  # Primary image for backward compatibility
                 vcpus=vcpus,
                 ram_mb=ram_mb,
                 disk_path=disk_path,
@@ -275,7 +285,11 @@ class VMManager:
                 boot_mode=boot_mode,
                 status=VMStatus.STOPPED,
                 created_by=created_by,
+                description=description,
             )
+            
+            # Associate all images with VM
+            vm.images = images
             
             db.add(vm)
             await db.commit()
@@ -405,6 +419,9 @@ class VMManager:
         if not vm:
             raise VMError(f"VM with ID {vm_id} not found")
         
+        # Refresh to load images relationship
+        await db.refresh(vm, ["images"])
+        
         info = {
             "id": vm.id,
             "name": vm.name,
@@ -416,11 +433,17 @@ class VMManager:
             "zfs_clone": vm.zfs_clone,
             "vnc_port": vm.vnc_port,
             "vnc_token": vm.vnc_token,
+            "image_id": vm.image_id,  # Primary image (backward compatibility)
+            "image_ids": [img.id for img in vm.images] if vm.images else [],
+            "mac_address": vm.mac_address,
+            "ip_address": vm.ip_address,
+            "boot_mode": vm.boot_mode,
+            "description": vm.description,
             "created_at": vm.created_at.isoformat() if vm.created_at else None,
             "updated_at": vm.updated_at.isoformat() if vm.updated_at else None,
         }
         
-        # Add image info
+        # Add image info (primary image)
         if vm.image_id:
             stmt = select(Image).where(Image.id == vm.image_id)
             result = await db.execute(stmt)
@@ -431,6 +454,17 @@ class VMManager:
                     "name": image.name,
                     "image_type": image.image_type.value,
                 }
+        
+        # Add all images info
+        if vm.images:
+            info["images"] = [
+                {
+                    "id": img.id,
+                    "name": img.name,
+                    "image_type": img.image_type.value,
+                }
+                for img in vm.images
+            ]
         
         # Get libvirt domain info if running and available
         if vm.status == VMStatus.RUNNING and self._is_libvirt_available():

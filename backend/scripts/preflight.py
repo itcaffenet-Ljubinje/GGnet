@@ -125,27 +125,31 @@ def check_network_interfaces() -> Tuple[bool, str]:
 
 
 def check_dhcp_config() -> Tuple[bool, str]:
-    """Check DHCP configuration"""
+    """Check dnsmasq configuration"""
     try:
-        dhcp_conf = Path("docker/dhcp/dhcpd.conf")
-        if not dhcp_conf.exists():
-            dhcp_conf = Path("/etc/dhcp/dhcpd.conf")
+        # Check for dnsmasq config
+        dnsmasq_conf = Path("docker/dnsmasq/dnsmasq.conf")
+        if not dnsmasq_conf.exists():
+            dnsmasq_conf = Path("/etc/dnsmasq.conf")
         
-        if not dhcp_conf.exists():
-            return False, "DHCP config file not found"
+        if not dnsmasq_conf.exists():
+            return False, "dnsmasq config file not found"
         
-        content = dhcp_conf.read_text()
+        content = dnsmasq_conf.read_text()
         
-        # Check for critical settings
-        if "option arch" not in content:
-            return False, "DHCP config missing architecture detection (option arch)"
+        # Check for critical dnsmasq settings
+        if "dhcp-range" not in content:
+            return False, "dnsmasq config missing DHCP range (dhcp-range)"
         
-        if "snponly.efi" not in content and "ipxe.efi" not in content:
-            return False, "DHCP config missing iPXE boot files"
+        if "dhcp-match" not in content and "dhcp-boot" not in content:
+            return False, "dnsmasq config missing PXE boot configuration"
         
-        return True, "DHCP configuration OK"
+        if "snponly.efi" not in content and "ipxe.efi" not in content and "undionly.kpxe" not in content:
+            return False, "dnsmasq config missing iPXE boot files"
+        
+        return True, "dnsmasq configuration OK"
     except Exception as e:
-        return False, f"DHCP config check error: {str(e)}"
+        return False, f"dnsmasq config check error: {str(e)}"
 
 
 def check_tftp_files() -> Tuple[bool, str]:

@@ -40,6 +40,7 @@ class ImageResponse(BaseModel):
     name: str
     description: Optional[str]
     filename: str
+    file_path: Optional[str] = None  # Include file_path for cloning operations
     format: ImageFormat
     size_bytes: int
     virtual_size_bytes: Optional[int]
@@ -171,6 +172,7 @@ async def upload_image(
     name: str = Form(...),
     description: Optional[str] = Form(None),
     image_type: ImageType = Form(ImageType.SYSTEM),
+    os_template: Optional[str] = Form(None),  # OS template for system images
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -203,6 +205,15 @@ async def upload_image(
             while chunk := await file.read(8192):
                 await f.write(chunk)
         
+        # Map OS template to os_type if provided
+        os_type_map = {
+            'windows-10': 'windows10',
+            'windows-11': 'windows11',
+            'windows-server-2019': 'windows-server-2019',
+            'windows-server-2022': 'windows-server-2022',
+        }
+        os_type = os_type_map.get(os_template) if os_template else None
+        
         # Create image record
         image = Image(
             name=name,
@@ -212,6 +223,7 @@ async def upload_image(
             original_filename=file.filename,
             format=image_format,
             image_type=image_type,
+            os_type=os_type,  # Set OS type from template
             status=ImageStatus.UPLOADING,
             size_bytes=0,  # Will be calculated in background
             created_by=current_user.id

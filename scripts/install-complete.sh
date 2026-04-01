@@ -116,9 +116,8 @@ apt-get install -y -qq \
 
 step "3/12 Installing network services..."
 apt-get install -y -qq \
-    isc-dhcp-server \
-    tftpd-hpa \
-    dnsmasq
+    dnsmasq \
+    tftpd-hpa
 
 step "4/12 Installing iSCSI and storage tools..."
 apt-get install -y -qq \

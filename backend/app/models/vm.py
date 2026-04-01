@@ -4,12 +4,20 @@ Virtual Machine model for QEMU/KVM VMs
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
-from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text  # pyright: ignore[reportMissingImports]
+from typing import Optional, List
+from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, Table, Column  # pyright: ignore[reportMissingImports]
 from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
 from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
+
+# Association table for many-to-many relationship between VM and Image
+vm_images = Table(
+    "vm_images",
+    Base.metadata,
+    Column("vm_id", Integer, ForeignKey("vms.id", ondelete="CASCADE"), primary_key=True),
+    Column("image_id", Integer, ForeignKey("images.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class VMStatus(str, Enum):
@@ -31,9 +39,17 @@ class VM(Base):
     # Libvirt domain UUID
     vm_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     
-    # Image relationship
+    # Image relationships
+    # Legacy single image_id for backward compatibility
     image_id: Mapped[Optional[int]] = mapped_column(ForeignKey("images.id"), index=True)
-    image = relationship("Image", back_populates="vms")
+    image = relationship("Image", foreign_keys=[image_id], back_populates="vms")
+    
+    # Many-to-many relationship for multiple images
+    images: Mapped[List["Image"]] = relationship(
+        "Image",
+        secondary=vm_images,
+        back_populates="vm_instances"
+    )
     
     # Resources
     vcpus: Mapped[int] = mapped_column(Integer, default=2)

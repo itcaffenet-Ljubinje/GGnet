@@ -24,6 +24,7 @@ import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
+import { formatDateTime, formatBytes } from '../utils/formatters';
 
 // Type for Axios error responses
 interface AxiosErrorResponse extends Error {
@@ -225,16 +226,7 @@ const TargetManager: React.FC = () => {
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-  };
+  // Using shared utilities from utils/formatters
 
   if (targetsLoading || machinesLoading || imagesLoading) {
     return (
@@ -320,7 +312,7 @@ const TargetManager: React.FC = () => {
                   .filter((i: DiskImage) => i.status === 'READY')
                   .map((image: DiskImage) => (
                     <option key={image.id} value={image.id}>
-                      {image.name} ({image.format}) - {formatFileSize(image.size_bytes)}
+                      {image.name} ({image.format}) - {formatBytes(image.size_bytes)}
                     </option>
                   ))}
               </select>

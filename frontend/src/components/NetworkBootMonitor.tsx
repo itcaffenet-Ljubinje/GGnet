@@ -26,6 +26,7 @@ import { Card } from './ui/Card';
 import { StatusBadge } from './ui/StatusBadge';
 // import { ProgressBar } from './ui/ProgressBar'; // Unused for now
 import { api } from '../lib/api';
+import { formatDateTime, formatDuration } from '../utils/formatters';
 
 interface BootEvent {
   id: string;
@@ -172,15 +173,7 @@ const NetworkBootMonitor: React.FC = () => {
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}m ${secs}s`;
-  };
+  // Using shared utilities from utils/formatters
 
   const formatEventType = (eventType: string) => {
     return eventType.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
