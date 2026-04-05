@@ -70,6 +70,7 @@ export const useAuthStore = create<AuthStore>()(
 
           return true
         } catch (error: unknown) {
+          console.error('Login failed:', error)
           set({ isLoading: false })
           return false
         }

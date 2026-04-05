@@ -51,6 +51,12 @@ class PasswordError(SecurityError):
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     try:
+        # Ensure password is not too long for bcrypt (max 72 bytes)
+        # Truncate to match the behavior of get_password_hash
+        password_bytes = plain_password.encode('utf-8')
+        if len(password_bytes) > 72:
+            plain_password = plain_password[:72]
+        
         return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
         logger.error("Password verification failed", error=str(e))

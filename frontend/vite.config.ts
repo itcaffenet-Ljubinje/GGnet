@@ -1,9 +1,8 @@
 /// <reference types="vitest" />
-import { defineConfig, splitVendorChunkPlugin } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import viteCompression from 'vite-plugin-compression'
 import path from 'path'
-import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
@@ -118,7 +117,7 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
-        bypass: (req, res, options) => {
+        bypass: (req) => {
           // Don't proxy if it's a Vite internal request
           if (req.url?.startsWith('/@')) {
             return req.url
@@ -144,6 +143,21 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    testTimeout: 10000, // Increase timeout for slower tests (especially with coverage)
+    // Only include test files in src directory, explicitly exclude e2e
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/e2e/**',
+      '**/e2e/**/*',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      '**/*.e2e.{ts,tsx}',
+      'e2e/**/*.spec.ts', // Exclude Playwright spec files
+      'e2e/**/*.spec.tsx', // Exclude Playwright spec files
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -155,8 +169,9 @@ export default defineConfig({
         'src/**/*.spec.{ts,tsx}',
         'src/test/**',
         'src/main.tsx',
-        'src/vite-env.d.ts'
+        'src/vite-env.d.ts',
+        'e2e/**'
       ]
     }
   }
-}))
+})

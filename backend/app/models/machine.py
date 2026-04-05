@@ -4,12 +4,20 @@ Machine model for client computers
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON  # pyright: ignore[reportMissingImports]
+from typing import Optional, List
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Text, JSON, Table, Column, Integer  # pyright: ignore[reportMissingImports]
 from sqlalchemy.orm import Mapped, mapped_column, relationship  # pyright: ignore[reportMissingImports]
 from sqlalchemy.sql import func  # pyright: ignore[reportMissingImports]
 
 from app.core.database import Base
+
+# Association table for many-to-many relationship between Machine and Image
+machine_images = Table(
+    "machine_images",
+    Base.metadata,
+    Column("machine_id", Integer, ForeignKey("machines.id", ondelete="CASCADE"), primary_key=True),
+    Column("image_id", Integer, ForeignKey("images.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class MachineStatus(str, Enum):
@@ -114,6 +122,17 @@ class Machine(Base):
     # Relationships
     targets = relationship("Target", back_populates="machine")
     sessions = relationship("Session", back_populates="machine")
+    writebacks = relationship("Writeback", back_populates="machine", cascade="all, delete-orphan")
+    snapshots = relationship("Snapshot", back_populates="machine", cascade="all, delete-orphan")
+    clients = relationship("Client", back_populates="machine", cascade="all, delete-orphan")
+    boot_events = relationship("BootEvent", back_populates="machine", cascade="all, delete-orphan")
+    
+    # Many-to-many relationship for multiple images
+    images: Mapped[List["Image"]] = relationship(
+        "Image",
+        secondary=machine_images,
+        back_populates="machine_instances"
+    )
     
     def __repr__(self) -> str:
         return f"<Machine(id={self.id}, name='{self.name}', mac='{self.mac_address}', status='{self.status}')>"

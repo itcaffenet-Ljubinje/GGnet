@@ -3,37 +3,131 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   Menu,
   X,
-  Home,
-  HardDrive,
-  Monitor,
-  Target,
-  Activity,
-  Settings,
   User,
   Bell,
   ChevronDown,
   BarChart3,
   Database,
+  Monitor,
+  HardDrive,
+  Camera,
+  Import,
+  FileText,
+  Download,
+  Network,
+  Wifi,
+  Target,
+  Server,
+  Layers,
+  Clock,
+  History as HistoryIcon,
+  Activity,
+  Users,
+  Settings,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { clsx } from 'clsx'
 import { Button } from './ui'
 import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates'
+import Navigation from './Navigation'
+import { NavigationSection } from '../types/navigation'
 
 interface LayoutProps {
   children: ReactNode
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Machines', href: '/machines', icon: Monitor },
-  { name: 'Images', href: '/images', icon: HardDrive },
-  { name: 'Sessions', href: '/sessions', icon: Activity },
-  { name: 'Targets', href: '/targets', icon: Target },
-  { name: 'Network Boot', href: '/network-boot', icon: Activity },
-  { name: 'System Monitor', href: '/system-monitor', icon: BarChart3 },
-  { name: 'Storage', href: '/storage', icon: Database },
-  { name: 'Settings', href: '/settings', icon: Settings },
+// GgRock-inspired navigation structure
+const navigationSections: NavigationSection[] = [
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    icon: BarChart3,
+    href: '/dashboard',
+    single: true,
+  },
+  {
+    id: 'machines',
+    name: 'Machines',
+    icon: Monitor,
+    items: [
+      { name: 'All Machines', href: '/machines', icon: Monitor },
+      { name: 'Sessions', href: '/sessions', icon: Activity },
+      { name: 'Clients', href: '/clients', icon: Users },
+    ],
+  },
+  {
+    id: 'storage',
+    name: 'Storage & Arrays',
+    icon: Database,
+    items: [
+      { name: 'Arrays', href: '/storage', icon: Database },
+    ],
+  },
+  {
+    id: 'images',
+    name: 'Images',
+    icon: HardDrive,
+    items: [
+      { name: 'All Images', href: '/images', icon: HardDrive },
+      { name: 'Snapshots', href: '/snapshots', icon: Camera },
+      { name: 'Import/Export', href: '/image-import-export', icon: Import },
+    ],
+  },
+  {
+    id: 'writebacks',
+    name: 'Writebacks',
+    icon: FileText,
+    href: '/writebacks',
+    single: true,
+  },
+  {
+    id: 'updates',
+    name: 'Updates',
+    icon: Download,
+    href: '/updates',
+    single: true,
+  },
+  {
+    id: 'network',
+    name: 'Network',
+    icon: Network,
+    items: [
+      { name: 'Network Boot', href: '/network-boot', icon: Wifi },
+      { name: 'Targets', href: '/targets', icon: Target },
+    ],
+  },
+  {
+    id: 'virtualization',
+    name: 'Virtualization',
+    icon: Server,
+    items: [
+      { name: 'VMs', href: '/vms', icon: Server },
+    ],
+  },
+  {
+    id: 'operations',
+    name: 'Operations',
+    icon: Layers,
+    items: [
+      { name: 'Batch Operations', href: '/batch-operations', icon: Layers },
+      { name: 'Scheduler', href: '/scheduler', icon: Clock },
+      { name: 'Activities', href: '/activities', icon: HistoryIcon },
+    ],
+  },
+  {
+    id: 'monitoring',
+    name: 'Monitoring',
+    icon: BarChart3,
+    href: '/system-monitor',
+    single: true,
+  },
+  {
+    id: 'settings',
+    name: 'Settings',
+    icon: Settings,
+    href: '/settings',
+    single: true,
+  },
 ]
 
 export default function Layout({ children }: LayoutProps) {
@@ -44,6 +138,25 @@ export default function Layout({ children }: LayoutProps) {
   
   // Initialize real-time updates
   useRealTimeUpdates()
+
+  // Load collapsed sections from localStorage
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('ggnet-nav-collapsed')
+    return saved ? new Set(JSON.parse(saved)) : new Set()
+  })
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId)
+      } else {
+        newSet.add(sectionId)
+      }
+      localStorage.setItem('ggnet-nav-collapsed', JSON.stringify(Array.from(newSet)))
+      return newSet
+    })
+  }
 
   const handleLogout = () => {
     logout()
@@ -79,34 +192,13 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
             
-            <nav className="mt-5 px-2 space-y-1">
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={clsx(
-                      'group flex items-center px-2 py-2 text-base font-medium rounded-lg transition-colors duration-200',
-                      isActive
-                        ? 'bg-blue-600 text-white' 
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    )}
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <item.icon
-                      className={clsx(
-                        'mr-4 flex-shrink-0 h-5 w-5',
-                        isActive 
-                          ? 'text-blue-500' 
-                          : 'text-gray-400 group-hover:text-gray-300'
-                      )}
-                    />
-                    {item.name}
-                  </Link>
-                )
-              })}
-            </nav>
+            <Navigation
+              sections={navigationSections}
+              collapsedSections={collapsedSections}
+              onToggleSection={toggleSection}
+              onItemClick={() => setSidebarOpen(false)}
+              isMobile={true}
+            />
           </div>
         </div>
       </div>
@@ -126,33 +218,12 @@ export default function Layout({ children }: LayoutProps) {
               </div>
               
               {/* Navigation */}
-              <nav className="mt-8 px-2 space-y-1">
-                {navigation.map((item) => {
-                  const isActive = location.pathname === item.href
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={clsx(
-                        'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200',
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-lg' 
-                          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                      )}
-                    >
-                      <item.icon
-                        className={clsx(
-                          'mr-3 flex-shrink-0 h-5 w-5 transition-colors duration-200',
-                          isActive 
-                            ? 'text-blue-200' 
-                            : 'text-gray-400 group-hover:text-gray-300'
-                        )}
-                      />
-                      {item.name}
-                    </Link>
-                  )
-                })}
-              </nav>
+              <Navigation
+                sections={navigationSections}
+                collapsedSections={collapsedSections}
+                onToggleSection={toggleSection}
+                isMobile={false}
+              />
             </div>
             
             {/* User section */}

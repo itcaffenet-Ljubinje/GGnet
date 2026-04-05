@@ -1,8 +1,4 @@
 import { lazy, Suspense } from 'react'
-import type { 
-  LineChart as LineChartType, 
-  AreaChart as AreaChartType 
-} from 'recharts'
 import { LoadingSpinner } from '../LoadingSpinner'
 
 // Lazy load the entire chart component

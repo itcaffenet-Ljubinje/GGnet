@@ -164,12 +164,15 @@ cython_debug/
 
 # Node.js
 node_modules/
-package-lock.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+
+# Allow package-lock.json for reproducible builds (needed for CI/CD)
+# This must come after the general ignore patterns
+!frontend/package-lock.json
 
 # Runtime data
 pids

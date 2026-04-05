@@ -36,6 +36,7 @@ class ImageStatus(str, Enum):
 class ImageType(str, Enum):
     """Image type classification"""
     SYSTEM = "system"  # OS images
+    APPLICATION = "application"  # Application images
     GAME = "game"      # Game disk images
     DATA = "data"      # Data disk images
     TEMPLATE = "template"  # Template images
@@ -89,9 +90,9 @@ class Image(Base):
     download_count: Mapped[int] = mapped_column(default=0)
     last_used: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     
-    # Relationships
+    # Foreign keys
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    created_by_user = relationship("User", back_populates="created_images", foreign_keys=[created_by])
+    converted_from_id: Mapped[Optional[int]] = mapped_column(ForeignKey("images.id"))
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -111,12 +112,15 @@ class Image(Base):
     processing_log: Mapped[Optional[str]] = mapped_column(Text)
     error_message: Mapped[Optional[str]] = mapped_column(Text)
     
-    # Conversion tracking
-    converted_from_id: Mapped[Optional[int]] = mapped_column(ForeignKey("images.id"))
+    # Relationships (all relationships must be defined after all columns)
+    vms = relationship("VM", foreign_keys="[VM.image_id]", back_populates="image", cascade="all, delete-orphan")
+    vm_instances = relationship("VM", secondary="vm_images", back_populates="images")
+    machine_instances = relationship("Machine", secondary="machine_images", back_populates="images")
+    created_by_user = relationship("User", back_populates="created_images", foreign_keys=[created_by])
     converted_from = relationship("Image", remote_side=[id], backref="conversions")
-    
-    # Targets using this image
     targets = relationship("Target", back_populates="image")
+    writebacks = relationship("Writeback", back_populates="image", cascade="all, delete-orphan")
+    snapshots = relationship("Snapshot", back_populates="image", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, name='{self.name}', format='{self.format}', status='{self.status}')>"

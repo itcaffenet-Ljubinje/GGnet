@@ -16,6 +16,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_operator, log_user_activity
 from app.models.user import User
 from app.models.machine import Machine, MachineStatus, BootMode
+from app.models.image import Image
 from app.models.target import Target
 from app.models.session import Session, SessionStatus
 from app.models.audit import AuditAction
@@ -40,6 +41,7 @@ class MachineResponse(BaseModel):
     location: Optional[str]
     room: Optional[str]
     asset_tag: Optional[str]
+    image_ids: Optional[List[int]] = None  # List of associated image IDs
     created_at: datetime
     last_seen: Optional[datetime]
     last_boot: Optional[datetime]
@@ -59,6 +61,14 @@ class MachineCreate(BaseModel):
     location: Optional[str] = None
     room: Optional[str] = None
     asset_tag: Optional[str] = None
+    image_ids: Optional[List[int]] = None  # List of image IDs (System + Application images)
+    
+    @field_validator('image_ids')
+    @classmethod
+    def validate_image_ids(cls, v):
+        if v is not None and len(v) == 0:
+            raise ValueError('If provided, image_ids must contain at least one image ID')
+        return v
     
     @field_validator('mac_address')
     @classmethod
@@ -167,6 +177,19 @@ async def create_machine(
     if result.scalar_one_or_none():
         raise ConflictError(f"Machine with name '{machine_data.name}' already exists")
     
+    # Validate images if provided
+    images = []
+    if machine_data.image_ids:
+        result = await db.execute(
+            select(Image).where(Image.id.in_(machine_data.image_ids))
+        )
+        images = result.scalars().all()
+        
+        if len(images) != len(machine_data.image_ids):
+            found_ids = {img.id for img in images}
+            missing_ids = set(machine_data.image_ids) - found_ids
+            raise ValidationError(f"Images with IDs {missing_ids} not found")
+    
     # Create machine
     machine = Machine(
         name=machine_data.name,
@@ -182,9 +205,13 @@ async def create_machine(
         created_by=current_user.id
     )
     
+    # Associate images with machine
+    if images:
+        machine.images = images
+    
     db.add(machine)
     await db.commit()
-    await db.refresh(machine)
+    await db.refresh(machine, ["images"])
     
     # Log activity
     await log_user_activity(
@@ -206,7 +233,10 @@ async def create_machine(
         user_id=current_user.id
     )
     
-    return ModelSerializer.serialize_model(machine, MachineResponse)
+    # Serialize with image_ids
+    response_data = ModelSerializer.serialize_model(machine, MachineResponse)
+    response_data.image_ids = [img.id for img in machine.images] if machine.images else []
+    return response_data
 
 
 @router.get("", response_model=List[MachineResponse])
@@ -256,6 +286,10 @@ async def list_machines(
     result = await db.execute(query)
     machines = result.scalars().all()
     
+    # Load images relationship for each machine
+    for machine in machines:
+        await db.refresh(machine, ["images"])
+    
     # Log activity
     await log_user_activity(
         action=AuditAction.MACHINE_UPDATED,  # Using closest available action
@@ -266,7 +300,11 @@ async def list_machines(
         db=db
     )
     
-    return ModelSerializer.serialize_model_list(machines, MachineResponse)
+    # Serialize with image_ids
+    serialized_machines = ModelSerializer.serialize_model_list(machines, MachineResponse)
+    for i, machine in enumerate(machines):
+        serialized_machines[i].image_ids = [img.id for img in machine.images] if machine.images else []
+    return serialized_machines
 
 
 @router.get("/{machine_id}", response_model=MachineResponse)
@@ -283,7 +321,13 @@ async def get_machine(
     if not machine:
         raise NotFoundError(f"Machine with ID {machine_id} not found")
     
-    return ModelSerializer.serialize_model(machine, MachineResponse)
+    # Refresh to load images relationship
+    await db.refresh(machine, ["images"])
+    
+    # Serialize with image_ids
+    response_data = ModelSerializer.serialize_model(machine, MachineResponse)
+    response_data.image_ids = [img.id for img in machine.images] if machine.images else []
+    return response_data
 
 
 @router.put("/{machine_id}", response_model=MachineResponse)

@@ -68,14 +68,25 @@ def get_async_engine():
     if _async_engine is None:
         settings = get_settings()
         try:
+            # SQLite doesn't support pool_size, max_overflow, pool_timeout with NullPool
+            # Only set these for PostgreSQL
+            engine_kwargs = {
+                "echo": settings.DEBUG,
+                "pool_pre_ping": True,
+            }
+            
+            # Add pool parameters only for PostgreSQL (not SQLite)
+            if settings.database_url_async.startswith("postgresql"):
+                engine_kwargs.update({
+                    "pool_size": 20,  # Number of connections to maintain (higher for async)
+                    "max_overflow": 40,  # Maximum number of connections to create beyond pool_size
+                    "pool_recycle": 3600,  # Recycle connections after 1 hour
+                    "pool_timeout": 30,  # Timeout for getting connection from pool
+                })
+            
             _async_engine = create_async_engine(
                 settings.database_url_async,
-                echo=settings.DEBUG,
-                pool_pre_ping=True,
-                pool_size=20,  # Number of connections to maintain (higher for async)
-                max_overflow=40,  # Maximum number of connections to create beyond pool_size
-                pool_recycle=3600,  # Recycle connections after 1 hour
-                pool_timeout=30,  # Timeout for getting connection from pool
+                **engine_kwargs
             )
         except Exception as e:
             logger.error(f"Failed to create async engine: {e}")

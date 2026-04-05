@@ -1,6 +1,6 @@
 # CI/CD Setup Checklist
 
-**Codecov Token:** `8af9069a-33d3-4237-9563-765e6832b26b`
+**Codecov Token:** Retrieve the upload token from the Codecov dashboard (Repository Settings → General → Upload token) and store it only in secret managers such as GitHub Actions secrets.
 
 ---
 
@@ -12,7 +12,7 @@
 - [ ] Settings → Secrets and variables → Actions
 - [ ] Click "New repository secret"
 - [ ] Name: `CODECOV_TOKEN`
-- [ ] Value: `8af9069a-33d3-4237-9563-765e6832b26b`
+- [ ] Value: Paste the upload token you copied from Codecov (do not commit it)
 - [ ] Click "Add secret"
 - [ ] Verify secret appears in list
 

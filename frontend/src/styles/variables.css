@@ -1,0 +1,191 @@
+/* GgRock Design System - CSS Variables */
+
+:root {
+  /* Backgrounds */
+  --ggrock-bg-01: #171a1c;  /* Dark */
+  --ggrock-bg-02: #2e3438;  /* Medium Dark */
+  --ggrock-bg-03: #454e54;  /* Light Dark */
+  
+  /* Text Colors */
+  --ggrock-text-high: rgba(255, 255, 255, 0.88);
+  --ggrock-text-medium: rgba(255, 255, 255, 0.64);
+  --ggrock-text-low: rgba(255, 255, 255, 0.32);
+  
+  /* Surfaces */
+  --ggrock-surface-enabled: rgba(255, 255, 255, 0.06);
+  --ggrock-surface-hover: rgba(255, 255, 255, 0.12);
+  --ggrock-surface-focus-pressed: rgba(255, 255, 255, 0.16);
+  --ggrock-surface-selected: rgba(97, 162, 209, 0.16);
+  --ggrock-surface-activated: rgba(97, 162, 209, 0.24);
+  
+  /* Interactive Colors */
+  --ggrock-interactive-enabled: #61a2d1;  /* Primary Blue */
+  --ggrock-interactive-hover: #88b9dd;
+  --ggrock-interactive-press: #b0d1e8;
+  --ggrock-accent: #61a2d1;
+  
+  /* Alert Colors */
+  --ggrock-alert-success: #7ab889;
+  --ggrock-alert-warning: #fba337;
+  --ggrock-alert-error: #d65e5c;
+  
+  /* Metallic Gradients */
+  --ggrock-metallic-gold: linear-gradient(120.81deg, #bc841f 8.1%, #f9c66c 93.02%);
+  --ggrock-metallic-silver: linear-gradient(116.01deg, #a0a5c5 7.9%, #cfe0e2 91.11%);
+  --ggrock-metallic-bronze: linear-gradient(116.01deg, #874a12 9.48%, #d3975f 92.69%);
+  
+  /* Border Radius */
+  --ggrock-border-radius-xxs: 2px;
+  --ggrock-border-radius-xs: 4px;
+  --ggrock-border-radius-s: 8px;
+  --ggrock-border-radius-m: 12px;
+  --ggrock-border-radius-l: 16px;
+  --ggrock-border-radius-xl: 24px;
+  --ggrock-border-radius-xxl: 32px;
+  
+  /* Shadows */
+  --ggrock-drop-shadow: 0px 2px 8px rgba(0, 0, 0, 0.64);
+  --ggrock-drop-shadow-02: 0px 4px 24px rgba(0, 0, 0, 0.48);
+  --ggrock-drop-shadow-03: 0px 16px 48px rgba(0, 0, 0, 0.32);
+  
+  /* Backdrop Filters */
+  --ggrock-backdrop-filter: blur(74px);
+  --ggrock-backdrop-filter-02: blur(48px);
+  --ggrock-backdrop-filter-03: blur(32px);
+  --ggrock-backdrop-filter-04: blur(16px);
+  
+  /* Typography */
+  --ggrock-font-family: "Inter", sans-serif;
+  --ggrock-disabled-opacity: 0.32;
+  
+  /* Layout */
+  --ggrock-header-block-height: 56px;
+  --ggrock-content-header-height: 64px;
+  --ggrock-form-horizontal-padding: 1.5em;
+  
+  /* Navigation */
+  --ggrock-sidebar-width: 256px;
+  --ggrock-sidebar-collapsed-width: 64px;
+  --ggrock-nav-item-height: 40px;
+  --ggrock-nav-section-spacing: 8px;
+}
+
+/* GgRock Theme Classes */
+.ggrock-theme {
+  background-color: var(--ggrock-bg-01);
+  color: var(--ggrock-text-high);
+  font-family: var(--ggrock-font-family);
+}
+
+.ggrock-surface {
+  background-color: var(--ggrock-surface-enabled);
+  border-radius: var(--ggrock-border-radius-s);
+}
+
+.ggrock-surface:hover {
+  background-color: var(--ggrock-surface-hover);
+}
+
+.ggrock-surface:focus,
+.ggrock-surface:active {
+  background-color: var(--ggrock-surface-focus-pressed);
+}
+
+.ggrock-surface-selected {
+  background-color: var(--ggrock-surface-selected);
+}
+
+.ggrock-surface-activated {
+  background-color: var(--ggrock-surface-activated);
+}
+
+.ggrock-interactive {
+  color: var(--ggrock-interactive-enabled);
+  transition: color 0.2s ease;
+}
+
+.ggrock-interactive:hover {
+  color: var(--ggrock-interactive-hover);
+}
+
+.ggrock-interactive:active {
+  color: var(--ggrock-interactive-press);
+}
+
+/* GgRock Navigation Styles */
+.ggrock-nav-section {
+  margin-bottom: var(--ggrock-nav-section-spacing);
+}
+
+.ggrock-nav-item {
+  height: var(--ggrock-nav-item-height);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--ggrock-border-radius-s);
+  color: var(--ggrock-text-medium);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.ggrock-nav-item:hover {
+  background-color: var(--ggrock-surface-hover);
+  color: var(--ggrock-text-high);
+}
+
+.ggrock-nav-item.active {
+  background-color: var(--ggrock-surface-selected);
+  color: var(--ggrock-interactive-enabled);
+  font-weight: 500;
+}
+
+.ggrock-nav-item.active:hover {
+  background-color: var(--ggrock-surface-activated);
+}
+
+.ggrock-nav-sub-item {
+  padding-left: 48px;
+  font-size: 14px;
+}
+
+/* GgRock Card Styles */
+.ggrock-card {
+  background-color: var(--ggrock-bg-02);
+  border-radius: var(--ggrock-border-radius-m);
+  box-shadow: var(--ggrock-drop-shadow);
+  padding: 16px;
+}
+
+/* GgRock Button Styles */
+.ggrock-button {
+  background-color: var(--ggrock-interactive-enabled);
+  color: white;
+  border: none;
+  border-radius: var(--ggrock-border-radius-s);
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ggrock-button:hover {
+  background-color: var(--ggrock-interactive-hover);
+}
+
+.ggrock-button:active {
+  background-color: var(--ggrock-interactive-press);
+}
+
+/* GgRock Alert Styles */
+.ggrock-alert-success {
+  color: var(--ggrock-alert-success);
+}
+
+.ggrock-alert-warning {
+  color: var(--ggrock-alert-warning);
+}
+
+.ggrock-alert-error {
+  color: var(--ggrock-alert-error);
+}
+

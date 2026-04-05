@@ -322,57 +322,49 @@ export default function DashboardPage() {
     refetchInterval: refreshInterval,
   })
 
-  // Storage data query - unused for now
-  // const { data: storageData } = useQuery({
-  //   queryKey: ['storage'],
-  //   queryFn: () => apiHelpers.getStorageInfo(),
-  //   refetchInterval: refreshInterval,
-  // })
+  // Fetch real data from API
+  const { data: imagesData } = useQuery({
+    queryKey: ['images'],
+    queryFn: () => apiHelpers.getImages(),
+    refetchInterval: refreshInterval,
+  })
 
-  // Mock data for demonstration
-  const mockStats = {
-    totalImages: 12,
-    activeMachines: 8,
-    runningSessions: 3,
-    totalStorage: '2.4 TB',
-    usedStorage: '1.8 TB',
-    availableStorage: '600 GB'
+  const { data: machinesData } = useQuery({
+    queryKey: ['machines'],
+    queryFn: () => apiHelpers.getMachines(),
+    refetchInterval: refreshInterval,
+  })
+
+  const { data: sessionsData } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: () => apiHelpers.getSessions(),
+    refetchInterval: refreshInterval,
+  })
+
+  const { data: storageData } = useQuery({
+    queryKey: ['storage'],
+    queryFn: () => apiHelpers.getStorageInfo(),
+    refetchInterval: refreshInterval,
+  })
+
+  // Calculate stats from real data
+  // Handle both array and object response formats
+  const images = Array.isArray(imagesData) ? imagesData : imagesData?.data || []
+  const machines = Array.isArray(machinesData) ? machinesData : machinesData?.data || []
+  const sessions = Array.isArray(sessionsData) ? sessionsData : sessionsData?.data || []
+  
+  const stats = {
+    totalImages: images.length || 0,
+    activeMachines: machines.filter((m: { status?: string }) => m.status === 'active')?.length || 0,
+    runningSessions: sessions.filter((s: { status?: string }) => s.status === 'running')?.length || 0,
+    totalStorage: storageData?.system_storage?.total_gb ? `${(storageData.system_storage.total_gb / 1024).toFixed(1)} TB` : '0 TB',
+    usedStorage: storageData?.system_storage?.used_gb ? `${(storageData.system_storage.used_gb / 1024).toFixed(1)} TB` : '0 TB',
+    availableStorage: storageData?.system_storage?.free_gb ? `${(storageData.system_storage.free_gb / 1024).toFixed(1)} TB` : '0 TB'
   }
 
-  const mockActivities: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'success',
-      message: 'Image "Windows 11 Pro" uploaded successfully',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-      user: 'admin'
-    },
-    {
-      id: '2',
-      type: 'info',
-      message: 'Machine "PC-001" started diskless session',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    },
-    {
-      id: '3',
-      type: 'warning',
-      message: 'Storage usage is above 80%',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    },
-    {
-      id: '4',
-      type: 'success',
-      message: 'Target "target-001" created successfully',
-      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      user: 'operator'
-    },
-    {
-      id: '5',
-      type: 'error',
-      message: 'Failed to connect to machine "PC-003"',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    }
-  ]
+  // Activities will be fetched from audit log API when available
+  // For now, show empty array
+  const activities: ActivityItem[] = []
 
   const systemStatus: SystemStatusProps = {
     status: healthData?.data?.status === 'healthy' ? 'healthy' : 'warning',
@@ -408,35 +400,35 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Images"
-          value={mockStats.totalImages}
+          value={stats.totalImages}
           icon={HardDrive}
           color="blue"
           subtitle="VHD/VHDX files"
-          trend={{ value: 12, isPositive: true }}
+          isLoading={!imagesData}
         />
         <StatsCard
           title="Active Machines"
-          value={mockStats.activeMachines}
+          value={stats.activeMachines}
           icon={Monitor}
           color="green"
           subtitle="Connected clients"
-          trend={{ value: 5, isPositive: true }}
+          isLoading={!machinesData}
         />
         <StatsCard
           title="Running Sessions"
-          value={mockStats.runningSessions}
+          value={stats.runningSessions}
           icon={Activity}
           color="purple"
           subtitle="Diskless boots"
-          trend={{ value: 2, isPositive: false }}
+          isLoading={!sessionsData}
         />
         <StatsCard
           title="Storage Used"
-          value={`${mockStats.usedStorage} / ${mockStats.totalStorage}`}
+          value={`${stats.usedStorage} / ${stats.totalStorage}`}
           icon={Database}
           color="indigo"
-          subtitle={`${mockStats.availableStorage} available`}
-          trend={{ value: 8, isPositive: false }}
+          subtitle={`${stats.availableStorage} available`}
+          isLoading={!storageData}
         />
       </div>
 
@@ -449,7 +441,7 @@ export default function DashboardPage() {
 
         {/* Activity Feed */}
         <div className="lg:col-span-2">
-          <ActivityFeed activities={mockActivities} />
+          <ActivityFeed activities={activities} />
         </div>
       </div>
 

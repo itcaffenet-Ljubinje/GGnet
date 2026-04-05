@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle, Button } from './ui'
 import { X, Save, Loader2 } from 'lucide-react'
 import { apiHelpers } from '../lib/api'
@@ -34,6 +34,13 @@ interface MachineModalProps {
   mode: 'create' | 'edit'
 }
 
+interface Image {
+  id: number
+  name: string
+  description?: string
+  image_type?: string
+}
+
 export default function MachineModal({ isOpen, onClose, machine, mode }: MachineModalProps) {
   const [formData, setFormData] = useState({
     name: machine?.name || '',
@@ -48,15 +55,28 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
     asset_tag: machine?.asset_tag || '',
     auto_boot: machine?.auto_boot || false,
     wake_on_lan: machine?.wake_on_lan || true,
+    system_image_id: '',
+    application_image_id: '',
     ...machine
   })
+
+  // Fetch images filtered by type
+  const { data: allImages, isLoading: imagesLoading } = useQuery({
+    queryKey: ['images'],
+    queryFn: () => apiHelpers.getImages(),
+    enabled: isOpen,
+  })
+
+  // Filter images by type
+  const systemImages = allImages?.filter((img: Image) => img.image_type === 'system') || []
+  const applicationImages = allImages?.filter((img: Image) => img.image_type === 'application') || []
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { addNotification } = useNotifications()
   const queryClient = useQueryClient()
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string }) => apiHelpers.createMachine(data),
+    mutationFn: (data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string; image_ids?: number[] }) => apiHelpers.createMachine(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] })
       addNotification({
@@ -74,7 +94,7 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string } }) => apiHelpers.updateMachine(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { name: string; hostname: string; ip_address: string; mac_address: string; asset_tag?: string; description?: string; image_ids?: number[] } }) => apiHelpers.updateMachine(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['machines'] })
       addNotification({
@@ -96,10 +116,24 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
     setIsSubmitting(true)
 
     try {
+      // Build list of image IDs (System Image + Application Image)
+      const imageIds: number[] = []
+      if (formData.system_image_id) {
+        imageIds.push(parseInt(formData.system_image_id))
+      }
+      if (formData.application_image_id) {
+        imageIds.push(parseInt(formData.application_image_id))
+      }
+
+      const submitData = {
+        ...formData,
+        image_ids: imageIds.length > 0 ? imageIds : undefined
+      }
+
       if (mode === 'create') {
-        await createMutation.mutateAsync(formData)
+        await createMutation.mutateAsync(submitData)
       } else if (machine?.id) {
-        await updateMutation.mutateAsync({ id: machine.id, data: formData })
+        await updateMutation.mutateAsync({ id: machine.id, data: submitData })
       }
     } finally {
       setIsSubmitting(false)
@@ -196,17 +230,59 @@ export default function MachineModal({ isOpen, onClose, machine, mode }: Machine
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Boot Mode
+                  System Image *
+                </label>
+                <select
+                  name="system_image_id"
+                  value={formData.system_image_id}
+                  onChange={handleInputChange}
+                  required
+                  disabled={imagesLoading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                >
+                  <option value="">Select System Image</option>
+                  {systemImages.map((image: Image) => (
+                    <option key={image.id} value={image.id}>
+                      {image.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Application Image *
+                </label>
+                <select
+                  name="application_image_id"
+                  value={formData.application_image_id}
+                  onChange={handleInputChange}
+                  required
+                  disabled={imagesLoading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                >
+                  <option value="">Select Application Image</option>
+                  {applicationImages.map((image: Image) => (
+                    <option key={image.id} value={image.id}>
+                      {image.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Boot Mode *
                 </label>
                 <select
                   name="boot_mode"
                   value={formData.boot_mode}
                   onChange={handleInputChange}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                 >
                   <option value="uefi">UEFI</option>
                   <option value="legacy">Legacy BIOS</option>
-                  <option value="auto">Auto</option>
                 </select>
               </div>
 

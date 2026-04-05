@@ -27,8 +27,9 @@ test.describe('Login Flow', () => {
     
     // Check default credentials hint is displayed
     await expect(page.locator('text=Default credentials')).toBeVisible();
-    await expect(page.locator('text=admin')).toBeVisible();
-    await expect(page.locator('text=admin123')).toBeVisible();
+    // Use more specific selectors to avoid strict mode violations
+    await expect(page.locator('code').filter({ hasText: 'admin' }).first()).toBeVisible();
+    await expect(page.locator('code').filter({ hasText: 'admin123' })).toBeVisible();
   });
 
   test('should show validation errors for empty fields', async ({ page }) => {
@@ -50,12 +51,12 @@ test.describe('Login Flow', () => {
     // Submit form
     await page.locator('button[type="submit"]').click();
     
-    // Wait for error message
-    await page.waitForTimeout(2000);
+    // Wait for error message - error is displayed in a div with class text-red-300
+    await expect(page.locator('.text-red-300')).toBeVisible({ timeout: 5000 });
     
-    // Check for error message (adjust selector based on actual error display)
+    // Check for error message text
     const errorMessage = page.locator('text=/invalid|error|failed/i');
-    await expect(errorMessage.first()).toBeVisible({ timeout: 5000 });
+    await expect(errorMessage.first()).toBeVisible({ timeout: 1000 });
   });
 
   test('should successfully login with valid credentials', async ({ page }) => {
@@ -63,15 +64,17 @@ test.describe('Login Flow', () => {
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
     
-    // Submit form
-    await page.locator('button[type="submit"]').click();
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
     
-    // Wait for navigation to dashboard
-    await page.waitForURL(/\/dashboard|\/$/, { timeout: 10000 });
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Check that we're logged in (look for dashboard or layout elements)
-    // Adjust selectors based on actual dashboard structure
-    await expect(page).toHaveURL(/\/dashboard|\/$/);
+    // Check that we're logged in
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Check that login form is no longer visible
     await expect(page.locator('input[name="username"]')).not.toBeVisible();
@@ -79,11 +82,6 @@ test.describe('Login Flow', () => {
 
   test('should toggle password visibility', async ({ page }) => {
     const passwordInput = page.locator('input[name="password"]');
-    const toggleButton = page.locator('button').filter({ hasText: /eye|show|hide/i }).or(
-      page.locator('[aria-label*="password"]').or(
-        page.locator('svg').near(passwordInput)
-      )
-    );
     
     // Fill password
     await passwordInput.fill('testpassword');
@@ -91,13 +89,25 @@ test.describe('Login Flow', () => {
     // Check initial state (password should be hidden)
     await expect(passwordInput).toHaveAttribute('type', 'password');
     
-    // Click toggle if button exists
-    if (await toggleButton.count() > 0) {
-      await toggleButton.first().click();
-      
-      // Check password is now visible
-      await expect(passwordInput).toHaveAttribute('type', 'text');
-    }
+    // Find the toggle button - it's a button with type="button" that contains an Eye icon
+    // The button is positioned absolutely within the password input's parent div
+    // Use CSS selector to find button in the same parent as password input
+    const toggleButton = page.locator('.relative button[type="button"]');
+    
+    // Verify button exists and is visible
+    await expect(toggleButton).toBeVisible();
+    
+    // Click toggle button
+    await toggleButton.click();
+    
+    // Check password is now visible
+    await expect(passwordInput).toHaveAttribute('type', 'text');
+    
+    // Click again to hide
+    await toggleButton.click();
+    
+    // Check password is hidden again
+    await expect(passwordInput).toHaveAttribute('type', 'password');
   });
 
   test('should disable submit button during login', async ({ page }) => {
@@ -119,20 +129,21 @@ test.describe('Login Flow', () => {
   });
 
   test('should redirect to dashboard after successful login', async ({ page }) => {
-    // Login
+    // Fill in valid credentials
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
     
-    // Wait for redirect
-    await page.waitForTimeout(3000);
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
     
-    // Should be redirected away from login page
-    const currentUrl = page.url();
-    expect(currentUrl).not.toContain('/login');
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Should be on dashboard or home
-    expect(currentUrl).toMatch(/\/dashboard|\/$/);
+    // Verify we're on dashboard
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 });
 

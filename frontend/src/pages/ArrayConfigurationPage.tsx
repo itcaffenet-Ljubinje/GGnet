@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, ProgressBar, StatusBadge, Button } from '../components/ui'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardHeader, CardTitle, ProgressBar, StatusBadge, Button, StatusLED, ActionMenu, type ActionMenuItem } from '../components/ui'
 import { 
   HardDrive, 
   Plus, 
@@ -14,10 +15,16 @@ import {
   Activity,
   RefreshCw,
   Save,
-  X
+  X,
+  Eye,
+  AlertCircle,
+  RotateCcw,
+  FileText,
+  Lightbulb
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useNotifications } from '../components/notifications'
+import { apiHelpers } from '../lib/api'
 
 interface Disk {
   id: string
@@ -50,6 +57,8 @@ interface ArrayStats {
   reservedPercentage: number
   status: string
   timestamp: string
+  raidType?: string
+  healthStatus?: 'green' | 'amber' | 'red' | 'off'
 }
 
 interface RaidConfig {
@@ -134,101 +143,10 @@ const raidConfigs: RaidConfig[] = [
   }
 ]
 
-const mockArrayStats: ArrayStats = {
-  totalSize: "39.8 GB",
-  usedSpace: "22.1 GB",
-  availableSpace: "17.7 GB",
-  reservedSpace: "7.2 GB",
-  reservedPercentage: 18.0,
-  status: "A4.9.6",
-  timestamp: "2025-01-05 14:30:25"
-}
-
-const mockDisks: Disk[] = [
-  {
-    id: '1',
-    path: '/dev/sda',
-    serial: 'WD-WMC5D1234567',
-    model: 'WDC WD40EFRX-68N32N0',
-    size: '4.0 TB',
-    used: '2.1 TB',
-    available: '1.9 TB',
-    reserved: '500 GB',
-    trimStatus: 'Supported',
-    status: 'active'
-  },
-  {
-    id: '2',
-    path: '/dev/sdb',
-    serial: 'WD-WMC5D1234568',
-    model: 'WDC WD40EFRX-68N32N0',
-    size: '4.0 TB',
-    used: '2.0 TB',
-    available: '2.0 TB',
-    reserved: '500 GB',
-    trimStatus: 'Supported',
-    status: 'active'
-  },
-  {
-    id: '3',
-    path: '/dev/sdc',
-    serial: 'ST4000DM005-2DP166',
-    model: 'Seagate ST4000DM005',
-    size: '4.0 TB',
-    used: '2.2 TB',
-    available: '1.8 TB',
-    reserved: '500 GB',
-    trimStatus: 'Trimmed',
-    status: 'warning'
-  },
-  {
-    id: '4',
-    path: '/dev/sdd',
-    serial: 'ST4000DM005-2DP167',
-    model: 'Seagate ST4000DM005',
-    size: '4.0 TB',
-    used: '1.9 TB',
-    available: '2.1 TB',
-    reserved: '500 GB',
-    trimStatus: 'Unsupported',
-    status: 'error'
-  }
-]
-
-const mockStripes: Stripe[] = [
-  {
-    id: '1',
-    name: 'Stripe 1 (Single-Drive)',
-    type: 'RAID 0',
-    totalSize: '4.0 TB',
-    diskCount: 1,
-    disks: [mockDisks[0]],
-    selected: false
-  },
-  {
-    id: '2',
-    name: 'Stripe 2 (Mirror)',
-    type: 'RAID 1',
-    totalSize: '4.0 TB',
-    diskCount: 2,
-    disks: [mockDisks[1], mockDisks[2]],
-    selected: false
-  },
-  {
-    id: '3',
-    name: 'Stripe 3 (Single-Drive)',
-    type: 'RAID 0',
-    totalSize: '4.0 TB',
-    diskCount: 1,
-    disks: [mockDisks[3]],
-    selected: false
-  }
-]
-
 export default function ArrayConfigurationPage() {
-  const [arrayStats] = useState<ArrayStats>(mockArrayStats)
-  const [disks] = useState<Disk[]>(mockDisks)
-  const [stripes, setStripes] = useState<Stripe[]>(mockStripes)
+  const [arrayStats, setArrayStats] = useState<ArrayStats | null>(null)
+  const [disks, setDisks] = useState<Disk[]>([])
+  const [stripes, setStripes] = useState<Stripe[]>([])
   const [showAddStripe, setShowAddStripe] = useState(false)
   const [showReservedSettings, setShowReservedSettings] = useState(false)
   const [showRaidConfig, setShowRaidConfig] = useState(false)
@@ -237,6 +155,95 @@ export default function ArrayConfigurationPage() {
   const [isLoading, setIsLoading] = useState(false)
   
   const { addNotification } = useNotifications()
+
+  // Fetch storage mounts (disks) from API
+  const { data: mountsData, isLoading: mountsLoading } = useQuery({
+    queryKey: ['storage', 'mounts'],
+    queryFn: async () => {
+      try {
+        const response = await apiHelpers.getStorageMounts()
+        return response
+      } catch (error) {
+        console.error('Failed to fetch storage mounts:', error)
+        return { data: [] }
+      }
+    },
+    refetchInterval: 30000,
+  })
+
+  // Fetch ZFS pools and datasets (for future use)
+  useQuery({
+    queryKey: ['zfs', 'pools'],
+    queryFn: () => apiHelpers.getZfsPools(),
+    refetchInterval: 30000,
+  })
+
+  useQuery({
+    queryKey: ['zfs', 'datasets'],
+    queryFn: () => apiHelpers.getZfsDatasets(),
+    refetchInterval: 30000,
+  })
+
+  // Update disks from API data
+  useEffect(() => {
+    // Handle different response formats
+    const mounts = Array.isArray(mountsData) ? mountsData : mountsData?.data || []
+    
+    if (mounts.length > 0) {
+      const apiDisks: Disk[] = mounts.map((mount: { device?: string; mountpoint?: string; serial?: string; filesystem?: string; total_bytes?: number; used_bytes?: number; free_bytes?: number; usage_percent?: number }, index: number) => ({
+        id: mount.device || `disk-${index}`,
+        path: mount.device || mount.mountpoint || '',
+        serial: mount.serial || 'N/A',
+        model: mount.filesystem || 'Unknown',
+        size: mount.total_bytes ? `${(mount.total_bytes / (1024 ** 3)).toFixed(2)} GB` : '0 GB',
+        used: mount.used_bytes ? `${(mount.used_bytes / (1024 ** 3)).toFixed(2)} GB` : '0 GB',
+        available: mount.free_bytes ? `${(mount.free_bytes / (1024 ** 3)).toFixed(2)} GB` : '0 GB',
+        reserved: '0 GB', // Will be calculated from ZFS when available
+        trimStatus: 'Supported' as const,
+        status: (mount.usage_percent ?? 0) > 90 ? 'error' : (mount.usage_percent ?? 0) > 80 ? 'warning' : 'active' as const,
+      }))
+      setDisks(apiDisks)
+    } else if (!mountsLoading) {
+      // Only clear disks if we're not loading
+      setDisks([])
+    }
+  }, [mountsData, mountsLoading])
+
+  // Update array stats from storage info
+  useEffect(() => {
+    // Handle different response formats
+    const mounts = Array.isArray(mountsData) ? mountsData : mountsData?.data || []
+    
+    if (mounts.length > 0) {
+      const total = mounts.reduce((sum: number, m: { total_bytes?: number }) => sum + (m.total_bytes || 0), 0)
+      const used = mounts.reduce((sum: number, m: { used_bytes?: number }) => sum + (m.used_bytes || 0), 0)
+      const free = mounts.reduce((sum: number, m: { free_bytes?: number }) => sum + (m.free_bytes || 0), 0)
+      
+      setArrayStats({
+        totalSize: `${(total / (1024 ** 3)).toFixed(1)} GB`,
+        usedSpace: `${(used / (1024 ** 3)).toFixed(1)} GB`,
+        availableSpace: `${(free / (1024 ** 3)).toFixed(1)} GB`,
+        reservedSpace: '0 GB',
+        reservedPercentage: 0,
+        status: 'Active',
+        healthStatus: 'green',
+        raidType: 'ZFS Pool', // TODO: Get actual RAID type from ZFS pool info
+        timestamp: new Date().toLocaleString(),
+      })
+    } else if (!mountsLoading) {
+      // No mounts available, set default empty stats (only if not loading)
+      setArrayStats({
+        totalSize: '0 GB',
+        usedSpace: '0 GB',
+        availableSpace: '0 GB',
+        reservedSpace: '0 GB',
+        reservedPercentage: 0,
+        status: 'No Storage',
+        healthStatus: 'off',
+        timestamp: new Date().toLocaleString(),
+      })
+    }
+  }, [mountsData, mountsLoading])
 
 
   const handleStripeSelect = (stripeId: string) => {
@@ -394,7 +401,7 @@ export default function ArrayConfigurationPage() {
                 Total Size
               </div>
               <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {arrayStats.totalSize}
+                {arrayStats?.totalSize || '0 GB'}
               </div>
             </div>
 
@@ -404,10 +411,10 @@ export default function ArrayConfigurationPage() {
                 Reserved Space
               </div>
               <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {arrayStats.reservedSpace}
+                {arrayStats?.reservedSpace || '0 GB'}
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                ({arrayStats.reservedPercentage}%)
+                ({arrayStats?.reservedPercentage || 0}%)
               </div>
             </div>
 
@@ -416,29 +423,49 @@ export default function ArrayConfigurationPage() {
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 Status
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <div className="text-2xl font-bold text-green-600">
-                  {arrayStats.status}
+              <div className="flex items-center gap-3">
+                <StatusLED 
+                  status={arrayStats?.healthStatus || (arrayStats?.status === 'Active' ? 'green' : arrayStats?.status === 'Degraded' ? 'amber' : 'red')}
+                  size="lg"
+                />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {arrayStats?.status || 'Loading...'}
+                    </div>
+                    {arrayStats?.raidType && (
+                      <StatusBadge 
+                        status="info" 
+                        text={arrayStats.raidType}
+                      />
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {arrayStats?.timestamp || '-'}
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {arrayStats.timestamp}
               </div>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="mt-6">
-            <ProgressBar
-              value={parseFloat(arrayStats.usedSpace)}
-              max={parseFloat(arrayStats.totalSize)}
-              showLabel={true}
-              label={`Storage Usage (${arrayStats.usedSpace} / ${arrayStats.totalSize})`}
-              color="blue"
-              size="md"
-            />
-          </div>
+          {arrayStats && (
+            <div className="mt-6">
+              <ProgressBar
+                value={parseFloat(arrayStats.usedSpace.replace(/[^0-9.]/g, '')) || 0}
+                max={parseFloat(arrayStats.totalSize.replace(/[^0-9.]/g, '')) || 1}
+                showLabel={true}
+                label={`Storage Usage (${arrayStats.usedSpace} / ${arrayStats.totalSize})`}
+                color="blue"
+                size="md"
+              />
+            </div>
+          )}
+          {!arrayStats && (
+            <div className="mt-6 text-center text-gray-500 dark:text-gray-400">
+              Loading storage information...
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -602,6 +629,9 @@ export default function ArrayConfigurationPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     TRIM STATUS
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    ACTIONS
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -650,6 +680,87 @@ export default function ArrayConfigurationPage() {
                           disk.trimStatus === 'Unsupported' ? 'error' : 'warning'
                         }
                         text={disk.trimStatus}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <ActionMenu
+                        items={[
+                          {
+                            label: 'Details',
+                            icon: <Eye className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open drive details modal
+                              addNotification({
+                                type: 'info',
+                                message: `Viewing details for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'Identify',
+                            icon: <Lightbulb className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Trigger drive identify (blink LED)
+                              addNotification({
+                                type: 'info',
+                                message: `Identifying drive ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'View SMART',
+                            icon: <FileText className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open SMART data modal
+                              addNotification({
+                                type: 'info',
+                                message: `Viewing SMART data for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            divider: true
+                          },
+                          {
+                            label: 'Mark Failed',
+                            icon: <AlertCircle className="h-4 w-4" />,
+                            onClick: () => {
+                              if (window.confirm(`Mark drive ${disk.path} as failed?`)) {
+                                // TODO: Call API to mark drive as failed
+                                addNotification({
+                                  type: 'warning',
+                                  message: `Marking drive ${disk.path} as failed`
+                                })
+                              }
+                            },
+                            danger: true
+                          },
+                          {
+                            label: 'Replace',
+                            icon: <RotateCcw className="h-4 w-4" />,
+                            onClick: () => {
+                              // TODO: Open replace drive flow
+                              addNotification({
+                                type: 'info',
+                                message: `Starting replace flow for ${disk.path}`
+                              })
+                            }
+                          },
+                          {
+                            label: 'Remove',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => {
+                              if (window.confirm(`Remove drive ${disk.path} from array? This action cannot be undone.`)) {
+                                // TODO: Call API to remove drive
+                                addNotification({
+                                  type: 'warning',
+                                  message: `Removing drive ${disk.path}`
+                                })
+                              }
+                            },
+                            danger: true
+                          }
+                        ]}
                       />
                     </td>
                   </tr>

@@ -347,72 +347,80 @@ LABEL local_boot
         self,
         machines: List[Dict],
         server_ip: str,
-        dhcp_config_path: str = "/etc/dhcp/dhcpd.conf"
+        dhcp_config_path: str = "/etc/dnsmasq.conf"
     ) -> str:
-        """Generate DHCP configuration for network boot"""
+        """Generate dnsmasq configuration for network boot"""
         
-        dhcp_template = Template("""# GGnet DHCP Configuration
+        dhcp_template = Template("""# GGnet dnsmasq Configuration
 # Auto-generated - review before applying
 
-# Global settings
-default-lease-time 600;
-max-lease-time 7200;
-authoritative;
+# Interface configuration
+interface=eth0
+bind-interfaces
 
-# Network boot settings
-option space PXE;
-option PXE.mtftp-ip code 1 = ip-address;
-option PXE.mtftp-cport code 2 = unsigned integer 16;
-option PXE.mtftp-sport code 3 = unsigned integer 16;
-option PXE.mtftp-tmout code 4 = unsigned integer 8;
-option PXE.mtftp-delay code 5 = unsigned integer 8;
-option arch code 93 = unsigned integer 16;
+# DHCP configuration
+dhcp-range=192.168.1.100,192.168.1.200,255.255.255.0,12h
+dhcp-option=option:router,192.168.1.1
+dhcp-option=option:dns-server,8.8.8.8,8.8.4.4
+dhcp-option=option:domain-name,ggnet.local
 
-# Subnet configuration (adjust as needed)
-subnet 192.168.1.0 netmask 255.255.255.0 {
-    range 192.168.1.100 192.168.1.200;
-    option routers 192.168.1.1;
-    option domain-name-servers 8.8.8.8, 8.8.4.4;
-    option broadcast-address 192.168.1.255;
-    
-    # Boot server
-    next-server ${server_ip};
-    
-    # Boot file selection based on client architecture
-    if option arch = 00:07 {
-        filename "EFI/BOOT/bootx64.efi";  # UEFI x64
-    } elsif option arch = 00:09 {
-        filename "EFI/BOOT/bootx64.efi";  # UEFI x64 alternative
-    } elsif option arch = 00:0b {
-        filename "EFI/BOOT/bootaa64.efi"; # UEFI ARM64
-    } else {
-        filename "pxelinux.0";            # Legacy BIOS
-    }
-}
+# PXE Boot configuration - Architecture detection
+dhcp-match=set:efi-x86_64,option:client-arch,7
+dhcp-match=set:efi-x86_64,option:client-arch,9
+dhcp-match=set:efi-x86,option:client-arch,6
+dhcp-match=set:bios,option:client-arch,0
+dhcp-match=set:ipxe,175
+
+# Boot files per architecture
+dhcp-boot=tag:efi-x86_64,tag:!ipxe,EFI/BOOT/bootx64.efi,${server_ip}
+dhcp-boot=tag:efi-x86,tag:!ipxe,EFI/BOOT/bootx32.efi,${server_ip}
+dhcp-boot=tag:bios,tag:!ipxe,pxelinux.0,${server_ip}
+dhcp-boot=tag:ipxe,http://${server_ip}:8000/boot/script.ipxe
+
+# TFTP configuration
+enable-tftp
+tftp-root=/var/lib/tftpboot
+tftp-secure
+tftp-no-blocksize
+
+# DNS configuration
+domain=ggnet.local
+expand-hosts
+
+# Logging
+log-dhcp
+log-queries
+log-facility=/var/log/dnsmasq.log
+
+# Performance
+cache-size=1000
+dns-forward-max=150
+
+# Security
+bogus-priv
+domain-needed
+no-resolv
+server=8.8.8.8
+server=8.8.4.4
 
 # Machine-specific configurations
 ${machine_configs}
 """)
         
-        # Generate machine-specific configs
+        # Generate machine-specific configs (dnsmasq format)
         machine_configs = []
         for machine in machines:
-            mac = machine.get('mac_address', '').replace(':', ':')
-            name = machine.get('name', 'unknown')
+            mac = machine.get('mac_address', '')
+            name = machine.get('name', 'unknown').lower().replace(' ', '-')
             ip = machine.get('ip_address')
+            tag = f"ggnet-{machine.get('id', 'unknown')}"
             
-            if mac:
-                config = f"""
-# {name}
-host {name.lower().replace(' ', '-')} {{
-    hardware ethernet {mac};"""
-                
-                if ip:
-                    config += f"\n    fixed-address {ip};"
-                
-                config += f"""
-    option host-name "{name}";
-}}"""
+            if mac and ip:
+                # dnsmasq format: dhcp-host=<mac>,<ip>,<hostname>,<lease-time>,set:<tag>
+                host_config = f"dhcp-host={mac},{ip},{name},12h,set:{tag}"
+                # Boot file: dhcp-boot=tag:<tag>,<filename>,<server>
+                boot_config = f"dhcp-boot=tag:{tag},machines/{mac.replace(':', '-').lower()}.ipxe,{server_ip}"
+                config = f"{host_config}\n{boot_config}"
                 machine_configs.append(config)
         
         dhcp_content = dhcp_template.substitute(

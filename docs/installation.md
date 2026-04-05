@@ -52,7 +52,7 @@ sudo apt install -y \
     redis-server \
     nginx \
     targetcli-fb open-iscsi qemu-utils \
-    tftpd-hpa isc-dhcp-server \
+    dnsmasq \
     git curl wget unzip build-essential libpq-dev
 ```
 
@@ -190,26 +190,37 @@ ISCSI_PORTAL_PORT=3260
 TFTP_ROOT=/var/lib/tftpboot
 ```
 
-### DHCP Configuration
+### DHCP Configuration (dnsmasq)
 
-Configure your DHCP server to support PXE boot:
+Configure dnsmasq to support PXE boot:
 
 ```bash
-# Example dhcpd.conf snippet
-subnet 192.168.1.0 netmask 255.255.255.0 {
-    range 192.168.1.100 192.168.1.200;
-    option routers 192.168.1.1;
-    option domain-name-servers 8.8.8.8;
-    
-    # PXE boot configuration
-    next-server 192.168.1.100;  # GGnet server IP
-    
-    if option arch = 00:07 {
-        filename "EFI/BOOT/bootx64.efi";  # UEFI x64
-    } else {
-        filename "pxelinux.0";            # Legacy BIOS
-    }
-}
+# Run the dnsmasq configuration script
+sudo bash scripts/dnsmasq_config.sh
+
+# Or manually configure /etc/dnsmasq.conf:
+# Example dnsmasq.conf snippet
+interface=eth0
+bind-interfaces
+
+# DHCP range
+dhcp-range=192.168.1.100,192.168.1.200,255.255.255.0,12h
+dhcp-option=option:router,192.168.1.1
+dhcp-option=option:dns-server,8.8.8.8,8.8.4.4
+dhcp-option=option:domain-name,ggnet.local
+
+# PXE boot configuration - Architecture detection
+dhcp-match=set:efi-x86_64,option:client-arch,7
+dhcp-match=set:efi-x86_64,option:client-arch,9
+dhcp-match=set:bios,option:client-arch,0
+
+# Boot files per architecture
+dhcp-boot=tag:efi-x86_64,EFI/BOOT/bootx64.efi,192.168.1.100
+dhcp-boot=tag:bios,pxelinux.0,192.168.1.100
+
+# TFTP configuration
+enable-tftp
+tftp-root=/var/lib/tftpboot
 ```
 
 ### TFTP Server Setup

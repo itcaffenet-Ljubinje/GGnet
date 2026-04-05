@@ -15,7 +15,8 @@ import time
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.exceptions import GGnetException
-from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe
+from app.utils.zfs_enhanced import ZFSUtils
+from app.routes import auth, images, machines, sessions, storage, health, monitoring, file_upload, iscsi, metrics, hardware, winpe, zfs, writebacks, snapshots, scheduler, activities, batch_operations, vms, clients, image_import_export, network_boot, preflight, hardware_detection, windows_registry, ipxe_binaries, vnc_console, server, settings, server_commands, updates, release_streams
 from app.api import targets, sessions as sessions_api
 from app.middleware.rate_limiting import RateLimitMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -83,6 +84,30 @@ async def lifespan(app: FastAPI):
     # Initialize WebSocket manager
     app.state.websocket_manager = WebSocketManager()
     logger.info("WebSocket manager initialized")
+    
+    # Initialize ZFS datasets if ZFS is available
+    try:
+        zfs_utils = ZFSUtils()
+        # Try to list pools to check if ZFS is available
+        try:
+            pools = zfs_utils.pool_list()
+            if pools:
+                logger.info("ZFS is available, ensuring required datasets exist")
+                result = zfs_utils.ensure_zfs_datasets()
+                if result["all_created"]:
+                    logger.info("All required ZFS datasets are ready", pool=result["pool_name"])
+                else:
+                    logger.warning(
+                        "Some ZFS datasets could not be created",
+                        pool=result["pool_name"],
+                        errors=result["errors"]
+                    )
+            else:
+                logger.info("No ZFS pools found, skipping dataset initialization")
+        except Exception as e:
+            logger.debug("ZFS not available or not configured", error=str(e))
+    except Exception as e:
+        logger.debug("Failed to initialize ZFS utilities", error=str(e))
     
     yield
     
@@ -179,24 +204,47 @@ def create_app() -> FastAPI:
     app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
     app.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
     
+    # Server and settings
+    app.include_router(server.router, prefix="/api", tags=["server"])
+    app.include_router(settings.router, prefix="/api", tags=["settings"])
+    app.include_router(server_commands.router, prefix="/api", tags=["server-commands"])
+    app.include_router(updates.router, prefix="/api", tags=["server-updates"])
+    app.include_router(release_streams.router, prefix="/api", tags=["server-release-streams"])
+    
     # Authentication
     app.include_router(auth.router, prefix="/auth", tags=["authentication"])
     
     # Core resources
     app.include_router(images.router, prefix="/images", tags=["images"])
     app.include_router(machines.router, prefix="/machines", tags=["machines"])
-    app.include_router(targets.router, prefix="/targets", tags=["targets"])
+    app.include_router(targets.router, prefix="/api/v1/targets", tags=["targets"])
     app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
-    app.include_router(sessions_api.router, prefix="/session-orchestration", tags=["session-orchestration"])
+    app.include_router(sessions_api.router, prefix="/api/v1/sessions", tags=["session-orchestration"])
     
     # Storage and infrastructure
     app.include_router(storage.router, prefix="/storage", tags=["storage"])
+    app.include_router(zfs.router, prefix="/zfs", tags=["zfs"])
+    app.include_router(writebacks.router, prefix="/v1", tags=["writebacks"])
+    app.include_router(snapshots.router, prefix="/v1", tags=["snapshots"])
+    app.include_router(scheduler.router, prefix="/v1", tags=["scheduler"])
+    app.include_router(activities.router, prefix="/v1", tags=["activities"])
+    app.include_router(batch_operations.router, prefix="/v1", tags=["batch-operations"])
+    app.include_router(vms.router, prefix="/v1", tags=["vms"])
+    app.include_router(clients.router, prefix="/v1", tags=["clients"])
+    app.include_router(image_import_export.router, prefix="/v1", tags=["image-import-export"])
+    app.include_router(network_boot.monitoring_router, prefix="/v1", tags=["network-boot-monitoring"])
+    app.include_router(network_boot.network_boot_router, prefix="/v1", tags=["network-boot"])
     app.include_router(file_upload.router, prefix="/upload", tags=["file-upload"])
     app.include_router(iscsi.router, prefix="/iscsi", tags=["iscsi"])
     
     # Hardware and boot
     app.include_router(hardware.router, tags=["hardware"])
     app.include_router(winpe.router, tags=["winpe"])
+    app.include_router(preflight.router, prefix="/preflight", tags=["preflight"])
+    app.include_router(hardware_detection.router, prefix="/v1", tags=["hardware-detection"])
+    app.include_router(windows_registry.router, prefix="/v1", tags=["windows-registry"])
+    app.include_router(ipxe_binaries.router, prefix="/v1", tags=["ipxe-binaries"])
+    app.include_router(vnc_console.router, prefix="/v1", tags=["vnc-console"])
     
     # WebSocket endpoint
     @app.websocket("/ws")

@@ -13,27 +13,33 @@ test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     // Login first
     await page.goto('/');
+    
+    // Wait for login form
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+    
+    // Fill credentials
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
     
-    // Wait for dashboard to load
-    await page.waitForTimeout(2000);
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
+    
+    // Wait for dashboard content to load
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display dashboard after login', async ({ page }) => {
-    // Check that we're on dashboard or home page
-    const url = page.url();
-    expect(url).toMatch(/\/dashboard|\/$/);
-    
-    // Check for dashboard elements (adjust selectors based on actual dashboard)
-    // Look for common dashboard elements
-    const dashboardContent = page.locator('text=/dashboard|overview|statistics/i').or(
-      page.locator('[data-testid="dashboard"]')
-    );
+    // Check that we're on dashboard page
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Dashboard should be visible (or at least not showing login)
     await expect(page.locator('input[name="username"]')).not.toBeVisible();
+    
+    // Check that we're not on login page
+    expect(page.url()).not.toContain('/login');
   });
 
   test('should have navigation menu', async ({ page }) => {

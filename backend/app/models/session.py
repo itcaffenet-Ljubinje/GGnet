@@ -56,6 +56,8 @@ class Session(Base):
     target_id: Mapped[int] = mapped_column(ForeignKey("targets.id"), nullable=False, index=True)
     target = relationship("Target", back_populates="sessions")
     
+    boot_events = relationship("BootEvent", back_populates="session", cascade="all, delete-orphan")
+    
     # Network information
     client_ip: Mapped[Optional[str]] = mapped_column(String(15))
     client_mac: Mapped[Optional[str]] = mapped_column(String(17))

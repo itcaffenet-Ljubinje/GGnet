@@ -8,7 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   backend-tests:
@@ -79,10 +79,21 @@ jobs:
           SECRET_KEY: "test-secret-key-for-ci"
         continue-on-error: true
         run: |
-          pytest --cov --cov-report=xml --cov-report=term-missing --junitxml=junit.xml -o junit_family=legacy || true
+          # Run pytest and capture exit code
+          set +e
+          pytest --cov --cov-report=xml --cov-report=term-missing --junitxml=junit.xml -o junit_family=legacy
+          pytest_exit_code=$?
+          set -e
+          
+          # Only create dummy XML if pytest didn't run at all (e.g., import errors)
+          # If tests failed, pytest will have created junit.xml with failures
           if [ ! -f junit.xml ]; then
+            echo "Warning: junit.xml not generated, creating empty test suite report"
             echo '<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" tests="0" failures="0" errors="0" skipped="0" time="0"></testsuite></testsuites>' > junit.xml
           fi
+          
+          # Exit with pytest's exit code to fail CI on test failures
+          exit $pytest_exit_code
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -129,6 +140,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify package-lock.json exists
+        working-directory: ./frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "✓ package-lock.json found"
+            ls -lh package-lock.json
+          else
+            echo "⚠️ package-lock.json not found, will generate it"
+          fi
       
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -140,7 +163,12 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "package-lock.json not found, generating it..."
+            npm install --package-lock-only
+          fi
+          npm ci
       
       - name: Type check
         working-directory: ./frontend
@@ -157,6 +185,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify package-lock.json exists
+        working-directory: ./frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "✓ package-lock.json found"
+            ls -lh package-lock.json
+          else
+            echo "⚠️ package-lock.json not found, will generate it"
+          fi
       
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -168,7 +208,12 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm ci
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "package-lock.json not found, generating it..."
+            npm install --package-lock-only
+          fi
+          npm ci
       
       - name: Run unit tests with coverage
         working-directory: ./frontend
@@ -199,6 +244,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Verify package-lock.json exists
+        working-directory: ./frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "✓ package-lock.json found"
+            ls -lh package-lock.json
+          else
+            echo "⚠️ package-lock.json not found, will generate it"
+          fi
       
       - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -279,9 +336,12 @@ jobs:
         working-directory: ./frontend
         env:
           CI: true
+          VITE_API_URL: "http://127.0.0.1:8000"
           DATABASE_URL: "postgresql+asyncpg://ggnet:test_password@localhost:5432/ggnet"
           REDIS_URL: "redis://localhost:6379"
           SECRET_KEY: "test-secret-key-for-ci"
+        # Playwright's webServer will start both frontend and backend servers
+        # The backend will stay running for the duration of the E2E tests
         run: npm run test:e2e
       
       - name: Upload E2E test results

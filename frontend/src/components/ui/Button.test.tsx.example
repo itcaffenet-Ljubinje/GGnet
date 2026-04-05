@@ -1,0 +1,97 @@
+/**
+ * Example Test File: Button Component
+ * 
+ * This is an example test file showing best practices for testing UI components.
+ * Copy this file and adapt it for other components.
+ */
+
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '../../__tests__/setup/test-utils'
+import userEvent from '@testing-library/user-event'
+import { Button } from './Button'
+
+describe('Button', () => {
+  describe('rendering', () => {
+    it('should render button with text', () => {
+      render(<Button>Click me</Button>)
+      
+      expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument()
+    })
+
+    it('should render button with custom className', () => {
+      const { container } = render(<Button className="custom-class">Button</Button>)
+      
+      expect(container.firstChild).toHaveClass('custom-class')
+    })
+
+    it('should render disabled button', () => {
+      render(<Button disabled>Disabled</Button>)
+      
+      expect(screen.getByRole('button')).toBeDisabled()
+    })
+
+    it('should render button with different variants', () => {
+      const { rerender } = render(<Button variant="primary">Primary</Button>)
+      expect(screen.getByRole('button')).toHaveClass('bg-blue-600')
+      
+      rerender(<Button variant="secondary">Secondary</Button>)
+      expect(screen.getByRole('button')).toHaveClass('bg-gray-600')
+    })
+  })
+
+  describe('user interactions', () => {
+    it('should call onClick when clicked', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(<Button onClick={handleClick}>Click me</Button>)
+      
+      await user.click(screen.getByRole('button'))
+      
+      expect(handleClick).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not call onClick when disabled', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(<Button onClick={handleClick} disabled>Disabled</Button>)
+      
+      await user.click(screen.getByRole('button'))
+      
+      expect(handleClick).not.toHaveBeenCalled()
+    })
+
+    it('should show loading state', () => {
+      render(<Button loading>Loading</Button>)
+      
+      expect(screen.getByRole('button')).toBeDisabled()
+      expect(screen.getByText(/loading/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('accessibility', () => {
+    it('should have proper aria-label when provided', () => {
+      render(<Button aria-label="Close dialog">×</Button>)
+      
+      expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Close dialog')
+    })
+
+    it('should be keyboard accessible', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(<Button onClick={handleClick}>Button</Button>)
+      
+      const button = screen.getByRole('button')
+      button.focus()
+      
+      await user.keyboard('{Enter}')
+      expect(handleClick).toHaveBeenCalledTimes(1)
+      
+      await user.keyboard(' ')
+      expect(handleClick).toHaveBeenCalledTimes(2)
+    })
+  })
+})
+

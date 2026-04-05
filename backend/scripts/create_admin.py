@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
-from app.core.database import async_engine, AsyncSessionLocal, Base
+from app.core.database import get_async_engine, get_async_session_local, Base
 from app.core.config import get_settings
 from app.models.user import User, UserRole, UserStatus
 from app.core.security import get_password_hash
@@ -81,9 +81,14 @@ async def create_admin_user(
     if create_tables:
         try:
             # Import all models to ensure they're registered
-            from app.models import user, image, machine, target, session, audit
+            from app.models import (
+                user, image, machine, target, session, audit,
+                writeback, snapshot, scheduled_job, batch_operation,
+                vm, client, boot_event
+            )
             
             # Create tables
+            async_engine = get_async_engine()
             async with async_engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("Database tables created/verified")
@@ -91,6 +96,7 @@ async def create_admin_user(
             logger.warning("Could not create tables (may already exist)", error=str(e))
     
     # Create or update admin user
+    AsyncSessionLocal = get_async_session_local()
     async with AsyncSessionLocal() as db:
         try:
             # Check if admin user exists

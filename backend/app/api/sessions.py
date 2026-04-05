@@ -26,6 +26,8 @@ from app.adapters.targetcli import create_target_for_machine, delete_target_for_
 from app.adapters.ipxe import iPXEScriptGenerator, save_boot_script_for_machine
 from app.adapters.dhcp import add_machine_to_dhcp, remove_machine_from_dhcp
 from app.adapters.tftp import save_boot_script_to_tftp
+from app.utils.boot_event_logger import BootEventLogger
+from app.core.dependencies import get_client_ip
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["Session Orchestration"])
@@ -107,6 +109,10 @@ async def start_session(
         user_id=current_user.id
     )
     
+    # Initialize boot event logger early
+    boot_logger = BootEventLogger(db)
+    client_ip = get_client_ip(request) if request else None
+    
     try:
         # 1. Validate machine exists and is active
         machine_result = await db.execute(
@@ -133,21 +139,48 @@ async def start_session(
         # 3. Check if machine already has an active session
         active_session_result = await db.execute(
             select(Session).where(
-                Session.machine_id == session_data.machine_id,
-                Session.status == SessionStatus.ACTIVE
+                (Session.machine_id == session_data.machine_id) & (Session.status == SessionStatus.ACTIVE)
             )
         )
         if active_session_result.scalar_one_or_none():
             raise ValidationError(f"Machine {session_data.machine_id} already has an active session")
         
+        # Log PXE boot start
+        try:
+            await boot_logger.log_pxe_start(machine, client_ip=client_ip)
+        except Exception as e:
+            logger.warning("Failed to log PXE start event", error=str(e))
+        
         # 4. Create iSCSI target for the machine
         logger.info(f"Creating iSCSI target for machine {machine.id}")
-        target_info = await create_target_for_machine(
-            machine_id=machine.id,
-            machine_mac=machine.mac_address,
-            image_path=image.file_path,
-            description=f"Session target for {machine.name}"
-        )
+        try:
+            target_info = await create_target_for_machine(
+                machine_id=machine.id,
+                machine_mac=machine.mac_address,
+                image_path=image.file_path,
+                description=f"Session target for {machine.name}"
+            )
+            
+            # Log iSCSI target creation
+            try:
+                await boot_logger.log_iscsi_connect(
+                    machine,
+                    target_iqn=target_info.get("iqn"),
+                    client_ip=client_ip
+                )
+            except Exception as e:
+                logger.warning("Failed to log iSCSI connect event", error=str(e))
+        except Exception as e:
+            # Log boot failure
+            try:
+                await boot_logger.log_boot_failed(
+                    machine,
+                    error_message=f"Failed to create iSCSI target: {str(e)}",
+                    client_ip=client_ip
+                )
+            except Exception:
+                pass
+            raise
         
         # 5. Create target record in database
         target = Target(
@@ -172,13 +205,41 @@ async def start_session(
         ipxe_generator = iPXEScriptGenerator()
         boot_script = ipxe_generator.generate_machine_boot_script(machine, target, image)
         
+        # Log iPXE script generation
+        try:
+            script_filename = ipxe_generator.get_machine_script_filename(machine)
+            script_url = f"http://{get_settings().ISCSI_PORTAL_IP}/tftp/{script_filename}"
+            await boot_logger.log_ipxe_load(
+                machine,
+                script_url=script_url,
+                client_ip=client_ip
+            )
+        except Exception as e:
+            logger.warning("Failed to log iPXE load event", error=str(e))
+        
         # 7. Save boot script to TFTP
         script_filename = ipxe_generator.get_machine_script_filename(machine)
         await save_boot_script_to_tftp(boot_script, script_filename)
         
+        # Log TFTP request
+        try:
+            await boot_logger.log_tftp_request(
+                machine,
+                filename=script_filename,
+                client_ip=client_ip
+            )
+        except Exception as e:
+            logger.warning("Failed to log TFTP request event", error=str(e))
+        
         # 8. Update DHCP configuration
         logger.info(f"Updating DHCP configuration for machine {machine.id}")
         await add_machine_to_dhcp(machine)
+        
+        # Log DHCP request
+        try:
+            await boot_logger.log_dhcp_request(machine, client_ip=client_ip)
+        except Exception as e:
+            logger.warning("Failed to log DHCP request event", error=str(e))
         
         # 9. Create session record
         session = Session(
@@ -195,6 +256,16 @@ async def start_session(
         db.add(session)
         await db.commit()
         await db.refresh(session)
+        
+        # Log successful boot (session created and ready)
+        try:
+            await boot_logger.log_boot_success(
+                machine,
+                session=session,
+                client_ip=client_ip
+            )
+        except Exception as e:
+            logger.warning("Failed to log boot success event", error=str(e))
         
         # 10. Prepare response
         settings = get_settings()
@@ -238,12 +309,57 @@ async def start_session(
         
     except NotFoundError as e:
         logger.warning(f"Session start failed: {e}")
+        # Log boot failure if machine is available
+        try:
+            machine_result = await db.execute(
+                select(Machine).where(Machine.id == session_data.machine_id)
+            )
+            machine = machine_result.scalar_one_or_none()
+            if machine:
+                boot_logger = BootEventLogger(db)
+                await boot_logger.log_boot_failed(
+                    machine,
+                    error_message=str(e),
+                    client_ip=get_client_ip(request) if request else None
+                )
+        except Exception:
+            pass
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:
         logger.warning(f"Session start failed: {e}")
+        # Log boot failure if machine is available
+        try:
+            machine_result = await db.execute(
+                select(Machine).where(Machine.id == session_data.machine_id)
+            )
+            machine = machine_result.scalar_one_or_none()
+            if machine:
+                boot_logger = BootEventLogger(db)
+                await boot_logger.log_boot_failed(
+                    machine,
+                    error_message=str(e),
+                    client_ip=get_client_ip(request) if request else None
+                )
+        except Exception:
+            pass
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error during session start: {e}")
+        # Log boot failure if machine is available
+        try:
+            machine_result = await db.execute(
+                select(Machine).where(Machine.id == session_data.machine_id)
+            )
+            machine = machine_result.scalar_one_or_none()
+            if machine:
+                boot_logger = BootEventLogger(db)
+                await boot_logger.log_boot_failed(
+                    machine,
+                    error_message=str(e),
+                    client_ip=get_client_ip(request) if request else None
+                )
+        except Exception:
+            pass
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
@@ -313,9 +429,29 @@ async def stop_session(
         session.ended_at = datetime.utcnow()
         await db.commit()
         
+        # Log PXE end and iSCSI disconnect events
+        try:
+            boot_logger = BootEventLogger(db)
+            client_ip = get_client_ip(request) if request else None
+            await boot_logger.log_pxe_end(machine, session=session, client_ip=client_ip)
+            # Also log iSCSI disconnect
+            from app.models.boot_event import BootEventType, BootEventStatus
+            await boot_logger.log_event(
+                event_type=BootEventType.ISCSI_DISCONNECT,
+                status=BootEventStatus.SUCCESS,
+                message=f"iSCSI connection closed for {machine.name}",
+                machine_id=machine.id,
+                session_id=session.id,
+                client_ip=client_ip,
+                mac_address=machine.mac_address,
+                details={"machine_name": machine.name, "target_iqn": target.iqn}
+            )
+        except Exception as e:
+            logger.warning("Failed to log session end events", error=str(e))
+        
         # 8. Log audit event
         await log_user_activity(
-            action=AuditAction.SESSION_STARTED,  # Using closest available action
+            action=AuditAction.SESSION_STOPPED,
             message=f"Stopped session for machine {machine.name}",
             request=request,
             user=current_user,
@@ -475,8 +611,7 @@ async def get_machine_boot_script(
         # Get active session for machine
         session_result = await db.execute(
             select(Session).where(
-                Session.machine_id == machine_id,
-                Session.status == SessionStatus.ACTIVE
+                (Session.machine_id == machine_id) & (Session.status == SessionStatus.ACTIVE)
             )
         )
         session = session_result.scalar_one_or_none()
@@ -541,8 +676,7 @@ async def get_active_session_for_machine(
     
     result = await db.execute(
         select(Session).where(
-            Session.machine_id == machine_id,
-            Session.status == SessionStatus.ACTIVE
+            (Session.machine_id == machine_id) & (Session.status == SessionStatus.ACTIVE)
         )
     )
     session = result.scalar_one_or_none()

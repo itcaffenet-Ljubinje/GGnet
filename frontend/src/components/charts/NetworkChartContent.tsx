@@ -46,7 +46,7 @@ export default function NetworkChartContent({
             borderRadius: '0.375rem'
           }}
           labelStyle={{ color: '#e5e7eb' }}
-          formatter={(value: any) => [`${value}`, label]}
+          formatter={(value: number | string) => [`${value}`, label]}
         />
         <Line 
           type="monotone" 

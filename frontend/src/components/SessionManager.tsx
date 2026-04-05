@@ -25,6 +25,7 @@ import { StatusBadge } from './ui/StatusBadge';
 // import { ProgressBar } from './ui/ProgressBar'; // Unused for now
 // import { useAuthStore } from '../stores/authStore'; // Unused for now
 import { api } from '../lib/api';
+import { formatDuration, formatDateTime } from '../utils/formatters';
 
 // Type for Axios error responses
 interface AxiosErrorResponse extends Error {
@@ -220,17 +221,7 @@ const SessionManager: React.FC = () => {
     }
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours}h ${minutes}m ${secs}s`;
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // Using shared utilities from utils/formatters
 
   if (sessionsLoading || machinesLoading || imagesLoading) {
     return (
@@ -299,15 +290,15 @@ const SessionManager: React.FC = () => {
             <select
               value={selectedMachine?.id || ''}
               onChange={(e) => {
-                const machine = machines.find((m: any) => m.id === parseInt(e.target.value));
+                const machine = machines.find((m: Machine) => m.id === parseInt(e.target.value));
                 setSelectedMachine(machine || null);
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose a machine...</option>
               {machines
-                .filter((m: any) => m.status === 'ACTIVE')
-                .map((machine: any) => (
+                .filter((m: Machine) => m.status === 'ACTIVE')
+                .map((machine: Machine) => (
                   <option key={machine.id} value={machine.id}>
                     {machine.name} ({machine.mac_address}) - {machine.ip_address}
                   </option>
@@ -323,15 +314,15 @@ const SessionManager: React.FC = () => {
             <select
               value={selectedImage?.id || ''}
               onChange={(e) => {
-                const image = images.find((i: any) => i.id === parseInt(e.target.value));
+                const image = images.find((i: DiskImage) => i.id === parseInt(e.target.value));
                 setSelectedImage(image || null);
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Choose an image...</option>
               {images
-                .filter((i: any) => i.status === 'READY')
-                .map((image: any) => (
+                .filter((i: DiskImage) => i.status === 'READY')
+                .map((image: DiskImage) => (
                   <option key={image.id} value={image.id}>
                     {image.name} ({image.format}) - {(image.size_bytes / 1024 / 1024 / 1024).toFixed(1)}GB
                   </option>
@@ -348,7 +339,7 @@ const SessionManager: React.FC = () => {
             </label>
             <select
               value={sessionType}
-              onChange={(e) => setSessionType(e.target.value as any)}
+              onChange={(e) => setSessionType(e.target.value as 'DISKLESS_BOOT' | 'MAINTENANCE' | 'TESTING')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="DISKLESS_BOOT">Diskless Boot</option>

@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install -y \
     qemu-utils \
     targetcli-fb \
     python3-rtslib-fb \
-    isc-dhcp-server \
-    tftpd-hpa \
+    dnsmasq \
     && rm -rf /var/lib/apt/lists/*
 
 # Create application user
@@ -34,8 +33,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make entrypoint script executable
-RUN chmod +x docker-entrypoint.sh
+# Make entrypoint script executable (required for container startup)
+RUN if [ ! -f docker-entrypoint.sh ]; then \
+      echo "ERROR: docker-entrypoint.sh is required but not found!"; \
+      exit 1; \
+    fi && \
+    chmod +x docker-entrypoint.sh
 
 # Create necessary directories
 RUN mkdir -p /opt/ggnet/{images,targets,backstores,tftp,logs,cache} && \

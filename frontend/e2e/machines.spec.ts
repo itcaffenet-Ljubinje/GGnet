@@ -14,40 +14,60 @@ test.describe('Machines Page', () => {
   test.beforeEach(async ({ page }) => {
     // Login first
     await page.goto('/');
+    
+    // Wait for login form
+    await page.waitForSelector('input[name="username"]', { timeout: 10000 });
+    
+    // Fill credentials
     await page.locator('input[name="username"]').fill('admin');
     await page.locator('input[name="password"]').fill('admin123');
-    await page.locator('button[type="submit"]').click();
     
-    // Wait for dashboard
-    await page.waitForTimeout(2000);
+    // Submit form and wait for navigation
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+      page.locator('button[type="submit"]').click(),
+    ]);
+    
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
     // Navigate to machines page
-    // Adjust URL based on actual routing
     await page.goto('/machines');
-    await page.waitForTimeout(1000);
+    
+    // Wait for machines page to load
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display machines page', async ({ page }) => {
     // Check URL
-    expect(page.url()).toContain('/machines');
+    await expect(page).toHaveURL(/\/machines/);
     
-    // Look for machines page elements
-    const pageTitle = page.locator('text=/machines|devices|clients/i');
-    await expect(pageTitle.first()).toBeVisible({ timeout: 5000 });
+    // Wait for page content to load - check that login form is not visible
+    await expect(page.locator('input[name="username"]')).not.toBeVisible();
+    
+    // Look for machines page elements - check for navigation menu item or page heading
+    const pageContent = page.locator('text=/machines/i').or(
+      page.locator('h1, h2, h3').filter({ hasText: /machines/i })
+    );
+    
+    // At least one element with "machines" should be visible
+    await expect(pageContent.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should show machines list', async ({ page }) => {
-    // Look for machines table or list
-    // Adjust selectors based on actual implementation
-    const machinesList = page.locator('table, [role="table"], [data-testid="machines-list"]').or(
-      page.locator('text=/machine|device|client/i')
-    );
+    // Wait for page to be fully loaded
+    await page.waitForLoadState('networkidle');
     
-    // Should show some machines content (even if empty)
-    await expect(machinesList.first()).toBeVisible({ timeout: 5000 }).catch(() => {
-      // If no machines, should show empty state
-      return expect(page.locator('text=/no machines|empty/i')).toBeVisible();
-    });
+    // Look for machines table, list, or any content indicating the page loaded
+    // Check for common patterns: table, list, or empty state message
+    const hasContent = await Promise.race([
+      page.locator('table').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+      page.locator('text=/no.*machines|empty|no data/i').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+      page.locator('[data-testid*="machine"]').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false),
+    ]);
+    
+    // Page should have loaded some content (table, empty state, or machines)
+    expect(hasContent).toBeTruthy();
   });
 
   test('should allow creating a new machine', async ({ page }) => {

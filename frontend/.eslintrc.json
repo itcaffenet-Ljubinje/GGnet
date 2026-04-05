@@ -41,7 +41,19 @@
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "src/setupTests.ts"],
       "env": { "jest": true },
-      "globals": { "vi": "readonly", "beforeAll": "readonly", "afterAll": "readonly" }
+      "globals": {
+        "vi": "readonly",
+        "describe": "readonly",
+        "it": "readonly",
+        "expect": "readonly",
+        "beforeEach": "readonly",
+        "afterEach": "readonly",
+        "beforeAll": "readonly",
+        "afterAll": "readonly"
+      },
+      "rules": {
+        "no-redeclare": ["error", { "builtinGlobals": false }]
+      }
     }
   ]
 }

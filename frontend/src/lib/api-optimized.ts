@@ -4,8 +4,8 @@ import toast from 'react-hot-toast';
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const requestCache = new Map<string, { data: any; timestamp: number }>();
-const pendingRequests = new Map<string, Promise<any>>();
+const requestCache = new Map<string, { data: unknown; timestamp: number }>();
+const pendingRequests = new Map<string, Promise<unknown>>();
 
 // Create cache key from request config
 function getCacheKey(config: AxiosRequestConfig): string {
@@ -27,7 +27,7 @@ interface QueryParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-interface ImageData {
+interface ImageUploadData {
   name?: string;
   description?: string;
   format?: string;
@@ -180,7 +180,7 @@ api.interceptors.response.use(
 function createOptimizedRequest<T>(
   method: 'get' | 'post' | 'put' | 'delete',
   url: string,
-  data?: any,
+  data?: unknown,
   config?: AxiosRequestConfig
 ): Promise<T> {
   const requestConfig = { ...config, method, url, data };
@@ -191,12 +191,12 @@ function createOptimizedRequest<T>(
     // Check if request is already pending
     const pending = pendingRequests.get(cacheKey);
     if (pending) {
-      return pending;
+      return pending as Promise<T>;
     }
     
     // Create new request and store as pending
     const request = api.request<T>(requestConfig).then(response => response.data);
-    pendingRequests.set(cacheKey, request);
+    pendingRequests.set(cacheKey, request as Promise<unknown>);
     
     // Clean up pending request after completion
     request.finally(() => {
@@ -238,31 +238,31 @@ export const cacheUtils = {
 export const apiHelpers = {
   // Auth
   login: (username: string, password: string) =>
-    createOptimizedRequest<any>('post', '/api/auth/login', { username, password }),
+    createOptimizedRequest<{ access_token: string; token_type: string; expires_in: number }>('post', '/api/auth/login', { username, password }),
   
   logout: () =>
-    createOptimizedRequest<any>('post', '/api/auth/logout').then(() => {
+    createOptimizedRequest<void>('post', '/api/auth/logout').then(() => {
       cacheUtils.clearCache(); // Clear all cache on logout
     }),
   
   refreshToken: (refreshToken: string) =>
-    createOptimizedRequest<any>('post', '/api/auth/refresh', { refresh_token: refreshToken }),
+    createOptimizedRequest<{ access_token: string; token_type: string }>('post', '/api/auth/refresh', { refresh_token: refreshToken }),
   
   getCurrentUser: () =>
-    createOptimizedRequest<any>('get', '/api/auth/me'),
+    createOptimizedRequest<{ id: number; username: string; email?: string; is_admin: boolean }>('get', '/api/auth/me'),
   
   changePassword: (currentPassword: string, newPassword: string) =>
-    createOptimizedRequest<any>('post', '/api/auth/change-password', {
+    createOptimizedRequest<{ message: string }>('post', '/api/auth/change-password', {
       current_password: currentPassword,
       new_password: newPassword,
     }),
 
   // Images - with cache invalidation on mutations
   getImages: (params?: QueryParams) =>
-    createOptimizedRequest<any>('get', '/api/images', undefined, { params }),
+    createOptimizedRequest<unknown[]>('get', '/api/images', undefined, { params }),
   
   getImage: (id: number) =>
-    createOptimizedRequest<any>('get', `/api/images/${id}`),
+    createOptimizedRequest<unknown>('get', `/api/images/${id}`),
   
   uploadImage: (formData: FormData, options?: { onProgress?: (progress: number) => void; signal?: AbortSignal }) =>
     api.post('/api/images/upload', formData, {
@@ -283,64 +283,64 @@ export const apiHelpers = {
       return response.data;
     }),
   
-  updateImage: (id: number, data: ImageData) =>
-    createOptimizedRequest<any>('put', `/api/images/${id}`, data).then(result => {
+  updateImage: (id: number, data: ImageUploadData) =>
+    createOptimizedRequest<unknown>('put', `/api/images/${id}`, data).then(result => {
       cacheUtils.clearCacheForPattern('/api/images');
       return result;
     }),
   
   deleteImage: (id: number) =>
-    createOptimizedRequest<any>('delete', `/api/images/${id}`).then(result => {
+    createOptimizedRequest<unknown>('delete', `/api/images/${id}`).then(result => {
       cacheUtils.clearCacheForPattern('/api/images');
       return result;
     }),
 
   // Machines - with cache invalidation
   getMachines: (params?: QueryParams) =>
-    createOptimizedRequest<any>('get', '/api/machines', undefined, { params }),
+    createOptimizedRequest<unknown[]>('get', '/api/machines', undefined, { params }),
   
   getMachine: (id: number) =>
-    createOptimizedRequest<any>('get', `/api/machines/${id}`),
+    createOptimizedRequest<unknown>('get', `/api/machines/${id}`),
   
   createMachine: (data: MachineData) =>
-    createOptimizedRequest<any>('post', '/api/machines', data).then(result => {
+    createOptimizedRequest<unknown>('post', '/api/machines', data).then(result => {
       cacheUtils.clearCacheForPattern('/api/machines');
       return result;
     }),
   
   updateMachine: (id: number, data: Partial<MachineData>) =>
-    createOptimizedRequest<any>('put', `/api/machines/${id}`, data).then(result => {
+    createOptimizedRequest<unknown>('put', `/api/machines/${id}`, data).then(result => {
       cacheUtils.clearCacheForPattern('/api/machines');
       return result;
     }),
   
   deleteMachine: (id: number) =>
-    createOptimizedRequest<any>('delete', `/api/machines/${id}`).then(result => {
+    createOptimizedRequest<unknown>('delete', `/api/machines/${id}`).then(result => {
       cacheUtils.clearCacheForPattern('/api/machines');
       return result;
     }),
 
   // Targets
   getTargets: (params?: QueryParams) =>
-    createOptimizedRequest<any>('get', '/api/api/v1/targets', undefined, { params }),
+    createOptimizedRequest<unknown[]>('get', '/api/api/v1/targets', undefined, { params }),
   
   getTarget: (id: number) =>
-    createOptimizedRequest<any>('get', `/api/api/v1/targets/${id}`),
+    createOptimizedRequest<unknown>('get', `/api/api/v1/targets/${id}`),
   
   createTarget: (data: TargetData) =>
-    createOptimizedRequest<any>('post', '/api/api/v1/targets', data).then(result => {
+    createOptimizedRequest<unknown>('post', '/api/api/v1/targets', data).then(result => {
       cacheUtils.clearCacheForPattern('/api/api/v1/targets');
       return result;
     }),
   
   updateTarget: (id: number, data: Partial<TargetData>) =>
-    createOptimizedRequest<any>('put', `/api/api/v1/targets/${id}`, data).then(result => {
+    createOptimizedRequest<unknown>('put', `/api/api/v1/targets/${id}`, data).then(result => {
       cacheUtils.clearCacheForPattern('/api/api/v1/targets');
       return result;
     }),
   
   deleteTarget: (id: number) =>
-    createOptimizedRequest<any>('delete', `/api/api/v1/targets/${id}`).then(result => {
+    createOptimizedRequest<unknown>('delete', `/api/api/v1/targets/${id}`).then(result => {
       cacheUtils.clearCacheForPattern('/api/api/v1/targets');
       return result;
     }),
@@ -360,13 +360,13 @@ export const apiHelpers = {
 
   // Storage
   getStorageInfo: () =>
-    createOptimizedRequest<any>('get', '/api/storage/info'),
+    createOptimizedRequest<unknown>('get', '/api/storage/info'),
   
   getStorageHealth: () =>
-    createOptimizedRequest<any>('get', '/api/storage/health'),
+    createOptimizedRequest<unknown>('get', '/api/storage/health'),
   
   cleanupStorage: () =>
-    createOptimizedRequest<any>('post', '/api/storage/cleanup').then(result => {
+    createOptimizedRequest<unknown>('post', '/api/storage/cleanup').then(result => {
       cacheUtils.clearCacheForPattern('/api/storage');
       return result;
     }),
@@ -376,7 +376,7 @@ export const apiHelpers = {
     api.get('/api/health').then(response => response.data), // No cache for health
   
   getDetailedHealth: () =>
-    createOptimizedRequest<any>('get', '/api/health/detailed'),
+    createOptimizedRequest<unknown>('get', '/api/health/detailed'),
 
   // Monitoring - no cache for real-time metrics
   getPerformanceMetrics: () =>
@@ -388,43 +388,43 @@ export const apiHelpers = {
   // Session Monitoring - no cache for real-time data
   getSessionStats: () =>
     api.get('/api/sessions/stats/overview').then(response => response.data),
-
+  
   getActiveSessionsDetailed: () =>
     api.get('/api/sessions/active').then(response => response.data),
-
+  
   getRealtimeSessionData: () =>
     api.get('/api/sessions/monitoring/realtime').then(response => response.data),
-
+  
   killSession: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/kill`).then(response => response.data),
 
   // iSCSI Target Management
   createIscsiTarget: (data: TargetData) =>
-    createOptimizedRequest<any>('post', '/api/iscsi', data).then(result => {
+    createOptimizedRequest<unknown>('post', '/api/iscsi', data).then(result => {
       cacheUtils.clearCacheForPattern('/api/iscsi');
       return result;
     }),
 
   getIscsiTargets: () =>
-    createOptimizedRequest<any>('get', '/api/iscsi'),
+    createOptimizedRequest<unknown[]>('get', '/api/iscsi'),
 
   getIscsiTarget: (id: number) =>
-    createOptimizedRequest<any>('get', `/iscsi/${id}`),
+    createOptimizedRequest<unknown>('get', `/iscsi/${id}`),
 
   deleteIscsiTarget: (id: number) =>
-    createOptimizedRequest<any>('delete', `/iscsi/${id}`).then(result => {
+    createOptimizedRequest<unknown>('delete', `/iscsi/${id}`).then(result => {
       cacheUtils.clearCacheForPattern('/iscsi');
       return result;
     }),
 
   startIscsiTarget: (id: number) =>
-    createOptimizedRequest<any>('post', `/iscsi/${id}/start`).then(result => {
+    createOptimizedRequest<unknown>('post', `/iscsi/${id}/start`).then(result => {
       cacheUtils.clearCacheForPattern(`/iscsi/${id}`);
       return result;
     }),
 
   stopIscsiTarget: (id: number) =>
-    createOptimizedRequest<any>('post', `/iscsi/${id}/stop`).then(result => {
+    createOptimizedRequest<unknown>('post', `/iscsi/${id}/stop`).then(result => {
       cacheUtils.clearCacheForPattern(`/iscsi/${id}`);
       return result;
     }),
