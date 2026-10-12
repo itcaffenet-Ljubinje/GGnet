@@ -22,7 +22,7 @@ import logging
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -31,6 +31,8 @@ from app.api.deps import get_provisioner, get_traffic_monitor, get_wol_sender
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     BOOT_MODE_LETTER,
+    BulkAction,
+    BulkResult,
     DriveLetterAll,
     KeepWriteback,
     MachinePin,
@@ -173,6 +175,47 @@ def set_drive_letter_all(body: DriveLetterAll, db: Session = Depends(get_db)):
         m.drive_letter = body.drive_letter
     db.commit()
     return db.scalars(select(Machine).order_by(Machine.name)).all()
+
+
+@router.post("/bulk", response_model=list[BulkResult])
+def bulk(
+    body: BulkAction,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+    wol=Depends(get_wol_sender),
+):
+    """
+    Run one action on several machines, each exactly like its single-machine
+    route (same checks, same messages). One machine failing does not stop the
+    others; the answer says per machine what happened.
+    """
+    def run(machine_id: int) -> None:
+        if body.action in ("on", "shutdown", "reboot"):
+            power(machine_id, PowerAction(action=body.action), db, wol)
+        elif body.action == "assign":
+            assign_disk(machine_id, MachineAssign(game_disk_id=body.game_disk_id), db, prov)
+        elif body.action == "pin":
+            pin_snapshot(machine_id, MachinePin(snapshot=body.snapshot), db, prov)
+        elif body.action == "drive_letter":
+            update_machine(machine_id, MachineUpdate(drive_letter=body.drive_letter), db)
+        else:
+            keep_writeback(machine_id, KeepWriteback(enabled=False), db, prov)
+
+    results = []
+    for machine_id in dict.fromkeys(body.machine_ids):   # each once, in order
+        m = db.get(Machine, machine_id)
+        name = m.name if m else None
+        try:
+            run(machine_id)
+        except HTTPException as e:
+            db.rollback()
+            detail = e.detail.get("error") if isinstance(e.detail, dict) else str(e.detail)
+            results.append(BulkResult(machine_id=machine_id, name=name, ok=False, error=detail))
+            continue
+        results.append(BulkResult(machine_id=machine_id, name=name, ok=True))
+    logger.info("Bulk %s on %d machine(s): %d failed", body.action, len(results),
+                sum(not r.ok for r in results))
+    return results
 
 
 @router.get("/traffic", response_model=list[MachineTrafficOut])

@@ -111,6 +111,16 @@ export interface AgentPackage {
   files: { name: string; size_bytes: number; sha256: string }[];
 }
 
+export type BulkKind = "on" | "shutdown" | "reboot" | "assign" | "pin" | "drive_letter" | "stop_keep_writeback";
+
+/** What happened to one machine in a bulk operation. */
+export interface BulkResult {
+  machine_id: number;
+  name: string | null;
+  ok: boolean;
+  error: string | null;
+}
+
 export type MachineMode = "disk" | "boot";
 export type MachineStatus = "idle" | "provisioned" | "editing" | "error";
 
@@ -246,6 +256,11 @@ export const api = {
   applyWritebacks: (id: number) => request<Machine>("POST", `/v1/machines/${id}/apply-writebacks`),
   pinSnapshot: (id: number, snapshot: string | null) =>
     request<Machine>("PUT", `/v1/machines/${id}/pin`, { snapshot }),
+    bulk: (
+    machine_ids: number[],
+    action: BulkKind,
+    extra: { game_disk_id?: number | null; snapshot?: string | null; drive_letter?: string } = {},
+  ) => request<BulkResult[]>("POST", "/v1/machines/bulk", { machine_ids, action, ...extra }),
     power: (id: number, action: "on" | "shutdown" | "reboot") =>
     request<Machine>("POST", `/v1/machines/${id}/power`, { action }),
     discardWriteback: (id: number) => request<Machine>("POST", `/v1/machines/${id}/discard-writeback`),
