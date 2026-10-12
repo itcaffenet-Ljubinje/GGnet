@@ -415,3 +415,20 @@ class MachineTrafficOut(BaseModel):
 
 class PowerAction(BaseModel):
     action: Literal["on", "shutdown", "reboot"]   # on = Wake-on-LAN; the others go through the agent
+
+
+class AgentPackageFileOut(BaseModel):
+    name: str
+    size_bytes: int
+    sha256: str
+
+
+class AgentPackageOut(BaseModel):
+    """Settings → Client app: what a PC needs to install ggnet-agent."""
+
+    available: bool                  # False: the files are not on the server yet
+    directory: str                   # where the server looks for them
+    version: str | None
+    server_url: str
+    install_command: str             # one line for an admin PowerShell on the PC
+    files: list[AgentPackageFileOut]

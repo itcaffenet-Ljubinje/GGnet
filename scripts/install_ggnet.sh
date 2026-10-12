@@ -284,7 +284,7 @@ done
 # ---------- 9. code + venv (system disk) ----------
 info "Copying ggNet to $INSTALL_DIR..."
 systemctl stop ggnet >/dev/null 2>&1 || true
-mkdir -p "$INSTALL_DIR" "$DATA_DIR"/{tftp,http,logs} "$CONF_DIR"
+mkdir -p "$INSTALL_DIR" "$DATA_DIR"/{tftp,http,logs,agent} "$CONF_DIR"
 rm -rf "$INSTALL_DIR/backend" "$INSTALL_DIR/frontend"
 cp -a "$SRC_DIR/backend" "$INSTALL_DIR/backend"
 if [[ -d "$SRC_DIR/frontend/dist" ]]; then
@@ -349,6 +349,8 @@ frontend_dist = "$INSTALL_DIR/frontend/dist"
 [paths]
 data_dir = "$DATA_DIR"
 database = "sqlite:///$DATA_DIR/ggnet.db"
+# Unpacked ggnet-agent-win-x64.zip, offered in the web UI (Settings → Client app).
+agent_dir = "$DATA_DIR/agent"
 EOF
 chmod 640 "$CONF_FILE"
 

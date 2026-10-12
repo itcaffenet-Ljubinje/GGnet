@@ -28,7 +28,17 @@ Logs: Event Viewer → Windows Logs → Application, source `ggnet-agent`.
 ## Install on a client PC
 
 1. Register the PC in the ggNet web UI (its Windows computer name, lowercase) and assign a game disk.
-2. Copy `ggnet-agent.exe` and `scripts/install.ps1` into one folder on the PC.
+2. Easiest: in an Administrator PowerShell on the PC, run the line shown in the web UI under
+   Settings → Client app:
+
+   ```powershell
+   irm http://<ggnet-server-ip>:8088/api/v1/agent/bootstrap.ps1 | iex
+   ```
+
+   It downloads the agent from the server, checks the SHA-256 of each file and runs `install.ps1`
+   with the server's URL. The server offers what is in `[paths] agent_dir` (the unpacked
+   `ggnet-agent-win-x64.zip` of a release). Or by hand: copy `ggnet-agent.exe` and `scripts/install.ps1`
+   (Settings → Client app → Download .zip) into one folder on the PC and continue with step 3.
 3. In an elevated PowerShell in that folder:
 
    ```powershell

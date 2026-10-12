@@ -101,6 +101,16 @@ export interface MachineTraffic {
   received_bps: number | null;
 }
 
+/** Settings → Client app: the ggnet-agent package on the server. */
+export interface AgentPackage {
+  available: boolean;
+  directory: string;
+  version: string | null;
+  server_url: string;
+  install_command: string;
+  files: { name: string; size_bytes: number; sha256: string }[];
+}
+
 export type MachineMode = "disk" | "boot";
 export type MachineStatus = "idle" | "provisioned" | "editing" | "error";
 
@@ -214,6 +224,7 @@ export const api = {
     request<void>("DELETE", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}`),
   listWritebacks: (id: number) => request<Writeback[]>("GET", `/v1/game-disks/${id}/writebacks`),
 
+  getAgentPackage: () => request<AgentPackage>("GET", "/v1/agent/package"),
   getStorage: () => request<Storage>("GET", "/v1/storage"),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),
   saveRetention: (body: RetentionSettings) => request<Retention>("PUT", "/v1/settings/retention", body),

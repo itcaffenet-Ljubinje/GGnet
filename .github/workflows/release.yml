@@ -55,6 +55,8 @@ jobs:
             -p:Version="${GITHUB_REF_NAME#v}"
           mkdir -p dist/ggnet-agent
           cp dist/agent/ggnet-agent.exe agent/scripts/*.ps1 agent/README.md dist/ggnet-agent/
+          # The web UI (Settings → Client app) shows this version.
+          echo "${GITHUB_REF_NAME#v}" > dist/ggnet-agent/VERSION
           (cd dist && zip -r ../ggnet-agent-win-x64.zip ggnet-agent)
 
       - uses: softprops/action-gh-release@v3
