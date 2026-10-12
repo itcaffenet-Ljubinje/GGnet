@@ -362,3 +362,17 @@ label.check {
 .facts dd {
   margin: 2px 0 0;
 }
+
+.copy-row {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.copy-row input {
+  flex: 1;
+}
+
+a {
+  color: var(--accent);
+}

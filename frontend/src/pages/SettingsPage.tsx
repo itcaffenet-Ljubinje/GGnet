@@ -7,6 +7,7 @@ import {
   type RetentionSettings,
   type Storage,
 } from "../api";
+import { ClientApp } from "../components/ClientApp";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
@@ -202,6 +203,8 @@ export function SettingsPage({ storage, reload }: Props) {
           </button>
         </div>
       </form>
+
+      <ClientApp />
 
       {preview && (
         <div className="card" aria-label="Preview">

@@ -17,15 +17,23 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner, get_writeback_settings
+from app.api.deps import get_agent_package, get_provisioner, get_server_url, get_writeback_settings
 from app.api.v1.errors import not_found
-from app.api.v1.schemas import AgentConfig, AgentHeartbeat, AgentInventory
+from app.api.v1.schemas import (
+    AgentConfig,
+    AgentHeartbeat,
+    AgentInventory,
+    AgentPackageFileOut,
+    AgentPackageOut,
+)
 from app.db.models import Machine, MachineMode, MachineStatus
 from app.db.session import get_db
+from app.services.agent_package import AgentPackage, bootstrap_script
 from app.services.power import take_command
 from app.services.provisioning import Provisioner
 from app.services.writebacks import WritebackSettings, on_heartbeat
@@ -101,3 +109,51 @@ def heartbeat(
         drive_letter=machine.drive_letter if machine.mode is MachineMode.DISK else "D",
         command=command,
     )
+
+
+# ── Client app download (Settings → Client app) ──────────────────────
+
+@router.get("/package", response_model=AgentPackageOut)
+def package_info(
+    package: AgentPackage = Depends(get_agent_package),
+    server_url: str = Depends(get_server_url),
+):
+    info = package.info()
+    return AgentPackageOut(
+        available=info is not None,
+        directory=str(package.directory),
+        version=info.version if info else None,
+        server_url=server_url,
+        install_command=f"irm {server_url}/api/v1/agent/bootstrap.ps1 | iex",
+        files=[AgentPackageFileOut(name=f.name, size_bytes=f.size, sha256=f.sha256)
+               for f in (info.files if info else ())],
+    )
+
+
+@router.get("/download.zip")
+def download_zip(package: AgentPackage = Depends(get_agent_package)):
+    info, path = package.info(), package.zip()
+    if info is None or path is None:
+        not_found("Agent package in", str(package.directory))
+    return FileResponse(path, media_type="application/zip",
+                        filename=f"ggnet-agent-{info.version or 'latest'}.zip")
+
+
+@router.get("/download/{name}")
+def download_file(name: str, package: AgentPackage = Depends(get_agent_package)):
+    path = package.path(name)
+    if path is None:
+        not_found("Agent file", name)
+    return FileResponse(path, media_type="application/octet-stream", filename=name)
+
+
+@router.get("/bootstrap.ps1", response_class=PlainTextResponse)
+def bootstrap(
+    package: AgentPackage = Depends(get_agent_package),
+    server_url: str = Depends(get_server_url),
+):
+    """One-line install on a PC: `irm <server>/api/v1/agent/bootstrap.ps1 | iex` (admin PowerShell)."""
+    info = package.info()
+    if info is None:
+        not_found("Agent package in", str(package.directory))
+    return PlainTextResponse(bootstrap_script(server_url, info))
