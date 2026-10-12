@@ -35,6 +35,9 @@ public sealed class AgentWorker(
     // start and then every InventoryEvery, and send the last one each beat.
     internal static readonly TimeSpan InventoryEvery = TimeSpan.FromMinutes(10);
     internal static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(3);
+    // After a shutdown/reboot command; if the shutdown is cancelled, beats resume.
+    internal static readonly TimeSpan QuietAfterCommand = TimeSpan.FromMinutes(2);
+    private DateTimeOffset? _quietUntil;
     private string? _initiator;
     private Inventory? _inventory;
     private DateTimeOffset? _inventoryAt;
@@ -79,6 +82,7 @@ public sealed class AgentWorker(
     /// <summary>One heartbeat round. Public to tests through InternalsVisibleTo.</summary>
     internal async Task TickAsync(CancellationToken ct)
     {
+        if (_quietUntil is { } quiet && time.GetUtcNow() < quiet) return;
         try
         {
             if (_bootedAt is null)
@@ -138,6 +142,11 @@ public sealed class AgentWorker(
             return;
         }
         logger.LogInformation("The server asked for a {Command}", command);
+        // Say goodbye now, while the network is surely up: during a Windows
+        // shutdown the service is not given time to stop cleanly. Then stay
+        // quiet so a heartbeat in the last seconds does not undo it.
+        await SayGoodbyeAsync(ct);
+        _quietUntil = time.GetUtcNow() + QuietAfterCommand;
         await power.RunAsync(command, ct);
     }
 

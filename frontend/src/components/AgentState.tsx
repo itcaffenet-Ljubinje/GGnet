@@ -22,8 +22,17 @@ interface Props {
 
 /** Whether the agent sent a heartbeat recently. */
 export function isOnline(m: Machine, now = Date.now()): boolean {
-  // A stopped agent said goodbye (Windows shutting down): offline at once.
-  return m.last_seen_at !== null && !m.agent_stopped && now - Date.parse(m.last_seen_at) < ONLINE_WINDOW_MS;
+  // A stopped agent said goodbye (shutdown/reboot): offline at once.
+  if (m.last_seen_at === null || m.agent_stopped) return false;
+  if (now - Date.parse(m.last_seen_at) >= ONLINE_WINDOW_MS) return false;
+  // Windows closes its iSCSI session as it shuts down (also from the Start
+  // menu, where the agent cannot say goodbye): a drop after the last
+  // heartbeat means the PC is going off. Same rule as the server.
+  const dropped =
+    m.session_active === false &&
+    m.session_changed_at !== null &&
+    Date.parse(m.session_changed_at) > Date.parse(m.last_seen_at);
+  return !dropped;
 }
 
 export function AgentState({ machine: m, now = Date.now() }: Props) {

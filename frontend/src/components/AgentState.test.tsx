@@ -89,4 +89,13 @@ describe("AgentState", () => {
     expect(isOnline(m, now)).toBe(false);
     expect(isOnline({ ...m, agent_stopped: false }, now)).toBe(true);
   });
+
+  it("is offline when the iSCSI session dropped after the last heartbeat", () => {
+    const now = Date.parse("2026-10-12T12:00:20Z");
+    const base = machine({ last_seen_at: "2026-10-12T12:00:00Z", session_active: false });
+    expect(isOnline({ ...base, session_changed_at: "2026-10-12T12:00:10Z" }, now)).toBe(false);
+    // Dropped before the last heartbeat (e.g. a blip it recovered from), or connected: online.
+    expect(isOnline({ ...base, session_changed_at: "2026-10-12T11:59:00Z" }, now)).toBe(true);
+    expect(isOnline({ ...base, session_active: true, session_changed_at: "2026-10-12T12:00:10Z" }, now)).toBe(true);
+  });
 });

@@ -92,9 +92,11 @@ The agent talks to the ggNet backend over HTTP (no authentication yet; JWT is pl
   IQN that does not match the server's ACL is visible.
 - `iscsi_connected`: whether the game disk target is currently connected.
 - `drive_letter`: the letter the game disk actually got (only while connected).
-- `stopping`: `true` only in the last heartbeat, sent while the service stops (Windows shutting down,
-  or an update). The server shows the PC as offline at once instead of after 90 s without heartbeats;
-  the agent gives up after 3 s so it never holds up a shutdown.
+- `stopping`: `true` only in a goodbye heartbeat, so the server shows the PC as offline at once instead
+  of after 90 s without heartbeats. The agent sends it right before it runs a Shutdown / Reboot command
+  (then stays quiet for 2 minutes) and when its service is stopped (e.g. an update), giving up after 3 s.
+  During a Windows shutdown the service is not given time to stop, so a shutdown from the Start menu
+  is caught by the server instead: its iSCSI session drops after the last heartbeat.
 - `inventory`: the network adapter the PC reaches the server on (IP, MAC, link speed) and its hardware,
   read with CIM at start and then every 10 minutes. The server ignores an inventory it cannot parse;
   the heartbeat itself never fails because of it.
