@@ -71,6 +71,7 @@ def heartbeat(
             agent_version=body.agent_version,
             reported_iqn=body.initiator_iqn,
             iscsi_connected=body.iscsi_connected,
+            agent_stopped=body.stopping,
             reported_drive_letter=body.drive_letter if body.iscsi_connected else None,
             **inventory,   # an old agent sends none: the last inventory stays
             updated_at=Machine.updated_at,
@@ -79,7 +80,9 @@ def heartbeat(
     db.commit()
     db.refresh(machine)
     on_heartbeat(db, prov, machine, body.booted_at, body.iscsi_connected, settings)
-    command = take_command(machine)
+    # A PC that is shutting down gets no command; it waits for the next start
+    # (and expires there if it is too old).
+    command = None if body.stopping else take_command(machine)
     db.commit()
 
     # While editing, the draft master is the machine's game disk.

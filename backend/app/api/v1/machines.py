@@ -388,7 +388,7 @@ def power(
             host_failed(f"Sending Wake-on-LAN to {mac} failed: {e}", machine_id=machine.id)
         return machine
 
-    online = machine.last_seen_at is not None and \
+    online = machine.last_seen_at is not None and not machine.agent_stopped and \
         datetime.now(timezone.utc) - machine.last_seen_at < AGENT_ONLINE
     if not online:
         conflict(f"'{machine.name}' is offline; its agent cannot receive a {body.action}")

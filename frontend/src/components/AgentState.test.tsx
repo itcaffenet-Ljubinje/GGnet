@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { machine } from "../test/fixtures";
-import { ago, AgentState } from "./AgentState";
+import { ago, AgentState, isOnline } from "./AgentState";
 
 const NOW = Date.parse("2026-10-07T12:10:00Z");
 
@@ -79,5 +79,14 @@ describe("AgentState", () => {
       />,
     );
     expect(screen.queryByText(/^Link /)).toBeNull();
+  });
+
+  it("is offline at once when the agent said it is stopping", () => {
+    const now = Date.parse("2026-10-12T12:00:05Z");
+    const m = machine({ last_seen_at: "2026-10-12T12:00:00Z", agent_stopped: true });
+    render(<AgentState now={now} machine={m} />);
+    expect(screen.getByText("Offline")).toBeInTheDocument();
+    expect(isOnline(m, now)).toBe(false);
+    expect(isOnline({ ...m, agent_stopped: false }, now)).toBe(true);
   });
 });

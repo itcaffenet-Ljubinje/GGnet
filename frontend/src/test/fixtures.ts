@@ -43,6 +43,7 @@ export function machine(overrides: Partial<Machine> = {}): Machine {
     agent_version: null,
     reported_iqn: null,
     iscsi_connected: null,
+    agent_stopped: false,
     keep_writeback: false,
     writeback_dirty: false,
     session_active: null,

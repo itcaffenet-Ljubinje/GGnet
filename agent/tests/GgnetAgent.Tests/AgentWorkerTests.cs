@@ -239,7 +239,28 @@ public class AgentWorkerTests
     }
 
     [Fact]
-    public async Task Stop_keeps_the_game_disk_connected()
+    public async Task Stop_tells_the_server_the_pc_goes_offline()
+    {
+        var worker = Worker();
+        await worker.TickAsync(CancellationToken.None);
+        await worker.StopAsync(CancellationToken.None);
+        var last = System.Text.Json.JsonDocument.Parse(_server.Requests[^1].Body).RootElement;
+        Assert.True(last.GetProperty("stopping").GetBoolean());
+        Assert.False(System.Text.Json.JsonDocument.Parse(_server.Requests[0].Body).RootElement
+            .GetProperty("stopping").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Stop_does_not_fail_when_the_server_is_unreachable()
+    {
+        var worker = Worker();
+        await worker.TickAsync(CancellationToken.None);
+        _server.Throw = new HttpRequestException("connection refused");
+        await worker.StopAsync(CancellationToken.None);   // logged, not thrown
+    }
+
+    [Fact]
+        public async Task Stop_keeps_the_game_disk_connected()
     {
         var worker = Worker();
         await worker.TickAsync(CancellationToken.None);

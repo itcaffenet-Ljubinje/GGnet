@@ -88,3 +88,22 @@ def test_stale_command_is_dropped():
     assert take_command(m, now) is None and m.pending_command is None
     m.pending_command, m.pending_command_at = "reboot", now - timedelta(seconds=30)
     assert take_command(m, now) == "reboot" and m.pending_command is None
+
+
+def test_goodbye_heartbeat_marks_the_pc_offline_at_once(client):
+    m = client.post("/api/v1/machines", json={"name": "pc01"}).json()
+    _beat(client)
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["agent_stopped"] is False
+    client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "reboot"})
+
+    r = client.post("/api/v1/agent/heartbeat",
+                    json={"name": "pc01", "agent_version": "0.1.8", "stopping": True})
+    assert r.status_code == 200 and r.json()["command"] is None        # not handed out while stopping
+    got = client.get(f"/api/v1/machines/{m['id']}").json()
+    assert (got["agent_stopped"], got["pending_command"]) == (True, "reboot")
+    r = client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "shutdown"})
+    assert r.status_code == 409 and "offline" in r.text
+
+    # The next start beats normally again.
+    assert _beat(client)["command"] == "reboot"
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["agent_stopped"] is False
