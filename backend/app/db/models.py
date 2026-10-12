@@ -181,6 +181,9 @@ class Machine(Base):
     agent_version: Mapped[str | None] = mapped_column(String(32), default=None)
     reported_iqn: Mapped[str | None] = mapped_column(String(223), default=None)
     iscsi_connected: Mapped[bool | None] = mapped_column(Boolean, default=None)
+    # The agent's last heartbeat said its service is stopping (Windows shutting
+    # down): the PC is offline now, not only after missed heartbeats.
+    agent_stopped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     reported_drive_letter: Mapped[str | None] = mapped_column(String(1), default=None)
     # Inventory from the agent: the network it reaches the server on and the
     # hardware (ggRock's IP and Link Speed columns, Hardware tab). JSON text.

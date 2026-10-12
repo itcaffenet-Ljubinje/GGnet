@@ -34,6 +34,11 @@ public sealed class AgentWorker(
     // Inventory (IP, link speed, hardware) costs a PowerShell run; read it at
     // start and then every InventoryEvery, and send the last one each beat.
     internal static readonly TimeSpan InventoryEvery = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan GoodbyeTimeout = TimeSpan.FromSeconds(3);
+    // After a shutdown/reboot command; if the shutdown is cancelled, beats resume.
+    internal static readonly TimeSpan QuietAfterCommand = TimeSpan.FromMinutes(2);
+    private DateTimeOffset? _quietUntil;
+    private string? _initiator;
     private Inventory? _inventory;
     private DateTimeOffset? _inventoryAt;
     private string? _portalIp;
@@ -77,6 +82,7 @@ public sealed class AgentWorker(
     /// <summary>One heartbeat round. Public to tests through InternalsVisibleTo.</summary>
     internal async Task TickAsync(CancellationToken ct)
     {
+        if (_quietUntil is { } quiet && time.GetUtcNow() < quiet) return;
         try
         {
             if (_bootedAt is null)
@@ -85,6 +91,7 @@ public sealed class AgentWorker(
                 _bootedAt = boot.AddTicks(-(boot.Ticks % TimeSpan.TicksPerSecond));   // whole seconds
             }
             string? initiator = await iscsi.GetInitiatorNameAsync(ct);
+            _initiator = initiator;
 
             // The session can drop (server reset, network); forget it so it is reconnected.
             if (ConnectedTarget is not null && !await iscsi.IsConnectedAsync(ConnectedTarget, ct))
@@ -135,6 +142,11 @@ public sealed class AgentWorker(
             return;
         }
         logger.LogInformation("The server asked for a {Command}", command);
+        // Say goodbye now, while the network is surely up: during a Windows
+        // shutdown the service is not given time to stop cleanly. Then stay
+        // quiet so a heartbeat in the last seconds does not undo it.
+        await SayGoodbyeAsync(ct);
+        _quietUntil = time.GetUtcNow() + QuietAfterCommand;
         await power.RunAsync(command, ct);
     }
 
@@ -201,6 +213,27 @@ public sealed class AgentWorker(
         if (ConnectedTarget is not null)
         {
             logger.LogInformation("Stopping; {Target} stays connected", ConnectedTarget);
+        }
+        await SayGoodbyeAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Tell the server right away that this PC is going offline, so the UI does
+    /// not wait for missed heartbeats. Best effort and short: it must never hold
+    /// up a Windows shutdown.
+    /// </summary>
+    private async Task SayGoodbyeAsync(CancellationToken cancellationToken)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(GoodbyeTimeout);
+        try
+        {
+            await server.HeartbeatAsync(new Heartbeat(_machineName, Version, _initiator,
+                ConnectedTarget is not null, _bootedAt, DriveLetter, null, Stopping: true), cts.Token);
+        }
+        catch (Exception e)
+        {
+            logger.LogInformation("Could not tell the server the PC goes offline: {Error}", e.Message);
         }
     }
 }

@@ -88,3 +88,56 @@ def test_stale_command_is_dropped():
     assert take_command(m, now) is None and m.pending_command is None
     m.pending_command, m.pending_command_at = "reboot", now - timedelta(seconds=30)
     assert take_command(m, now) == "reboot" and m.pending_command is None
+
+
+def test_goodbye_heartbeat_marks_the_pc_offline_at_once(client):
+    m = client.post("/api/v1/machines", json={"name": "pc01"}).json()
+    _beat(client)
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["agent_stopped"] is False
+    client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "reboot"})
+
+    r = client.post("/api/v1/agent/heartbeat",
+                    json={"name": "pc01", "agent_version": "0.1.8", "stopping": True})
+    assert r.status_code == 200 and r.json()["command"] is None        # not handed out while stopping
+    got = client.get(f"/api/v1/machines/{m['id']}").json()
+    assert (got["agent_stopped"], got["pending_command"]) == (True, "reboot")
+    r = client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "shutdown"})
+    assert r.status_code == 409 and "offline" in r.text
+
+    # The next start beats normally again.
+    assert _beat(client)["command"] == "reboot"
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["agent_stopped"] is False
+
+
+def test_session_drop_after_the_last_heartbeat_means_offline(client, host, prov, db_url):
+    from sqlalchemy.orm import sessionmaker
+
+    from app.db.session import make_engine
+    from app.services import writebacks
+    from app.services.writebacks import WritebackSettings
+
+    d = client.post("/api/v1/game-disks", json={"name": "cs2", "size_gb": 10}).json()
+    client.post(f"/api/v1/game-disks/{d['id']}/publish")
+    m = client.post("/api/v1/machines", json={"name": "pc01", "game_disk_id": d["id"]}).json()
+    engine = make_engine(db_url)
+    make_session = sessionmaker(bind=engine, expire_on_commit=False)
+    watch = WritebackSettings(auto_discard=False)
+    iqn = "iqn.1991-05.com.microsoft:pc01"
+    try:
+        host.sessions.add(iqn)
+        writebacks.tick(make_session, prov, watch)
+        _beat(client)
+        assert client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "reboot"}).status_code == 200
+        _beat(client)                                         # takes the reboot
+
+        # Windows shuts down from the Start menu: no goodbye, but the session drops.
+        host.sessions.discard(iqn)
+        writebacks.tick(make_session, prov, watch)
+        r = client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "shutdown"})
+        assert r.status_code == 409 and "offline" in r.text
+
+        # Back up: the next heartbeat is newer than the drop.
+        _beat(client)
+        assert client.post(f"/api/v1/machines/{m['id']}/power", json={"action": "shutdown"}).status_code == 200
+    finally:
+        engine.dispose()

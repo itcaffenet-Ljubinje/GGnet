@@ -130,6 +130,7 @@ export interface Machine {
   agent_version: string | null;
   reported_iqn: string | null;
   iscsi_connected: boolean | null;
+  agent_stopped: boolean;
   keep_writeback: boolean;
   writeback_dirty: boolean;
   session_active: boolean | null;

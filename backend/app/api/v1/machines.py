@@ -57,6 +57,20 @@ DUPLICATE = "A machine with that name, IQN or MAC address already exists"
 AGENT_ONLINE = timedelta(seconds=90)
 
 
+def agent_online(m: Machine, now: datetime | None = None) -> bool:
+    """
+    Whether the PC is up, the same rule as the UI's isOnline(): a recent
+    heartbeat, no goodbye from the agent, and no iSCSI session that dropped
+    after the last heartbeat (Windows closes it as it shuts down, which the
+    writeback watcher sees within seconds, also when the agent cannot say so).
+    """
+    now = now or datetime.now(timezone.utc)
+    if m.last_seen_at is None or m.agent_stopped or now - m.last_seen_at >= AGENT_ONLINE:
+        return False
+    return not (m.session_active is False and m.session_changed_at is not None
+                and m.session_changed_at > m.last_seen_at)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────
 
 def _get(db: Session, machine_id: int) -> Machine:
@@ -388,9 +402,7 @@ def power(
             host_failed(f"Sending Wake-on-LAN to {mac} failed: {e}", machine_id=machine.id)
         return machine
 
-    online = machine.last_seen_at is not None and \
-        datetime.now(timezone.utc) - machine.last_seen_at < AGENT_ONLINE
-    if not online:
+    if not agent_online(machine):
         conflict(f"'{machine.name}' is offline; its agent cannot receive a {body.action}")
     machine.pending_command = body.action
     machine.pending_command_at = datetime.now(timezone.utc)

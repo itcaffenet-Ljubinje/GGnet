@@ -257,6 +257,7 @@ class MachineOut(BaseModel):
     agent_version: str | None
     reported_iqn: str | None
     iscsi_connected: bool | None
+    agent_stopped: bool
     keep_writeback: bool
     writeback_dirty: bool
     session_active: bool | None
@@ -280,6 +281,7 @@ class AgentHeartbeat(BaseModel):
     # Network and hardware (AgentInventory); parsed leniently by the endpoint so
     # a bad inventory never fails the heartbeat itself.
     inventory: dict[str, Any] | None = None
+    stopping: bool = False              # last beat: the agent's service is stopping
 
     @field_validator("drive_letter")
     @classmethod

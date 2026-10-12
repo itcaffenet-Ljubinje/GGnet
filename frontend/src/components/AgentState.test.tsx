@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { machine } from "../test/fixtures";
-import { ago, AgentState } from "./AgentState";
+import { ago, AgentState, isOnline } from "./AgentState";
 
 const NOW = Date.parse("2026-10-07T12:10:00Z");
 
@@ -79,5 +79,23 @@ describe("AgentState", () => {
       />,
     );
     expect(screen.queryByText(/^Link /)).toBeNull();
+  });
+
+  it("is offline at once when the agent said it is stopping", () => {
+    const now = Date.parse("2026-10-12T12:00:05Z");
+    const m = machine({ last_seen_at: "2026-10-12T12:00:00Z", agent_stopped: true });
+    render(<AgentState now={now} machine={m} />);
+    expect(screen.getByText("Offline")).toBeInTheDocument();
+    expect(isOnline(m, now)).toBe(false);
+    expect(isOnline({ ...m, agent_stopped: false }, now)).toBe(true);
+  });
+
+  it("is offline when the iSCSI session dropped after the last heartbeat", () => {
+    const now = Date.parse("2026-10-12T12:00:20Z");
+    const base = machine({ last_seen_at: "2026-10-12T12:00:00Z", session_active: false });
+    expect(isOnline({ ...base, session_changed_at: "2026-10-12T12:00:10Z" }, now)).toBe(false);
+    // Dropped before the last heartbeat (e.g. a blip it recovered from), or connected: online.
+    expect(isOnline({ ...base, session_changed_at: "2026-10-12T11:59:00Z" }, now)).toBe(true);
+    expect(isOnline({ ...base, session_active: true, session_changed_at: "2026-10-12T12:00:10Z" }, now)).toBe(true);
   });
 });
