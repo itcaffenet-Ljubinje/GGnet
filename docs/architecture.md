@@ -366,7 +366,9 @@ React + Vite, served by the backend on port 8088. Layout follows ggRock's Machin
   heartbeat answer, dropped after 2 minutes, then runs `shutdown.exe` with a 10 s notice.)*
 - Settings dialog: Main (name, read-only IP and MAC, mode, game image, OS image, hide), Hardware (NIC, GPU, CPU,
   motherboard, reported by the agent), Advanced (Keep Writeback, snapshot pin per image).
-- Bulk: select PCs → Turn On, Turn Off, Reboot, Edit Selected (images, Keep Writeback, pins, hide).
+- Bulk: select PCs → Turn On, Turn Off, Reboot, Edit Selected (images, Keep Writeback, pins, hide). *(done:
+  Turn on, Shutdown, Reboot, game disk, version pin (when the PCs share a disk), drive letter, stop keeping
+  writeback; `POST /machines/bulk` runs each machine like its single route and reports per machine)*
 
 **Images**
 - Create a game image (name, size, drive letter, make default), import `.vhd`/`.vhdx` (Boot Mode system image).
@@ -394,7 +396,8 @@ network throughput of the iSCSI interface.
 | Edit on PC for drafts, game disk drive letter per machine, Images page: versions and writebacks | done |
 | Snapshot pin per machine and the ggRock image status | done |
 | Retention job, reserved space and warning threshold | done |
-| Machines UI per the ggRock docs (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | next |
+| Machines UI per the ggRock docs (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | done |
+| Settings → Client app: agent download and one-line install | done |
 | ZFS property defaults from section 1, Server monitor page | next |
 | Boot Mode: OS images, proxyDHCP, iPXE build, per-MAC script, Add Machines wizard | after Disk Mode |
 | JWT auth + TLS | last |

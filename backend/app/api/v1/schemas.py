@@ -432,3 +432,34 @@ class AgentPackageOut(BaseModel):
     server_url: str
     install_command: str             # one line for an admin PowerShell on the PC
     files: list[AgentPackageFileOut]
+
+
+BulkKind = Literal["on", "shutdown", "reboot", "assign", "pin", "drive_letter", "stop_keep_writeback"]
+
+
+class BulkAction(BaseModel):
+    """One action on several machines (ggRock's bulk operations / Edit Selected)."""
+
+    machine_ids: list[int] = Field(min_length=1, max_length=500)
+    action: BulkKind
+    game_disk_id: int | None = None   # assign: the disk, or None to remove it
+    snapshot: str | None = None       # pin: a version, or None to follow the active one
+    drive_letter: str | None = None   # drive_letter: D-Z
+
+    @field_validator("drive_letter")
+    @classmethod
+    def check_drive_letter(cls, v: str | None) -> str | None:
+        return _drive_letter(v) if v is not None else None
+
+    @model_validator(mode="after")
+    def needs_letter(self):
+        if self.action == "drive_letter" and self.drive_letter is None:
+            raise ValueError("drive_letter: required for the drive_letter action")
+        return self
+
+
+class BulkResult(BaseModel):
+    machine_id: int
+    name: str | None
+    ok: bool
+    error: str | None = None

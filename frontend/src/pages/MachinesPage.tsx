@@ -1,6 +1,14 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 
-import { api, type GameDisk, type Machine, type MachineMode, type MachineTraffic } from "../api";
+import {
+  api,
+  type BulkKind,
+  type BulkResult,
+  type GameDisk,
+  type Machine,
+  type MachineMode,
+  type MachineTraffic,
+} from "../api";
 import { AgentState, isOnline } from "../components/AgentState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ImageStatus } from "../components/ImageStatus";
@@ -32,6 +40,30 @@ export function MachinesPage({ disks, machines, traffic = {}, reload }: Props) {
   const [allLetter, setAllLetter] = useState("D");
   // The machine whose hardware and network are shown.
   const [open, setOpen] = useState<number | null>(null);
+  // Bulk operations: the selected machines and the last result.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkReport, setBulkReport] = useState<{ label: string; results: BulkResult[] } | null>(null);
+  const picked = machines.filter((m) => selected.has(m.id));
+
+  function toggle(id: number) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+
+  async function runBulk(
+    label: string,
+    action: BulkKind,
+    extra: Parameters<typeof api.bulk>[2] = {},
+    confirmText?: string,
+  ) {
+    if (confirmText && !window.confirm(`${confirmText}\n\n${picked.map((m) => m.name).join(", ")}`)) return;
+    await run("bulk", async () => {
+      setBulkReport({ label, results: await api.bulk([...selected], action, extra) });
+    });
+    await reload();
+  }
   // Versions of each game disk in use, for the pin drop-down.
   const [versions, setVersions] = useState<Record<number, string[]>>({});
 
@@ -223,12 +255,32 @@ export function MachinesPage({ disks, machines, traffic = {}, reload }: Props) {
         </div>
       )}
 
+      {picked.length > 0 && (
+        <BulkBar
+          machines={picked}
+          disks={published}
+          versions={versions}
+          busy={busy !== null}
+          run={runBulk}
+          clear={() => setSelected(new Set())}
+        />
+      )}
+      {bulkReport && <BulkReport {...bulkReport} onClose={() => setBulkReport(null)} />}
+
       {machines.length === 0 ? (
         <p className="empty">No machines yet.</p>
       ) : (
         <table>
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  aria-label="Select all machines"
+                  checked={machines.length > 0 && selected.size === machines.length}
+                  onChange={(e) => setSelected(new Set(e.target.checked ? machines.map((m) => m.id) : []))}
+                />
+              </th>
               <th>Name</th>
               <th>Mode</th>
               <th>MAC</th>
@@ -244,7 +296,15 @@ export function MachinesPage({ disks, machines, traffic = {}, reload }: Props) {
           <tbody>
             {machines.map((m) => (
               <Fragment key={m.id}>
-                <tr>
+                <tr className={selected.has(m.id) ? "selected" : undefined}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${m.name}`}
+                      checked={selected.has(m.id)}
+                      onChange={() => toggle(m.id)}
+                    />
+                  </td>
                   <td>
                     <div className="strong">{m.name}</div>
                     <div className="mono muted small">{m.initiator_iqn}</div>
@@ -430,6 +490,150 @@ function TrafficCell({ traffic: t }: { traffic: MachineTraffic | undefined }) {
           ↓ {formatRate(t.sent_bps)} · ↑ {formatRate(t.received_bps)}
         </div>
       )}
+    </div>
+  );
+}
+
+interface BulkBarProps {
+  machines: Machine[];
+  disks: GameDisk[];
+  versions: Record<number, string[]>;
+  busy: boolean;
+  run: (label: string, action: BulkKind, extra?: Parameters<typeof api.bulk>[2], confirmText?: string) => void;
+  clear: () => void;
+}
+
+/** ggRock's bulk operations on the selected machines. */
+function BulkBar({ machines, disks, versions, busy, run, clear }: BulkBarProps) {
+  const [disk, setDisk] = useState("");
+  const [version, setVersion] = useState("");
+  const [letter, setLetter] = useState("D");
+  const n = machines.length;
+  // A version can be pinned on several PCs only when they share a game disk.
+  const diskIds = new Set(machines.map((m) => m.game_disk_id));
+  const shared = diskIds.size === 1 ? [...diskIds][0] : null;
+  const sharedVersions = shared !== null ? (versions[shared] ?? []) : [];
+
+  return (
+    <div className="card bulk-bar" aria-label="Bulk actions">
+      <span className="strong">{n} selected</span>
+      <button type="button" className="secondary" disabled={busy} onClick={() => run("Turn on", "on")}>
+        Turn on
+      </button>
+      <button
+        type="button"
+        className="secondary"
+        disabled={busy}
+        onClick={() => run("Shutdown", "shutdown", {}, `Shut down ${n} PC(s)?`)}
+      >
+        Shutdown
+      </button>
+      <button
+        type="button"
+        className="secondary"
+        disabled={busy}
+        onClick={() => run("Reboot", "reboot", {}, `Restart ${n} PC(s)?`)}
+      >
+        Reboot
+      </button>
+
+      <span className="bulk-group">
+        <select aria-label="Game disk for selected" value={disk} onChange={(e) => setDisk(e.target.value)}>
+          <option value="">Game disk…</option>
+          <option value="none">None (remove)</option>
+          {disks.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={busy || !disk}
+          onClick={() =>
+            run(
+              "Game disk",
+              "assign",
+              { game_disk_id: disk === "none" ? null : Number(disk) },
+              `Set the game disk of ${n} PC(s)? Everything they wrote is lost. ${CLIENT_OFF}`,
+            )
+          }
+        >
+          Apply
+        </button>
+      </span>
+
+      {shared !== null && (
+        <span className="bulk-group">
+          <select aria-label="Version for selected" value={version} onChange={(e) => setVersion(e.target.value)}>
+            <option value="">Version…</option>
+            <option value="follow">Follow active</option>
+            {sharedVersions.map((v) => (
+              <option key={v} value={v}>
+                Pin @{v}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={busy || !version}
+            onClick={() => run("Version", "pin", { snapshot: version === "follow" ? null : version })}
+          >
+            Apply
+          </button>
+        </span>
+      )}
+
+      <span className="bulk-group">
+        <select aria-label="Drive letter for selected" value={letter} onChange={(e) => setLetter(e.target.value)}>
+          {LETTERS.map((l) => (
+            <option key={l} value={l}>
+              {l}:
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => run("Drive letter", "drive_letter", { drive_letter: letter }, `${MOVES_NOW}`)}
+        >
+          Apply
+        </button>
+      </span>
+
+      <button
+        type="button"
+        className="secondary"
+        disabled={busy || !machines.some((m) => m.keep_writeback)}
+        onClick={() => run("Stop keeping writeback", "stop_keep_writeback")}
+      >
+        Stop keeping writeback
+      </button>
+      <button type="button" className="link" aria-label="Clear selection" onClick={clear}>
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** "Turn on: done on 3, failed on 1" with the reason per failed PC. */
+function BulkReport({ label, results, onClose }: { label: string; results: BulkResult[]; onClose: () => void }) {
+  const failed = results.filter((r) => !r.ok);
+  const done = results.length - failed.length;
+  return (
+    <div className={failed.length ? "banner banner-warn" : "banner"} role="status">
+      <div>
+        <span className="strong">{label}</span>: done on {done}
+        {failed.length > 0 && `, failed on ${failed.length}`}
+        {failed.map((r) => (
+          <div key={r.machine_id} className="small">
+            {r.name ?? `#${r.machine_id}`}: {r.error}
+          </div>
+        ))}
+      </div>
+      <button type="button" className="link" aria-label="Close" onClick={onClose}>
+        ×
+      </button>
     </div>
   );
 }

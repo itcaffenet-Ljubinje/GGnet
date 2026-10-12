@@ -295,4 +295,75 @@ describe("MachinesPage", () => {
     expect(screen.getByText("Shutting down…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reboot" })).toBeDisabled();
   });
+
+  describe("bulk", () => {
+    const three = [
+      machine({ id: 1, name: "pc01", game_disk_id: 1 }),
+      machine({ id: 2, name: "pc02", initiator_iqn: "iqn.x:pc02", game_disk_id: 1 }),
+      machine({ id: 3, name: "pc03", initiator_iqn: "iqn.x:pc03", game_disk_id: 2 }),
+    ];
+
+    it("shows the bar only with a selection, and select all picks every PC", async () => {
+      render(<MachinesPage disks={DISKS} machines={three} reload={vi.fn()} />);
+      expect(screen.queryByLabelText("Bulk actions")).toBeNull();
+      await userEvent.click(screen.getByLabelText("Select all machines"));
+      expect(screen.getByLabelText("Bulk actions")).toHaveTextContent("3 selected");
+      // Different game disks: no shared version to pin.
+      expect(screen.queryByLabelText("Version for selected")).toBeNull();
+      await userEvent.click(screen.getByLabelText("Clear selection"));
+      expect(screen.queryByLabelText("Bulk actions")).toBeNull();
+    });
+
+    it("turns the selected PCs on and reports the ones that failed", async () => {
+      const fetchMock = stubFetch(200, [
+        { machine_id: 1, name: "pc01", ok: true, error: null },
+        { machine_id: 2, name: "pc02", ok: false, error: "'pc02' has no MAC address" },
+      ]);
+      render(<MachinesPage disks={DISKS} machines={three} reload={vi.fn().mockResolvedValue(undefined)} />);
+      await userEvent.click(screen.getByLabelText("Select pc01"));
+      await userEvent.click(screen.getByLabelText("Select pc02"));
+      await userEvent.click(within(screen.getByLabelText("Bulk actions")).getByRole("button", { name: "Turn on" }));
+
+      expect(actions(fetchMock)).toEqual([
+        { url: "/api/v1/machines/bulk", method: "POST", body: { machine_ids: [1, 2], action: "on" } },
+      ]);
+      const report = await screen.findByRole("status");
+      expect(report).toHaveTextContent("Turn on: done on 1, failed on 1");
+      expect(report).toHaveTextContent("pc02: 'pc02' has no MAC address");
+    });
+
+    it("asks before a bulk shutdown, naming the PCs", async () => {
+      const fetchMock = stubFetch(200, []);
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+      render(<MachinesPage disks={DISKS} machines={three} reload={vi.fn()} />);
+      await userEvent.click(screen.getByLabelText("Select pc01"));
+      await userEvent.click(within(screen.getByLabelText("Bulk actions")).getByRole("button", { name: "Shutdown" }));
+      expect(confirm.mock.calls[0][0]).toContain("Shut down 1 PC(s)?");
+      expect(confirm.mock.calls[0][0]).toContain("pc01");
+      expect(actions(fetchMock)).toEqual([]);
+    });
+
+    it("assigns a disk and pins a shared version on the selected PCs", async () => {
+      const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+        new Response(JSON.stringify(url.endsWith("/snapshots") ? [{ name: "base" }] : []), { status: 200 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      render(<MachinesPage disks={DISKS} machines={three} reload={vi.fn().mockResolvedValue(undefined)} />);
+      await userEvent.click(screen.getByLabelText("Select pc01"));
+      await userEvent.click(screen.getByLabelText("Select pc02"));
+      const bar = screen.getByLabelText("Bulk actions");
+
+      await userEvent.selectOptions(within(bar).getByLabelText("Game disk for selected"), "none");
+      await userEvent.click(within(bar).getAllByRole("button", { name: "Apply" })[0]);
+      await within(bar).findByRole("option", { name: "Pin @base" });
+      await userEvent.selectOptions(within(bar).getByLabelText("Version for selected"), "base");
+      await userEvent.click(within(bar).getAllByRole("button", { name: "Apply" })[1]);
+
+      expect(actions(fetchMock)).toEqual([
+        { url: "/api/v1/machines/bulk", method: "POST", body: { machine_ids: [1, 2], action: "assign", game_disk_id: null } },
+        { url: "/api/v1/machines/bulk", method: "POST", body: { machine_ids: [1, 2], action: "pin", snapshot: "base" } },
+      ]);
+    });
+  });
 });
