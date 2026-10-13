@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.db.models import MachineMode, MachineStatus
+from app.db.models import DiskKind, MachineMode, MachineStatus
 
 # The disk name becomes part of a ZFS path, so only [a-z0-9-].
 _DISK_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
@@ -31,6 +31,9 @@ def _machine_name(v: str) -> str:
     v = v.strip().lower()
     if not _MACHINE_NAME_RE.match(v) or v.isdigit():
         raise ValueError("name: 1-15 characters [a-z0-9-], not only digits")
+    # <writebacks>/<name>-os is the OS writeback of machine <name> (Boot Mode).
+    if v.endswith("-os"):
+        raise ValueError("name must not end in '-os'")
     return v
 
 
@@ -63,6 +66,7 @@ def _mac(v: str | None) -> str | None:
 class GameDiskCreate(BaseModel):
     name: str
     size_gb: int = Field(gt=0, le=16384)
+    kind: DiskKind = DiskKind.GAME     # `os`: a Boot Mode Windows image
 
     @field_validator("name")
     @classmethod
@@ -80,6 +84,7 @@ class GameDiskOut(BaseModel):
     name: str
     zvol_path: str
     size_gb: int
+    kind: DiskKind
     snapshot: str | None
     published: bool
     editor_id: int | None
@@ -128,6 +133,7 @@ class MachineCreate(BaseModel):
     initiator_iqn: str | None = None   # empty → iqn.1991-05.com.microsoft:<name>
     mac: str | None = None
     game_disk_id: int | None = None    # set → provision right away
+    os_disk_id: int | None = None      # Boot Mode: OS image, needed with game_disk_id
     drive_letter: str = "D"            # game disk letter on the PC (Disk Mode)
 
     @field_validator("name")
@@ -226,7 +232,9 @@ class DriveLetterAll(BaseModel):
 
 
 class MachineAssign(BaseModel):
-    game_disk_id: int | None   # None → remove the disk (deprovision)
+    game_disk_id: int | None   # None → remove the disks (deprovision)
+    # Boot Mode: the OS image. Not sent → the machine keeps its current one.
+    os_disk_id: int | None = None
 
 
 class MachineOut(BaseModel):
@@ -238,6 +246,7 @@ class MachineOut(BaseModel):
     initiator_iqn: str
     mac: str | None
     game_disk_id: int | None
+    os_disk_id: int | None
     editing_disk_id: int | None
     drive_letter: str
     reported_drive_letter: str | None
@@ -251,6 +260,8 @@ class MachineOut(BaseModel):
     last_error: str | None
     clone_zvol: str | None
     clone_snapshot: str | None
+    os_clone_zvol: str | None
+    os_clone_snapshot: str | None
     iscsi_target_iqn: str | None
     outdated: bool
     last_seen_at: datetime | None

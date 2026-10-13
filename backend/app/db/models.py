@@ -65,9 +65,15 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+class DiskKind(str, enum.Enum):
+    GAME = "game"    # game disk: Disk Mode D:, Boot Mode LUN 1
+    OS = "os"        # Windows system disk of Boot Mode machines (LUN 0)
+
+
 class GameDisk(Base):
     """
-    Master image (shared disk). Until `snapshot` is set the disk is a draft
+    Master image (shared disk). `kind` says whether it holds games or a
+    Boot Mode Windows install. Until `snapshot` is set the disk is a draft
     and must not be assigned to machines. After publish_master(), `snapshot`
     is the name of the current snapshot (`base`, later `vN`).
 
@@ -81,6 +87,9 @@ class GameDisk(Base):
     name: Mapped[str] = mapped_column(String(32), unique=True)
     zvol_path: Mapped[str] = mapped_column(String(255), unique=True)
     size_gb: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[DiskKind] = mapped_column(
+        _str_enum(DiskKind), default=DiskKind.GAME, server_default=DiskKind.GAME.value
+    )
     snapshot: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
 
@@ -106,7 +115,7 @@ class GameDisk(Base):
 
 class MachineMode(str, enum.Enum):
     DISK = "disk"    # local Windows on C:, game disk over iSCSI
-    BOOT = "boot"    # diskless UEFI PXE boot (later)
+    BOOT = "boot"    # diskless UEFI PXE boot: OS disk (LUN 0) + game disk (LUN 1)
 
 
 class MachineStatus(str, enum.Enum):
@@ -147,6 +156,16 @@ class Machine(Base):
     editing_disk: Mapped[GameDisk | None] = relationship(
         back_populates="editor", foreign_keys=[editing_disk_id]
     )
+
+    # Boot Mode: the OS image (kind `os`) and this machine's writeback of it.
+    # It follows the image's active version (no pin yet) and is discarded
+    # together with the game writeback.
+    os_disk_id: Mapped[int | None] = mapped_column(
+        ForeignKey("game_disks.id", ondelete="RESTRICT"), default=None, index=True
+    )
+    os_disk: Mapped[GameDisk | None] = relationship(foreign_keys=[os_disk_id])
+    os_clone_zvol: Mapped[str | None] = mapped_column(String(255), default=None)
+    os_clone_snapshot: Mapped[str | None] = mapped_column(String(320), default=None)
 
     # Game disk letter on the PC (Disk Mode; Boot Mode is always D:).
     drive_letter: Mapped[str] = mapped_column(String(1), default="D", server_default="D")
@@ -215,13 +234,26 @@ class Machine(Base):
         return self.game_disk.snapshot_path
 
     @property
+    def os_snapshot_path(self) -> str | None:
+        """The OS version a Boot Mode machine is cloned from: the image's active one."""
+        if self.mode is not MachineMode.BOOT or self.os_disk is None:
+            return None
+        return self.os_disk.snapshot_path
+
+    @property
     def outdated(self) -> bool:
-        """The clone was made from another snapshot than the one it should run."""
-        return (
+        """A clone was made from another snapshot than the one it should run."""
+        game = (
             self.clone_snapshot is not None
             and self.target_snapshot_path is not None
             and self.clone_snapshot != self.target_snapshot_path
         )
+        os_ = (
+            self.os_clone_snapshot is not None
+            and self.os_snapshot_path is not None
+            and self.os_clone_snapshot != self.os_snapshot_path
+        )
+        return game or os_
 
 
 class AppSetting(Base):

@@ -4,6 +4,9 @@ API for game disks (master images).
 Flow: POST (empty zvol, draft) → POST /edit (the draft becomes one PC's
 game disk; partition and fill it there) → shut that PC down → POST
 /finish-edit → POST /publish (@base, hold, readonly) → assign to machines.
+
+A disk of kind `os` is the Windows image of Boot Mode machines. It is not
+filled with Edit on PC; importing a .vhdx into it comes with Boot Mode.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,7 +29,7 @@ from app.api.v1.schemas import (
     SnapshotOut,
     WritebackOut,
 )
-from app.db.models import GameDisk, Machine, MachineMode, MachineStatus
+from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services.provisioning import Provisioner, ProvisioningError
 
@@ -61,11 +64,11 @@ def create_disk(
     if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
         conflict(f"Game disk '{body.name}' already exists")
     try:
-        path = prov.create_disk(body.name, body.size_gb)
+        path = prov.create_disk(body.name, body.size_gb, os_image=body.kind is DiskKind.OS)
     except ProvisioningError as e:
         host_failed(str(e))
 
-    disk = GameDisk(name=body.name, zvol_path=path, size_gb=body.size_gb)
+    disk = GameDisk(name=body.name, zvol_path=path, size_gb=body.size_gb, kind=body.kind)
     db.add(disk)
     try:
         db.commit()
@@ -98,6 +101,8 @@ def start_edit(
     A published disk is changed with Keep Writeback + Apply Writebacks instead.
     """
     disk = _get(db, disk_id)
+    if disk.kind is DiskKind.OS:
+        conflict(f"'{disk.name}' is an OS image; it cannot be edited on a Disk Mode PC")
     if disk.published:
         conflict(f"Game disk '{disk.name}' is published; change it with Keep Writeback "
                  "and Apply Writebacks")
@@ -188,7 +193,14 @@ def _versions(prov: Provisioner, disk: GameDisk) -> list[dict]:
 
 
 def _machines_by_clone(db: Session) -> dict[str, Machine]:
-    return {m.clone_zvol: m for m in db.scalars(select(Machine).where(Machine.clone_zvol.is_not(None)))}
+    """Machines by the zvol of each of their writebacks (game, and OS in Boot Mode)."""
+    out: dict[str, Machine] = {}
+    for m in db.scalars(select(Machine).where(
+            or_(Machine.clone_zvol.is_not(None), Machine.os_clone_zvol.is_not(None)))):
+        for clone in (m.clone_zvol, m.os_clone_zvol):
+            if clone:
+                out[clone] = m
+    return out
 
 
 @router.get("/{disk_id}/snapshots", response_model=list[SnapshotOut])
@@ -307,7 +319,8 @@ def delete_disk(
     disk = _get(db, disk_id)
     _not_edited(disk)
     assigned = db.scalar(
-        select(func.count()).select_from(Machine).where(Machine.game_disk_id == disk.id)
+        select(func.count()).select_from(Machine).where(
+            or_(Machine.game_disk_id == disk.id, Machine.os_disk_id == disk.id))
     )
     if assigned:
         conflict(f"Game disk '{disk.name}' is assigned to {assigned} machine(s); move them first")

@@ -30,7 +30,7 @@ Names come from `[storage]` in `/etc/ggnet/config.toml`; nothing is hard-coded. 
 ├── writebacks/             per-PC clones, disposable (sync=disabled)
 │   ├── pc01                clone of images/cs2@v3      → Disk Mode, mapped LUN 0
 │   ├── pc02-os             clone of images/win11-os@v2 → Boot Mode, mapped LUN 0
-│   └── pc02-game           clone of images/cs2@v3      → Boot Mode, mapped LUN 1
+│   └── pc02                clone of images/cs2@v3      → Boot Mode, mapped LUN 1
 ├── snapshots/
 └── iscsi_targets/
 ```
@@ -266,7 +266,17 @@ being active). The job thread is off in dev defaults (`[retention] job = false`)
 
 ---
 
-## 4. Boot Mode: proxyDHCP and iPXE (planned)
+## 4. Boot Mode: proxyDHCP and iPXE
+
+*Done: OS images, a Boot Mode PC's OS and game writebacks, and the per-MAC iPXE script. Planned: the
+dnsmasq proxyDHCP, the iPXE build, importing a `.vhdx` into an OS image, and Secure Boot.*
+
+An OS image is a disk of kind `os` (`POST /game-disks` with `"kind": "os"`; created with the OS properties
+above). A Boot Mode machine is assigned an OS image and a game disk together (`os_disk_id` + `game_disk_id`) and
+gets two writebacks: `<writebacks>/<name>-os` (mapped LUN 0) and `<writebacks>/<name>` (mapped LUN 1; the same
+path as a Disk Mode game writeback). Machine names may not end in `-os`, so the two never collide. Both
+writebacks are discarded together, by the same rules as in Disk Mode, and the OS writeback always follows the OS
+image's active version (no pin yet). Apply Writebacks is not available for Boot Mode PCs yet.
 
 The router stays the DHCP server for IP addresses. dnsmasq on the Proxmox host only answers PXE requests
 (proxyDHCP) and serves the iPXE binary over TFTP. Only one PXE server may run in the LAN.
@@ -342,7 +352,11 @@ sleep 5
 exit
 ```
 
-The request is recorded so the PC shows up under "Unregistered" (and in the Add Machines wizard).
+The MAC is looked up in the machine's own MAC, then in the MAC its agent reported. For now an unknown MAC is
+only logged; recording it so the PC shows up under "Unregistered" (and in the Add Machines wizard) comes with
+discovery.
+
+Boot Mode PC without its disks (not provisioned, or in `error`): a message with the reason, then `exit`.
 
 Disk Mode PC that PXE-boots by mistake: the same `exit` script, so it falls through to its local disk.
 
@@ -398,6 +412,9 @@ network throughput of the iSCSI interface.
 | Retention job, reserved space and warning threshold | done |
 | Machines UI per the ggRock docs (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | done |
 | Settings → Client app: agent download and one-line install | done |
+| Boot Mode: OS images, OS + game writebacks per PC, per-MAC iPXE script | done |
+| Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
+| Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |
 | Boot Mode: OS images, proxyDHCP, iPXE build, per-MAC script, Add Machines wizard | after Disk Mode |
 | JWT auth + TLS | last |
