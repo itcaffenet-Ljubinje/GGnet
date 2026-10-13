@@ -3,7 +3,7 @@ Automatic writeback discard (ggRock model).
 
 A machine's writeback is thrown away by the SERVER whenever the client goes
 away, so every boot starts from a clean copy of the game disk's active
-snapshot. Nobody clicks "Reset". Two triggers:
+snapshot. Nobody clicks "Reset". Three triggers:
 
   watcher   LIO shows no iSCSI session for the machine for `grace` seconds
             (shutdown, restart, cable pulled). The grace period keeps a short
@@ -11,6 +11,7 @@ snapshot. Nobody clicks "Reset". Two triggers:
   boot      ggnet-agent reports a newer Windows boot time while the machine
             has no session yet. This covers a restart that reconnects
             faster than the grace period.
+  iPXE      a Boot Mode PC asks for its boot script (app.api.v1.boot).
 
 Machines with `keep_writeback` are never discarded. A clean writeback (not
 written since it was cloned) on the active snapshot is left alone, so an idle
@@ -59,13 +60,12 @@ def _now() -> datetime:
 
 
 def _managed(m: Machine) -> bool:
-    """Machines whose writeback this module may discard."""
-    return (
-        m.mode is MachineMode.DISK
-        and m.status is MachineStatus.PROVISIONED
-        and m.game_disk is not None
-        and m.game_disk.published
-    )
+    """Machines whose writebacks this module may discard."""
+    if m.status is not MachineStatus.PROVISIONED or m.game_disk is None or not m.game_disk.published:
+        return False
+    if m.mode is MachineMode.BOOT:
+        return m.os_disk is not None and m.os_disk.published and m.os_clone_zvol is not None
+    return True
 
 
 def _needs_discard(m: Machine) -> bool:
@@ -75,18 +75,22 @@ def _needs_discard(m: Machine) -> bool:
 def discard(db: Session, prov: Provisioner, m: Machine, reason: str) -> bool:
     """
     Re-clone the machine's writeback from the version it should run (its
-    pin, else the disk's active snapshot).
+    pin, else the disk's active snapshot); in Boot Mode its OS writeback too,
+    from the OS image's active snapshot.
     Commits. On a host error the machine goes to `error` with the reason.
     """
     clone = m.clone_zvol or prov.client_path(m.name)
+    os_clone = m.os_clone_zvol if m.mode is MachineMode.BOOT else None
     try:
-        cd = prov.reset(m.name, m.initiator_iqn, clone, m.target_snapshot_path)
+        cd = prov.reset(m.name, m.initiator_iqn, clone, m.target_snapshot_path,
+                        os_clone, m.os_snapshot_path if os_clone else None)
     except ProvisioningError as e:
         m.status = MachineStatus.ERROR
         m.last_error = f"Automatic writeback discard failed: {e}"
         db.commit()
         return False
     m.clone_zvol, m.clone_snapshot = cd.clone_zvol, cd.clone_snapshot
+    m.os_clone_zvol, m.os_clone_snapshot = cd.os_clone_zvol, cd.os_clone_snapshot
     m.iscsi_target_iqn = cd.iscsi_target_iqn
     m.writeback_dirty = False
     m.last_error = None
@@ -151,6 +155,20 @@ def on_heartbeat(db: Session, prov: Provisioner, m: Machine, booted_at: datetime
     if prov.session_active(m.initiator_iqn, m.iscsi_target_iqn) is not False:
         return
     discard(db, prov, m, "client rebooted")
+
+
+def on_ipxe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSettings) -> bool:
+    """
+    Boot Mode: iPXE asks for its script, so the PC is booting. Its writebacks
+    are discarded before it logs in, unless it keeps them or LIO still shows
+    a session (the old one has not timed out yet; booting on the current
+    writeback is the safe choice then). False only when a discard failed.
+    """
+    if not (settings.auto_discard and _managed(m) and _needs_discard(m)):
+        return True
+    if prov.session_active(m.initiator_iqn, m.iscsi_target_iqn) is not False:
+        return True
+    return discard(db, prov, m, "client booting (iPXE)")
 
 
 def tick(make_session: Callable[[], Session], prov: Provisioner,

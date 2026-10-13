@@ -65,7 +65,7 @@ def test_create_machine_unknown_disk(client):
     assert r.status_code == 404
 
 
-def test_create_boot_mode_machine_cannot_get_disk(client, host):
+def test_create_boot_mode_machine_needs_an_os_image(client, host):
     d = _disk(client)
     host.calls.clear()
     r = client.post("/api/v1/machines",

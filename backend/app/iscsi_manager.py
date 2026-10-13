@@ -242,23 +242,28 @@ class ISCSIManager:
             return False
         return "TARG_SESS_STATE_LOGGED_IN" in out
 
-    def acl_traffic(self, initiator_iqn: str, target_iqn: Optional[str] = None) -> Optional[tuple[int, int]]:
+    def acl_traffic(self, initiator_iqn: str, target_iqn: Optional[str] = None,
+                    mapped_luns: int = 1) -> Optional[tuple[int, int]]:
         """
-        Megabytes the initiator has read from and written to its game disk
-        (mapped LUN 0), from LIO's per-ACL statistics in configfs. The
-        counters start at 0 whenever the ACL is created, i.e. at each new
-        clone. None when they cannot be read.
+        Megabytes the initiator has read from and written to its disks
+        (mapped LUN 0 .. mapped_luns-1, summed; Boot Mode has two), from
+        LIO's per-ACL statistics in configfs. The counters start at 0
+        whenever the ACL is created, i.e. at each new clone. None when they
+        cannot be read.
         """
         target = target_iqn or self.target_iqn()
         if not (self._valid_initiator(initiator_iqn) and self._valid_initiator(target)):
             return None
-        base = (f"{self.cfg.configfs}/{target}/tpgt_1/acls/{initiator_iqn}"
-                "/lun_0/statistics/scsi_auth_intr")
-        ok, out, _ = self._run(["cat", f"{base}/read_mbytes", f"{base}/write_mbytes"], quiet=True)
+        paths = []
+        for lun in range(mapped_luns):
+            base = (f"{self.cfg.configfs}/{target}/tpgt_1/acls/{initiator_iqn}"
+                    f"/lun_{lun}/statistics/scsi_auth_intr")
+            paths += [f"{base}/read_mbytes", f"{base}/write_mbytes"]
+        ok, out, _ = self._run(["cat", *paths], quiet=True)
         values = out.split()
-        if not ok or len(values) != 2 or not all(v.isdigit() for v in values):
+        if not ok or len(values) != len(paths) or not all(v.isdigit() for v in values):
             return None
-        return int(values[0]), int(values[1])
+        return sum(map(int, values[0::2])), sum(map(int, values[1::2]))
 
     # ── Shared target ─────────────────────────────────────────────────
 
