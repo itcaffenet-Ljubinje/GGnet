@@ -351,6 +351,21 @@ class ZFSManager:
             return None
         return [line.partition("@")[2] for line in out.splitlines() if "@" in line]
 
+    def rename_snapshot(self, dataset: str, old: str, new: str) -> bool:
+        """
+        zfs rename dataset@old dataset@new. Holds stay on the snapshot and
+        clones made from it follow the new name (their origin is renamed too).
+        """
+        if not (self._is_managed(dataset, allow_snapshot=False)
+                and _COMPONENT_RE.match(old) and _COMPONENT_RE.match(new)):
+            return False
+        ok, _, err = self._run(["zfs", "rename", f"{dataset}@{old}", f"{dataset}@{new}"])
+        if not ok:
+            logger.error("Renaming %s@%s to @%s failed: %s", dataset, old, new, err)
+            return False
+        logger.info("Snapshot %s@%s renamed to @%s", dataset, old, new)
+        return True
+
     def apply_clone(self, clone: str, master: str, base_snap: str, new_snap: str) -> bool:
         """
         Turn a client's writeback into a new version of its master

@@ -258,6 +258,20 @@ changes on the host when the pin is set: the PC is cloned from the pinned versio
 version cannot be deleted; switching the PC's game disk or applying its writeback clears the pin.
 **Rollback for everyone** = make an older snapshot active.
 
+**Merge into base** (`POST /game-disks/{id}/snapshots/{name}/merge-into-base`): after a few Windows or game
+updates (`@base @v2 @v3 @v4`), the chosen version becomes the new `@base` and every older one is deleted. Nothing
+is merged or copied: a ZFS snapshot is the whole disk, so `@v4` already holds every change.
+
+```bash
+zfs release ggnet:protected tank/ggnet/images/cs2@base && zfs destroy tank/ggnet/images/cs2@base   # same for @v2, @v3
+zfs rename tank/ggnet/images/cs2@v4 tank/ggnet/images/cs2@base   # hold kept; clones of @v4 follow the new name
+```
+
+Refused while an older version is active, pinned, or the origin of any PC's writeback (those PCs move off it at
+their next reboot). Versions newer than the chosen one are kept. The database follows the rename (active version,
+pins, each PC's `clone_snapshot`), so PCs on `@v4` stay up to date. The next change is `@v2` again. If a step fails
+after some deletions, the chosen version keeps its old name and running the merge again finishes it.
+
 ### Retention (Settings → Retention)
 
 As in ggRock's "Automated Snapshot and Writeback Removal". The settings live in the database (`settings` table, set in
