@@ -338,3 +338,27 @@ def test_disk_mode_pcs_are_never_set_up(client, disks, windows):
     r = client.post("/api/v1/machines", json={"name": "pc01", "game_disk_id": game["id"]})
     assert r.status_code == 201
     assert windows.done == []
+
+
+# ── [boot] gateway ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("value, line", [
+    (None, None),
+    ("", None),
+    ("none", "set netX/gateway 0.0.0.0"),
+    ("192.168.10.1", "set netX/gateway 192.168.10.1"),
+    ("not-an-ip", None),
+])
+def test_boot_gateway(value, line):
+    from app.api.v1.boot import boot_gateway
+    cfg = {} if value is None else {"boot": {"gateway": value}}
+    assert boot_gateway(cfg) == (line.split()[-1] if line else None)
+
+
+def test_the_gateway_goes_before_the_sanboot(client, disks, monkeypatch):
+    from app.api.v1 import boot
+    monkeypatch.setattr(boot, "boot_gateway", lambda: "0.0.0.0")
+    _boot_machine(client, disks)
+    lines = _ipxe(client).splitlines()
+    assert lines[1] == "set netX/gateway 0.0.0.0"
+    assert lines.index("set netX/gateway 0.0.0.0") < next(i for i, l in enumerate(lines) if l.startswith("sanboot"))
