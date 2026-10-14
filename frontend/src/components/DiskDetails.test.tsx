@@ -140,6 +140,39 @@ describe("DiskDetails", () => {
     ]);
   });
 
+  it("offers Merge into base only when no older version is in use", async () => {
+    stubHost();
+    renderDetails();
+
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    const merge = within(versions).getAllByRole("button", { name: "Merge into base" });
+    // @base has no button; for the others pc02 still runs on @base.
+    expect(merge).toHaveLength(3);
+    expect(merge.every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    expect(merge[0]).toHaveAttribute("title", expect.stringContaining("used by pc02"));
+    expect(merge[2]).toHaveAttribute("title", expect.stringContaining("pinned on pc03"));
+  });
+
+  it("merges the newest version into base after confirmation", async () => {
+    const free = SNAPSHOTS.map((s) => ({ ...s, machines: s.active ? s.machines : [], pinned: [] }));
+    const mock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const get = (init?.method ?? "GET") === "GET";
+      const body = !get ? {} : url.endsWith("/snapshots") ? free : [];
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal("fetch", mock);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetails();
+
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    const merge = within(versions).getAllByRole("button", { name: "Merge into base" });
+    await userEvent.click(merge[2]);
+    expect(confirm.mock.calls[0][0]).toContain("Deleted: @base, @v1old, @v1pin");
+    expect(actions(mock)).toEqual([
+      { url: "/api/v1/game-disks/1/snapshots/v2/merge-into-base", method: "POST", body: undefined },
+    ]);
+  });
+
   it("discards a writeback and warns that a kept one loses unapplied changes", async () => {
     const mock = stubHost();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);

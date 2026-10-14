@@ -51,6 +51,29 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     }
   }
 
+  /** Why the versions older than `index` cannot be deleted, or null when they can. */
+  function mergeBlocker(index: number): string | null {
+    const older = snapshots!.slice(0, index);
+    const active = older.find((o) => o.active);
+    if (active) return `@${active.name} is active; make this or a newer version active first`;
+    const pinned = older.flatMap((o) => o.pinned);
+    if (pinned.length > 0) return `Older versions are pinned on ${pinned.join(", ")}; unpin them first`;
+    const users = [...new Set(older.flatMap((o) => o.machines))];
+    if (users.length > 0) {
+      return `Older versions are still used by ${users.join(", ")}; they move off at their next reboot`;
+    }
+    return null;
+  }
+
+  function mergeIntoBase(s: Snapshot, index: number) {
+    const older = snapshots!.slice(0, index).map((o) => `@${o.name}`);
+    const msg =
+      `Make @${s.name} the new @base of "${disk.name}"?\n\n` +
+      `Deleted: ${older.join(", ")}. This cannot be undone.\n` +
+      `@${s.name} is renamed to @base with all its changes; PCs on it keep running.`;
+    if (window.confirm(msg)) act(`merge-${s.name}`, () => api.mergeIntoBase(disk.id, s.name));
+  }
+
   function discard(w: Writeback) {
     const lost = w.keep_writeback
       ? "It keeps its writeback, so changes not applied yet are lost too."
@@ -84,7 +107,8 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
             </tr>
           </thead>
           <tbody>
-            {snapshots.map((s) => {
+            {snapshots.map((s, i) => {
+              const blocker = i > 0 ? mergeBlocker(i) : null;
               const users = [...s.machines, ...s.pinned.filter((p) => !s.machines.includes(p))];
               const used = users.length > 0;
               return (
@@ -107,6 +131,16 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                     {!s.active && (
                       <button type="button" onClick={() => makeActive(s)} disabled={busy !== null}>
                         {busy === `active-${s.name}` ? "Activating…" : "Make active"}
+                      </button>
+                    )}
+                    {i > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => mergeIntoBase(s, i)}
+                        disabled={busy !== null || blocker !== null}
+                        title={blocker ?? `Delete every older version and rename @${s.name} to @base`}
+                      >
+                        {busy === `merge-${s.name}` ? "Merging…" : "Merge into base"}
                       </button>
                     )}
                     <button
