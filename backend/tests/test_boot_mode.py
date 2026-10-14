@@ -16,7 +16,7 @@ from app.services.writebacks import WritebackSettings
 
 SETTINGS = WritebackSettings(auto_discard=True, grace=timedelta(seconds=30))
 T0 = datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc)
-IQN = "iqn.1991-05.com.microsoft:vip-05"
+IQN = "iqn.2025-05.net.ggnet:pc-aabbccddee05"   # derived from MAC
 MAC = "aa:bb:cc:dd:ee:05"
 OS_CLONE = "tank/ggnet/writebacks/vip-05-os"
 GAME_CLONE = "tank/ggnet/writebacks/vip-05"

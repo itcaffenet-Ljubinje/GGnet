@@ -4,12 +4,14 @@ import {
   api,
   type BulkKind,
   type BulkResult,
+  type Discovered,
   type GameDisk,
   type Machine,
   type MachineMode,
   type MachineTraffic,
 } from "../api";
 import { AgentState, isOnline } from "../components/AgentState";
+import { DiscoveredPanel } from "../components/DiscoveredPanel";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ImageStatus } from "../components/ImageStatus";
 import { MachineDetails } from "../components/MachineDetails";
@@ -22,6 +24,8 @@ interface Props {
   machines: Machine[];
   /** Sent / Received / Speed per machine id, read live from LIO. */
   traffic?: Record<number, MachineTraffic>;
+  /** PCs that asked for a disk but are not registered. */
+  discovered?: Discovered[];
   reload: () => Promise<void>;
 }
 
@@ -30,7 +34,7 @@ const CLIENT_OFF = "The client PC must be powered off or disconnected.";
 const LETTERS = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const MOVES_NOW = "Running PCs move the game disk within a minute; close games on them first.";
 
-export function MachinesPage({ disks, machines, traffic = {}, reload }: Props) {
+export function MachinesPage({ disks, machines, traffic = {}, discovered = [], reload }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
   const [name, setName] = useState("");
   const [mac, setMac] = useState("");
@@ -187,27 +191,31 @@ export function MachinesPage({ disks, machines, traffic = {}, reload }: Props) {
     <section>
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
+      <DiscoveredPanel discovered={discovered} busy={busy !== null} run={run} reload={reload} />
+
       <form className="card form-row" onSubmit={create}>
         <label>
           Name
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Windows PC name"
+            placeholder="e.g. pc-01"
             required
             maxLength={15}
           />
         </label>
         <label>
           MAC
-          <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="optional" />
+          <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="identifies the PC" />
         </label>
         <label>
           Initiator IQN
           <input
             value={iqn}
             onChange={(e) => setIqn(e.target.value)}
-            placeholder={`iqn.1991-05.com.microsoft:${name.trim().toLowerCase() || "<name>"}`}
+            placeholder={
+              mac.trim() ? "from the MAC" : `iqn.1991-05.com.microsoft:${name.trim().toLowerCase() || "<name>"}`
+            }
           />
         </label>
         <label>

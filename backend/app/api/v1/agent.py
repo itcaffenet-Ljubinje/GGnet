@@ -3,7 +3,9 @@ API for ggnet-agent, the Windows service on each client.
 
 The agent posts a heartbeat at boot and periodically; the answer tells it
 which iSCSI target to connect and on which portal. Machines must be
-registered first (UI / /machines); unknown names get 404.
+registered first (UI / /machines). The PC is found by the MAC in its
+inventory (the machine's MAC set in the UI), else by its Windows computer
+name. An unknown PC gets 404 and shows up in Discovery for the admin to add.
 
 No authentication yet (planned with JWT). The heartbeat records what the
 agent reports; the only host change it can cause is the automatic writeback
@@ -31,8 +33,9 @@ from app.api.v1.schemas import (
     AgentPackageFileOut,
     AgentPackageOut,
 )
-from app.db.models import Machine, MachineMode, MachineStatus
+from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
+from app.services import discovery
 from app.services.agent_package import AgentPackage, bootstrap_script
 from app.services.power import take_command
 from app.services.provisioning import Provisioner
@@ -43,6 +46,25 @@ logger = logging.getLogger("ggnet.api.agent")
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+def identify(db: Session, name: str, mac: str | None) -> Machine | None:
+    """
+    The machine a heartbeat comes from: the one with the reported MAC, else
+    the one with the PC's name. A name match is refused when that machine has
+    a MAC and the PC reports another one: it is a different PC with the same
+    Windows name (a cloned Windows), which must not get that machine's disk.
+    """
+    if mac:
+        machine = db.scalar(select(Machine).where(Machine.mac == mac))
+        if machine is not None:
+            return machine
+    machine = db.scalar(select(Machine).where(Machine.name == name))
+    if machine is not None and machine.mac and mac and machine.mac != mac:
+        logger.warning("Heartbeat from %s with MAC %s, but machine %s has MAC %s; ignoring it",
+                       name, mac, machine.name, machine.mac)
+        return None
+    return machine
+
+
 @router.post("/heartbeat", response_model=AgentConfig)
 def heartbeat(
     body: AgentHeartbeat,
@@ -50,24 +72,30 @@ def heartbeat(
     prov: Provisioner = Depends(get_provisioner),
     settings: WritebackSettings = Depends(get_writeback_settings),
 ):
-    machine = db.scalar(select(Machine).where(Machine.name == body.name))
-    if machine is None:
-        not_found("Machine", body.name)
-
-    inventory: dict = {}
+    inv = None
     if body.inventory is not None:
         try:
             inv = AgentInventory.model_validate(body.inventory)
         except ValidationError as e:
             logger.warning("Ignoring the inventory of %s: %s", body.name, e.errors()[0]["msg"])
-        else:
-            hw = inv.model_dump(include={"nic", "cpu", "gpus", "motherboard", "memory_bytes"})
-            inventory = {
-                "reported_ip": inv.ip_address,
-                "reported_mac": inv.mac_address,
-                "link_speed_mbps": inv.link_speed_mbps,
-                "hardware": json.dumps(hw),
-            }
+
+    mac = inv.mac_address if inv else None
+    machine = identify(db, body.name, mac)
+    if machine is None:
+        if mac:
+            discovery.record(db, mac, DiscoverySource.AGENT, hostname=body.name,
+                             ip_address=inv.ip_address, agent_version=body.agent_version)
+        not_found("Machine", body.name)
+
+    inventory: dict = {}
+    if inv is not None:
+        hw = inv.model_dump(include={"nic", "cpu", "gpus", "motherboard", "memory_bytes"})
+        inventory = {
+            "reported_ip": inv.ip_address,
+            "reported_mac": inv.mac_address,
+            "link_speed_mbps": inv.link_speed_mbps,
+            "hardware": json.dumps(hw),
+        }
 
     # A Core UPDATE that keeps updated_at: a heartbeat every few seconds is
     # not a change to the machine record.

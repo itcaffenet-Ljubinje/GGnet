@@ -160,6 +160,26 @@ export interface Machine {
   updated_at: string;
 }
 
+/** A PC that knocked (iPXE or its agent) but is not registered yet. */
+export interface Discovered {
+  id: number;
+  mac: string;
+  source: "pxe" | "agent";
+  hostname: string | null;
+  ip_address: string | null;
+  agent_version: string | null;
+  seen_count: number;
+  ignored: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface DiscoveryClaim {
+  name: string;
+  mode?: MachineMode;
+  game_disk_id?: number | null;
+}
+
 export interface MachineCreate {
   name: string;
   mode?: MachineMode;
@@ -256,13 +276,18 @@ export const api = {
   applyWritebacks: (id: number) => request<Machine>("POST", `/v1/machines/${id}/apply-writebacks`),
   pinSnapshot: (id: number, snapshot: string | null) =>
     request<Machine>("PUT", `/v1/machines/${id}/pin`, { snapshot }),
-    bulk: (
+  bulk: (
     machine_ids: number[],
     action: BulkKind,
     extra: { game_disk_id?: number | null; snapshot?: string | null; drive_letter?: string } = {},
   ) => request<BulkResult[]>("POST", "/v1/machines/bulk", { machine_ids, action, ...extra }),
-    power: (id: number, action: "on" | "shutdown" | "reboot") =>
+  power: (id: number, action: "on" | "shutdown" | "reboot") =>
     request<Machine>("POST", `/v1/machines/${id}/power`, { action }),
-    discardWriteback: (id: number) => request<Machine>("POST", `/v1/machines/${id}/discard-writeback`),
+  discardWriteback: (id: number) => request<Machine>("POST", `/v1/machines/${id}/discard-writeback`),
   deleteMachine: (id: number) => request<void>("DELETE", `/v1/machines/${id}`),
+
+  listDiscovered: () => request<Discovered[]>("GET", "/v1/discovery"),
+  claimDiscovered: (id: number, body: DiscoveryClaim) =>
+    request<Machine>("POST", `/v1/discovery/${id}/claim`, body),
+  ignoreDiscovered: (id: number) => request<Discovered>("POST", `/v1/discovery/${id}/ignore`),
 };

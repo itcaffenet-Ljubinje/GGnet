@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.db.models import DiskKind, MachineMode, MachineStatus
+from app.db.models import DiscoverySource, DiskKind, MachineMode, MachineStatus
 
 # The disk name becomes part of a ZFS path, so only [a-z0-9-].
 _DISK_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
@@ -130,7 +130,9 @@ class WritebackOut(BaseModel):
 class MachineCreate(BaseModel):
     name: str
     mode: MachineMode = MachineMode.DISK
-    initiator_iqn: str | None = None   # empty → iqn.1991-05.com.microsoft:<name>
+    # Empty: derived from the MAC (<iqn_prefix>:pc-<mac>), or without a MAC
+    # the Windows default iqn.1991-05.com.microsoft:<name>.
+    initiator_iqn: str | None = None
     mac: str | None = None
     game_disk_id: int | None = None    # set → provision right away
     os_disk_id: int | None = None      # Boot Mode: OS image, needed with game_disk_id
@@ -157,9 +159,7 @@ class MachineCreate(BaseModel):
         return _mac(v)
 
     @model_validator(mode="after")
-    def default_iqn(self):
-        if self.initiator_iqn is None:
-            self.initiator_iqn = WINDOWS_IQN_PREFIX + self.name
+    def check_letter(self):
         if self.mode is MachineMode.BOOT and self.drive_letter != "D":
             raise ValueError(BOOT_MODE_LETTER)
         return self
@@ -168,7 +168,8 @@ class MachineCreate(BaseModel):
 class MachineUpdate(BaseModel):
     """
     Partial update: only the fields sent are changed (`"mac": null` clears
-    the MAC). Name, IQN and mode only while the machine has no disk; the
+    the MAC; `"initiator_iqn": ""` resets the IQN to its default, see
+    MachineCreate). Name, IQN and mode only while the machine has no disk; the
     drive letter at any time (the agent moves the disk on its next heartbeat).
     """
 
@@ -203,8 +204,8 @@ class MachineUpdate(BaseModel):
     @classmethod
     def check_iqn(cls, v: str | None) -> str | None:
         if v is None:
-            raise ValueError("IQN cannot be empty")
-        return _iqn(v)
+            raise ValueError("IQN cannot be null; send \"\" for the default")
+        return _iqn(v) if v.strip() else ""
 
     @field_validator("mac")
     @classmethod
@@ -474,3 +475,42 @@ class BulkResult(BaseModel):
     name: str | None
     ok: bool
     error: str | None = None
+
+
+# ── Discovery ─────────────────────────────────────────────────────────
+
+class DiscoveredOut(BaseModel):
+    """A PC that knocked but is not registered (app.services.discovery)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    mac: str
+    source: DiscoverySource
+    hostname: str | None
+    ip_address: str | None
+    agent_version: str | None
+    seen_count: int
+    ignored: bool
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class DiscoveryClaim(BaseModel):
+    """Add a discovered PC as a machine; its MAC comes from the discovery."""
+
+    name: str
+    mode: MachineMode = MachineMode.DISK
+    game_disk_id: int | None = None
+    os_disk_id: int | None = None
+    drive_letter: str = "D"
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str) -> str:
+        return _machine_name(v)
+
+    @field_validator("drive_letter")
+    @classmethod
+    def check_drive_letter(cls, v: str) -> str:
+        return _drive_letter(v)
