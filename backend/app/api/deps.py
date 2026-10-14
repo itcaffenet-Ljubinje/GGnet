@@ -4,18 +4,19 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from app.config import get_config
+from app.config import get_config, server_url
 from app.iscsi_manager import ISCSIManager
 from app.services.provisioning import Provisioner
 from app.services.traffic import TrafficMonitor
 from app.services.writebacks import WritebackSettings
+from app.windows_setup import WindowsSetup
 from app.zfs_manager import ZFSManager
 
 
 @lru_cache(maxsize=1)
 def get_provisioner() -> Provisioner:
     """One Provisioner (and one lock) for the whole process; config from config.toml."""
-    return Provisioner(ZFSManager(), ISCSIManager())
+    return Provisioner(ZFSManager(), ISCSIManager(), WindowsSetup())
 
 
 def get_writeback_settings() -> WritebackSettings:
@@ -49,5 +50,4 @@ def get_agent_package():
 
 def get_server_url() -> str:
     """The URL agents use to reach this server (service IP and web port)."""
-    cfg = get_config()
-    return f"http://{cfg['network']['server_ip']}:{cfg['web']['port']}"
+    return server_url()

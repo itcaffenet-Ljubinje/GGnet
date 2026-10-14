@@ -39,3 +39,9 @@ def get_config() -> dict[str, Any]:
         return DEV_DEFAULTS
     with path.open("rb") as f:
         return tomllib.load(f)
+
+
+def server_url(cfg: dict[str, Any] | None = None) -> str:
+    """The URL clients reach this server on (service IP and web port)."""
+    cfg = cfg if cfg is not None else get_config()
+    return f"http://{cfg['network']['server_ip']}:{cfg['web']['port']}"

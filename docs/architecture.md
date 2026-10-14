@@ -379,6 +379,28 @@ in Discovery (section 2) for the admin to add.
 
 Boot Mode PC without its disks (not provisioned, or in `error`): a message with the reason, then `exit`.
 
+### The PC's identity in its OS writeback
+
+Every Boot Mode PC boots the same Windows image, so on its own every PC would have the image's computer name.
+Like ggRock (its `Rename.PC` and `Inject.EnvVariables` registry templates), the server edits each fresh OS
+writeback offline before it is mapped, so Windows comes up as that PC without an extra reboot
+(`backend/app/windows_setup.py`):
+
+1. Find the NTFS partitions of the clone (`lsblk`, largest first) and mount them in turn with `ntfs-3g` under
+   `/run/ggnet/windows/<name>` until one has `Windows\System32\config\SYSTEM`.
+2. Read the control set Windows boots with (`SYSTEM\Select\Current`, not a fixed `ControlSet001`).
+3. Merge with `hivexregedit --merge` (ntfs-3g and hivexregedit ship with Proxmox VE):
+   - `Control\ComputerName\ComputerName`: `ComputerName` = the machine name in capitals (PC-07)
+   - `Services\Tcpip\Parameters`: `Hostname`, `NV Hostname` = the machine name (pc-07)
+   - `Control\Session Manager\Environment`: `GGNET_SERVER`, `GGNET_MACHINE_ID`, `GGNET_MACHINE_NAME`, so the
+     agent and other software on the PC need no configuration in the image
+4. Unmount.
+
+It runs whenever an OS writeback is cloned fresh (assign, reset, every discard) and never touches the image.
+A failure (an image without Windows yet, a hibernated Windows that ntfs-3g refuses) is logged and the PC boots
+with the image's name: better than a PC that does not boot. One Windows account per image: auto-logon is set
+in the image itself, not per PC.
+
 Disk Mode PC that PXE-boots by mistake: the same `exit` script, so it falls through to its local disk.
 
 ---
@@ -436,7 +458,8 @@ network throughput of the iSCSI interface.
 | Settings → Client app: agent download and one-line install | done |
 | Boot Mode: OS images, OS + game writebacks per PC, per-MAC iPXE script | done |
 | PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |
-| Boot Mode: per-PC writeback setup before boot (computer name, environment, auto-logon, agent) | next |
+| Boot Mode: per-PC OS writeback setup before boot (computer name, environment variables) | done |
+| Boot Mode: agent installed into the OS image by the server | planned |
 | Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
 | Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |

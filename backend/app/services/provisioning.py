@@ -15,6 +15,7 @@ import threading
 from dataclasses import dataclass
 
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
+from app.windows_setup import OsSetup, WindowsSetup
 from app.zfs_manager import ZFSManager
 
 logger = logging.getLogger("ggnet.provisioning")
@@ -42,12 +43,17 @@ class ClientDisk:
     # Boot Mode only: the machine's writeback of its OS image (mapped LUN 0).
     os_clone_zvol: str | None = None
     os_clone_snapshot: str | None = None
+    # Why the fresh OS writeback could not be set up as this PC (it boots
+    # with the image's name then); None when it was, or nothing was asked.
+    os_setup_problem: str | None = None
 
 
 class Provisioner:
-    def __init__(self, zfs: ZFSManager, iscsi: ISCSIManager):
+    def __init__(self, zfs: ZFSManager, iscsi: ISCSIManager, windows: WindowsSetup | None = None):
         self.zfs = zfs
         self.iscsi = iscsi
+        # Boot Mode: writes the PC's identity into its fresh OS writeback.
+        self.windows = windows
         self.lock = threading.Lock()
 
     # ── Helpers ───────────────────────────────────────────────────────
@@ -78,6 +84,15 @@ class Provisioner:
         if os_clone is None:
             return [game]
         return [Disk("os", self.zfs.zvol_device_path(os_clone)), game]
+
+    def _set_up_os(self, os_clone: str | None, os_setup: OsSetup | None) -> str | None:
+        """Personalize a fresh OS clone before it is mapped (app.windows_setup)."""
+        if os_clone is None or os_setup is None or self.windows is None:
+            return None
+        problem = self.windows.personalize(self.zfs.zvol_device_path(os_clone), os_setup)
+        if problem:
+            logger.warning("%s boots with the image's identity: %s", os_setup.computer_name, problem)
+        return problem
 
     def _detach(self, machine_name: str, initiator_iqn: str) -> None:
         """
@@ -195,13 +210,14 @@ class Provisioner:
 
     def provision(
         self, machine_name: str, initiator_iqn: str, snapshot_path: str,
-        os_snapshot_path: str | None = None,
+        os_snapshot_path: str | None = None, os_setup: OsSetup | None = None,
     ) -> ClientDisk:
         """
         Clone of the game disk snapshot, exposed on the shared iSCSI target
         as mapped LUN 0 of an ACL for the machine's initiator IQN. With
         `os_snapshot_path` (Boot Mode) the OS image is cloned too and becomes
-        LUN 0, the game disk LUN 1.
+        LUN 0, the game disk LUN 1; `os_setup` is written into the OS clone
+        before it is mapped.
         """
         clones = [(snapshot_path, self.client_path(machine_name))]
         if os_snapshot_path is not None:
@@ -227,23 +243,26 @@ class Provisioner:
                     raise err
                 made.append(clone)
             os_clone = clones[1][1] if os_snapshot_path is not None else None
+            problem = self._set_up_os(os_clone, os_setup)
             iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clones[0][1], os_clone))
             if iqn is None:
                 err = self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
                 # attach() cleaned up its own iSCSI state; roll back the clones.
                 rollback()
                 raise err
-        return ClientDisk(clones[0][1], snapshot_path, iqn, os_clone, os_snapshot_path)
+        return ClientDisk(clones[0][1], snapshot_path, iqn, os_clone, os_snapshot_path, problem)
 
     def reset(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str, snapshot_path: str,
         os_clone_zvol: str | None = None, os_snapshot_path: str | None = None,
+        os_setup: OsSetup | None = None,
     ) -> ClientDisk:
         """
         Order: detach (ACL + backstores) → destroy clones → clone → attach.
         `snapshot_path` is the disk's CURRENT snapshot, so a reset also moves
         the machine to the newest version of the master. Boot Mode passes the
-        OS clone and snapshot too; both writebacks are reset together.
+        OS clone and snapshot too; both writebacks are reset together, and
+        `os_setup` is written into the fresh OS clone before it is mapped.
         The client must be powered off or disconnected.
         """
         if (os_clone_zvol is None) != (os_snapshot_path is None):
@@ -255,10 +274,11 @@ class Provisioner:
                 raise self._fail(f"Resetting clone {clone_zvol} failed")
             if os_clone_zvol is not None and not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
                 raise self._fail(f"Resetting clone {os_clone_zvol} failed")
+            problem = self._set_up_os(os_clone_zvol, os_setup)
             iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol))
             if iqn is None:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
-        return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path)
+        return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path, problem)
 
     def deprovision(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str | None,
