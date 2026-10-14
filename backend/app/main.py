@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import agent, boot, game_disks, machines, settings
+from app.api.v1 import agent, boot, discovery, game_disks, machines, settings
 from app.config import get_config
 
 VERSION_FILE = Path(__file__).resolve().parents[2] / "VERSION"
@@ -59,6 +59,7 @@ app.include_router(machines.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(boot.router, prefix="/api/v1")
+app.include_router(discovery.router, prefix="/api/v1")
 
 
 @app.get("/api/health")

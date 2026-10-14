@@ -127,8 +127,10 @@ class MachineStatus(str, enum.Enum):
 
 class Machine(Base):
     """
-    Client PC. The iSCSI ACL is bound to `initiator_iqn`; the MAC is only
-    for DHCP/WoL.
+    Client PC. The iSCSI ACL is bound to `initiator_iqn`. The MAC identifies
+    the PC (iPXE asks by MAC, the agent reports it) and is used for WoL; with
+    a MAC the default IQN is derived from it (app.services.identity), so it
+    does not depend on the Windows computer name.
 
     `clone_zvol`/`iscsi_target_iqn` are recorded at provisioning time; they
     are the source of truth for cleanup even if the config changes later.
@@ -267,3 +269,30 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, onupdate=_now)
+
+
+class DiscoverySource(str, enum.Enum):
+    PXE = "pxe"      # asked /boot/ipxe for a script
+    AGENT = "agent"  # its ggnet-agent sent a heartbeat
+
+
+class DiscoveredMachine(Base):
+    """
+    A PC that knocked but is not registered: an unknown MAC asked for an iPXE
+    script, or an agent reported from an unknown PC. The admin adds it as a
+    machine (claim) or ignores it. Rows are keyed by MAC, so a PC that keeps
+    knocking updates its row instead of adding new ones.
+    """
+
+    __tablename__ = "discovered_machines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mac: Mapped[str] = mapped_column(String(17), unique=True)
+    source: Mapped[DiscoverySource] = mapped_column(_str_enum(DiscoverySource))
+    hostname: Mapped[str | None] = mapped_column(String(64), default=None)     # agent only
+    ip_address: Mapped[str | None] = mapped_column(String(45), default=None)
+    agent_version: Mapped[str | None] = mapped_column(String(32), default=None)
+    seen_count: Mapped[int] = mapped_column(Integer, default=1)
+    ignored: Mapped[bool] = mapped_column(Boolean, default=False)
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { api, type GameDisk, type Health, type Machine, type MachineTraffic, type Storage } from "./api";
+import {
+  api,
+  type Discovered,
+  type GameDisk,
+  type Health,
+  type Machine,
+  type MachineTraffic,
+  type Storage,
+} from "./api";
 import { GameDisksPage } from "./pages/GameDisksPage";
 import { MachinesPage } from "./pages/MachinesPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -17,6 +25,7 @@ export function App() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [storage, setStorage] = useState<Storage | null>(null);
   const [traffic, setTraffic] = useState<Record<number, MachineTraffic>>({});
+  const [discovered, setDiscovered] = useState<Discovered[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -34,6 +43,7 @@ export function App() {
       .machineTraffic()
       .then((t) => setTraffic(Object.fromEntries(t.map((x) => [x.machine_id, x]))))
       .catch(() => setTraffic({}));
+    api.listDiscovered().then(setDiscovered).catch(() => setDiscovered([]));
   }, []);
 
   useEffect(() => {
@@ -88,7 +98,13 @@ export function App() {
           </div>
         )}
         {tab === "machines" ? (
-          <MachinesPage disks={disks} machines={machines} traffic={traffic} reload={reload} />
+          <MachinesPage
+            disks={disks}
+            machines={machines}
+            traffic={traffic}
+            discovered={discovered}
+            reload={reload}
+          />
         ) : tab === "disks" ? (
           <GameDisksPage disks={disks} machines={machines} reload={reload} />
         ) : (

@@ -9,7 +9,8 @@ boot falls through to its next boot device instead of stopping in iPXE:
   Boot Mode PC with its disks   sanboot from the shared target, LUN 0 (OS);
                                 Windows sees LUN 1 (game disk) on the same session
   Boot Mode PC without disks    message, then exit
-  Disk Mode PC, unknown MAC     exit (boot from the local disk)
+  Disk Mode PC, unknown MAC     exit (boot from the local disk); an unknown
+                                MAC is listed in Discovery for the admin to add
 
 Before it answers a provisioned PC, the server discards its writebacks like
 the watcher does after a disconnect (app.services.writebacks), unless the PC
@@ -21,15 +22,16 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_provisioner, get_writeback_settings
 from app.api.v1.schemas import _mac
-from app.db.models import Machine, MachineMode, MachineStatus
+from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
+from app.services import discovery
 from app.services.provisioning import Provisioner
 from app.services.writebacks import WritebackSettings, on_ipxe
 
@@ -77,6 +79,7 @@ def _find(db: Session, mac: str) -> Machine | None:
 
 @router.get("/ipxe", response_class=PlainTextResponse)
 def ipxe_script(
+    request: Request,
     mac: str = "",
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
@@ -92,6 +95,8 @@ def ipxe_script(
     m = _find(db, mac)
     if m is None:
         logger.info("iPXE request from unregistered MAC %s", mac)
+        discovery.record(db, mac, DiscoverySource.PXE,
+                         ip_address=request.client.host if request.client else None)
         return exit_script(f"This PC is not registered in ggNet ({mac}). Booting from local disk.")
     if m.mode is not MachineMode.BOOT:
         return exit_script(f"ggNet: {m.name} is in Disk Mode. Booting from local disk.")

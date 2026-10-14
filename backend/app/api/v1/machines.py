@@ -44,9 +44,11 @@ from app.api.v1.schemas import (
     MachineCreate,
     MachineOut,
     MachineUpdate,
+    WINDOWS_IQN_PREFIX,
 )
 from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
+from app.services import discovery
 from app.services.provisioning import ClientDisk, Provisioner, ProvisioningError
 from app.services.traffic import TrafficMonitor
 from app.services.writebacks import discard
@@ -76,6 +78,11 @@ def agent_online(m: Machine, now: datetime | None = None) -> bool:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
+def default_iqn(prov: Provisioner, name: str, mac: str | None) -> str:
+    """A machine's IQN when none is given: from its MAC, else the Windows default."""
+    return prov.iscsi.mac_initiator_iqn(mac) if mac else WINDOWS_IQN_PREFIX + name
+
 
 def _get(db: Session, machine_id: int) -> Machine:
     machine = db.get(Machine, machine_id)
@@ -220,7 +227,7 @@ def bulk(
         elif body.action == "pin":
             pin_snapshot(machine_id, MachinePin(snapshot=body.snapshot), db, prov)
         elif body.action == "drive_letter":
-            update_machine(machine_id, MachineUpdate(drive_letter=body.drive_letter), db)
+            update_machine(machine_id, MachineUpdate(drive_letter=body.drive_letter), db, prov)
         else:
             keep_writeback(machine_id, KeepWriteback(enabled=False), db, prov)
 
@@ -285,14 +292,16 @@ def create_machine(
     elif body.os_disk_id is not None:
         conflict(f"Machine '{body.name}' needs a game disk with its OS image")
 
-    machine = Machine(name=body.name, mode=body.mode, initiator_iqn=body.initiator_iqn, mac=body.mac,
-                      drive_letter=body.drive_letter)
+    machine = Machine(name=body.name, mode=body.mode, mac=body.mac, drive_letter=body.drive_letter,
+                      initiator_iqn=body.initiator_iqn or default_iqn(prov, body.name, body.mac))
     db.add(machine)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         conflict(DUPLICATE)
+    discovery.forget(db, body.mac)
+    db.commit()
 
     if disk is not None:
         _provision(db, prov, machine, disk, os_disk)
@@ -301,9 +310,17 @@ def create_machine(
 
 
 @router.patch("/{machine_id}", response_model=MachineOut)
-def update_machine(machine_id: int, body: MachineUpdate, db: Session = Depends(get_db)):
+def update_machine(
+    machine_id: int,
+    body: MachineUpdate,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
     machine = _get(db, machine_id)
     changes = body.model_dump(exclude_unset=True)
+    if changes.get("initiator_iqn") == "":
+        changes["initiator_iqn"] = default_iqn(prov, changes.get("name", machine.name),
+                                               changes.get("mac", machine.mac))
 
     # The name is in the clone path and target name, the IQN in the ACL;
     # they cannot change on the host while the machine has a disk.
@@ -324,6 +341,9 @@ def update_machine(machine_id: int, body: MachineUpdate, db: Session = Depends(g
     except IntegrityError:
         db.rollback()
         conflict(DUPLICATE)
+    if changes.get("mac"):
+        discovery.forget(db, changes["mac"])
+        db.commit()
     return machine
 
 

@@ -141,6 +141,18 @@ class ISCSIManager:
         """The one shared target every client logs in to."""
         return f"{self.cfg.iqn_prefix}:{self.cfg.target_name}"
 
+    def mac_initiator_iqn(self, mac: str) -> str:
+        """
+        The initiator IQN of a client, derived from its MAC (aa:bb:cc:dd:ee:ff →
+        <iqn_prefix>:pc-aabbccddeeff). iPXE sets it in Boot Mode and the agent
+        renames the Windows initiator to it, so it never depends on the
+        Windows computer name (a cloned or renamed Windows keeps its disk).
+        """
+        digits = re.sub(r"[^0-9a-f]", "", mac.lower())
+        if len(digits) != 12:
+            raise ValueError(f"Invalid MAC address: {mac!r}")
+        return f"{self.cfg.iqn_prefix}:pc-{digits}"
+
     def legacy_target_iqn(self, machine_id: str) -> str:
         """Per-client target of the old design; only ever deleted."""
         return f"{self.cfg.iqn_prefix}:client-{machine_id}"

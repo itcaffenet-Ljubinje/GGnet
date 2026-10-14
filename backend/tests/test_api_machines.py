@@ -36,10 +36,16 @@ def test_create_machine_without_disk(client, host):
     m = r.json()
     assert m["name"] == "pc01"
     assert m["mode"] == "disk"
-    assert m["initiator_iqn"] == "iqn.1991-05.com.microsoft:pc01"
+    # With a MAC the IQN is derived from it, not from the Windows name.
+    assert m["initiator_iqn"] == "iqn.2025-05.net.ggnet:pc-aabbccddeeff"
     assert m["mac"] == "aa:bb:cc:dd:ee:ff"
     assert m["status"] == "idle"
     assert host.calls == []
+
+
+def test_create_machine_without_mac_gets_the_windows_iqn(client):
+    m = _machine(client)
+    assert m["initiator_iqn"] == "iqn.1991-05.com.microsoft:pc01"
 
 
 def test_create_machine_auto_provisions(client, host):
@@ -108,7 +114,7 @@ def test_create_machine_validation(client, host, body):
 def test_create_machine_duplicates(client):
     _machine(client, mac="aa:bb:cc:dd:ee:01")
     for body in ({"name": "pc01"},
-                 {"name": "pc02", "initiator_iqn": "iqn.1991-05.com.microsoft:pc01"},
+                 {"name": "pc02", "initiator_iqn": "iqn.2025-05.net.ggnet:pc-aabbccddee01"},
                  {"name": "pc03", "mac": "AA:BB:CC:DD:EE:01"}):
         assert client.post("/api/v1/machines", json=body).status_code == 409
 

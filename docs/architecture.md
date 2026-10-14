@@ -116,6 +116,28 @@ target itself is never deleted, so resetting one PC never drops another PC's ses
 the provisioner lock, so there are no parallel targetcli runs and no half-built targets left behind: a failed
 attach removes what it created and reports the real error.
 
+### Initiator IQN: the PC's identity on the target
+
+A PC with a MAC gets an initiator IQN derived from it, `<iscsi_iqn_prefix>:pc-<mac without separators>`
+(`iqn.2025-05.net.ggnet:pc-aabbccddee02`). It does not depend on the Windows computer name, so a renamed or
+cloned Windows keeps its own disk, and in Boot Mode, where every PC boots the same Windows, iPXE sets it from
+the server. ggRock does the same (`iqn.2019-08.com.ggrock:pc-100`, set by its iPXE). A machine without a MAC
+keeps the Windows default `iqn.1991-05.com.microsoft:<name>`. `PATCH /machines/{id}` with `"initiator_iqn": ""`
+resets a machine to its default (only while it has no disk, like every ACL change); the agent renames the
+Windows initiator to the IQN in its heartbeat answer before it connects.
+
+The agent's heartbeat finds its machine by the MAC in its inventory (the machine's MAC set in the UI), else by
+the Windows computer name. A name match is refused when that machine has a MAC and the PC reports another one:
+it is a different PC with the same Windows name, which must not get that machine's disk.
+
+### Discovery
+
+A PC that knocks but is not registered is listed under Discovered PCs on the Machines page (ggRock adds a PC on
+its first network boot): an unknown MAC that asks for an iPXE script, or a ggnet-agent whose heartbeat matches no
+machine (with its Windows name, IP and agent version). The admin adds it with the name it should have (its MAC
+comes along, so its IQN is derived from it), ignores it (hidden also when it knocks again) or removes it from the
+list. Both sources are open to the LAN, so the list is capped at 500 PCs; when full, new MACs are only logged.
+
 ### Migrating from per-PC targets
 
 The previous version made one target per PC (`<prefix>:client-<name>`, backstore `client-<name>`). `detach()`
@@ -329,7 +351,7 @@ snapshot) is decided by the server before it answers:
 
 ```
 #!ipxe
-set initiator-iqn iqn.1991-05.com.microsoft:pc02
+set initiator-iqn iqn.2025-05.net.ggnet:pc-aabbccddee02
 set root-path iscsi:192.168.0.50::3260:0:iqn.2025-05.net.ggnet:storage
 echo ggNet: booting pc02 (win11-os v2, cs2 v3)
 sanboot ${root-path} || goto failed
@@ -352,9 +374,8 @@ sleep 5
 exit
 ```
 
-The MAC is looked up in the machine's own MAC, then in the MAC its agent reported. For now an unknown MAC is
-only logged; recording it so the PC shows up under "Unregistered" (and in the Add Machines wizard) comes with
-discovery.
+The MAC is looked up in the machine's own MAC, then in the MAC its agent reported. An unknown MAC is listed
+in Discovery (section 2) for the admin to add.
 
 Boot Mode PC without its disks (not provisioned, or in `error`): a message with the reason, then `exit`.
 
@@ -378,6 +399,7 @@ React + Vite, served by the backend on port 8088. Layout follows ggRock's Machin
   Reboot done: WoL is a magic packet broadcast on `[network] cidr` from the service IP, using the machine's MAC
   or the one its agent reported; Shutdown / Reboot wait on the machine and the agent gets them once in its next
   heartbeat answer, dropped after 2 minutes, then runs `shutdown.exe` with a 10 s notice.)*
+- Discovered PCs: unregistered PCs that asked for a disk, with Add (name, mode) and Ignore. *(done)*
 - Settings dialog: Main (name, read-only IP and MAC, mode, game image, OS image, hide), Hardware (NIC, GPU, CPU,
   motherboard, reported by the agent), Advanced (Keep Writeback, snapshot pin per image).
 - Bulk: select PCs → Turn On, Turn Off, Reboot, Edit Selected (images, Keep Writeback, pins, hide). *(done:
@@ -413,6 +435,8 @@ network throughput of the iSCSI interface.
 | Machines UI per the ggRock docs (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | done |
 | Settings → Client app: agent download and one-line install | done |
 | Boot Mode: OS images, OS + game writebacks per PC, per-MAC iPXE script | done |
+| PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |
+| Boot Mode: per-PC writeback setup before boot (computer name, environment, auto-logon, agent) | next |
 | Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
 | Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |

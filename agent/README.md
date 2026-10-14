@@ -143,5 +143,8 @@ Response `200`:
 - If `iscsi_target_iqn` changes or becomes null (disk switched, removed or reset in
   the UI), disconnect the old target before connecting a new one.
 
-Errors: `404` when the machine is not registered in ggNet (register it in the UI
-first), `422` for an invalid request body.
+The server finds the machine by `inventory.mac_address` (the MAC set for it in the UI),
+else by `name`, so the name in the UI may differ from the Windows computer name.
+
+Errors: `404` when the machine is not registered in ggNet (the PC then shows up under
+Discovered PCs in the UI, where it is added), `422` for an invalid request body.
