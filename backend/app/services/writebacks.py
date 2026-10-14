@@ -30,6 +30,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import Machine, MachineMode, MachineStatus
+from app.services.os_setup import os_setup_for
 from app.services.provisioning import Provisioner, ProvisioningError
 
 logger = logging.getLogger("ggnet.writebacks")
@@ -83,7 +84,8 @@ def discard(db: Session, prov: Provisioner, m: Machine, reason: str) -> bool:
     os_clone = m.os_clone_zvol if m.mode is MachineMode.BOOT else None
     try:
         cd = prov.reset(m.name, m.initiator_iqn, clone, m.target_snapshot_path,
-                        os_clone, m.os_snapshot_path if os_clone else None)
+                        os_clone, m.os_snapshot_path if os_clone else None,
+                        os_setup_for(m) if os_clone else None)
     except ProvisioningError as e:
         m.status = MachineStatus.ERROR
         m.last_error = f"Automatic writeback discard failed: {e}"

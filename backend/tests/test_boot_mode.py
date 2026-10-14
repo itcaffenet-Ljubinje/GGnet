@@ -282,3 +282,59 @@ def test_boot_traffic_sums_both_luns(client, host, disks):
     out = client.get("/api/v1/machines/traffic").json()
     row = next(t for t in out if t["machine_id"] == m["id"])
     assert (row["received_bytes"], row["sent_bytes"]) in {(14 << 20, 200 << 20), (200 << 20, 14 << 20)}
+
+
+# ── The PC's identity in its OS writeback (app.windows_setup) ─────────
+
+class FakeWindows:
+    """Records each personalize() and what was on the target at that moment."""
+
+    def __init__(self, host, problem: str | None = None):
+        self.host = host
+        self.problem = problem
+        self.done: list[tuple[str, object, bool]] = []
+
+    def personalize(self, device, setup):
+        mapped = any(c[0] == "targetcli" and OS_CLONE.split("/")[-1] in " ".join(c)
+                     for c in self.host.calls)
+        self.done.append((device, setup, mapped))
+        return self.problem
+
+
+@pytest.fixture
+def windows(prov, host):
+    prov.windows = FakeWindows(host)
+    return prov.windows
+
+
+def test_a_new_os_writeback_gets_the_pc_identity_before_it_is_mapped(client, host, disks, windows):
+    host.calls.clear()
+    m = _boot_machine(client, disks)
+    [(device, setup, mapped)] = windows.done
+    assert device == f"/dev/zvol/{OS_CLONE}"
+    assert mapped is False
+    assert setup.computer_name == "vip-05"
+    assert setup.env == {"GGNET_SERVER": "http://127.0.0.1:8088",
+                         "GGNET_MACHINE_ID": str(m["id"]), "GGNET_MACHINE_NAME": "vip-05"}
+
+
+def test_every_discard_sets_it_up_again(client, host, disks, auto, db_url, windows):
+    _boot_machine(client, disks)
+    _mark_dirty(db_url)
+    windows.done.clear()
+    assert "sanboot" in _ipxe(client)
+    assert [d for d, _, _ in windows.done] == [f"/dev/zvol/{OS_CLONE}"]
+
+
+def test_a_setup_problem_does_not_stop_the_boot(client, host, disks, windows):
+    windows.problem = "no Windows partition found"
+    m = _boot_machine(client, disks)
+    assert m["status"] == "provisioned"
+    assert "sanboot" in _ipxe(client)
+
+
+def test_disk_mode_pcs_are_never_set_up(client, disks, windows):
+    _, game = disks
+    r = client.post("/api/v1/machines", json={"name": "pc01", "game_disk_id": game["id"]})
+    assert r.status_code == 201
+    assert windows.done == []

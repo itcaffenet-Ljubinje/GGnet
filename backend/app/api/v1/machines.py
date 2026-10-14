@@ -49,6 +49,7 @@ from app.api.v1.schemas import (
 from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services import discovery
+from app.services.os_setup import os_setup_for
 from app.services.provisioning import ClientDisk, Provisioner, ProvisioningError
 from app.services.traffic import TrafficMonitor
 from app.services.writebacks import discard
@@ -178,7 +179,7 @@ def _provision(db: Session, prov: Provisioner, m: Machine, disk: GameDisk,
     m.os_disk_id = os_disk.id if os_disk else None
     try:
         cd = prov.provision(m.name, m.initiator_iqn, disk.snapshot_path,
-                            os_disk.snapshot_path if os_disk else None)
+                            os_disk.snapshot_path if os_disk else None, os_setup_for(m))
     except ProvisioningError as e:
         # The clones may be left over (rollback failed); remember their paths for cleanup.
         m.clone_zvol = prov.client_path(m.name)
@@ -414,7 +415,7 @@ def reset_machine(
         os_clone = machine.os_clone_zvol or prov.os_client_path(machine.name)
     try:
         cd = prov.reset(machine.name, machine.initiator_iqn, clone, machine.target_snapshot_path,
-                        os_clone, machine.os_snapshot_path)
+                        os_clone, machine.os_snapshot_path, os_setup_for(machine))
     except ProvisioningError as e:
         machine.clone_zvol, machine.os_clone_zvol = clone, os_clone
         _fail(db, machine, e)
