@@ -460,6 +460,7 @@ network throughput of the iSCSI interface.
 | PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |
 | Boot Mode: per-PC OS writeback setup before boot (computer name, environment variables) | done |
 | Boot Mode: agent installed into the OS image by the server | planned |
+| Maintenance VM: the installer offers one Proxmox VM (UEFI, TPM, no disk, stopped; its ID in config.toml); Images → OS image → Edit in VM attaches the image, Finish makes a new version | planned |
 | Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
 | Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |
