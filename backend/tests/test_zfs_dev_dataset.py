@@ -116,6 +116,14 @@ def test_apply_clone_on_real_zfs(dev_zfs):
         assert zfs.destroy(other)
         assert zfs.destroy_snapshot(f"{master}@base"), zfs.runner.last_error
         assert zfs.list_snapshots(master) == ["v2"]
+
+        # Merge into base: @v2 becomes @base while a PC runs on it.
+        assert zfs.clone(f"{master}@v2", other)
+        assert zfs.rename_snapshot(master, "v2", "base"), zfs.runner.last_error
+        assert zfs.list_snapshots(master) == ["base"]
+        assert zfs.get_property(other, "origin") == f"{master}@base"
+        ok, out, _ = zfs.runner.run(["zfs", "holds", "-H", f"{master}@base"])
+        assert ok and "ggnet:protected" in out
     finally:
         zfs.runner.run(["zfs", "release", "ggnet:protected", f"{keeper}@v2"], quiet=True)
         for ds in (other, keeper):

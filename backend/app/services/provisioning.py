@@ -149,6 +149,33 @@ class Provisioner:
             if not self.zfs.destroy_snapshot(f"{zvol_path}@{name}"):
                 raise self._fail(f"Deleting {zvol_path}@{name} failed")
 
+    def merge_into_base(self, zvol_path: str, name: str) -> list[str]:
+        """
+        Make version `name` the new @base of a master: every older version is
+        deleted, then `name` is renamed to `base`. No data is copied: a ZFS
+        snapshot is a whole disk, so `name` already holds every change.
+        Returns the deleted versions, oldest first.
+
+        The caller checks first that no PC uses an older version; ZFS refuses
+        to destroy a snapshot with clones anyway, so a PC that started on one
+        in between stops the merge there. A failure after some deletions
+        leaves `name` under its old name, and running it again finishes.
+        """
+        with self.lock:
+            self._clear()
+            snaps = self.zfs.list_snapshots(zvol_path)
+            if snaps is None:
+                raise self._fail(f"Listing versions of {zvol_path} failed")
+            if name not in snaps:
+                raise ProvisioningError(f"{zvol_path}@{name} does not exist")
+            older = snaps[: snaps.index(name)]
+            for old in older:
+                if not self.zfs.destroy_snapshot(f"{zvol_path}@{old}"):
+                    raise self._fail(f"Deleting {zvol_path}@{old} failed")
+            if name != "base" and not self.zfs.rename_snapshot(zvol_path, name, "base"):
+                raise self._fail(f"Renaming {zvol_path}@{name} to @base failed")
+        return older
+
     def pool_space(self) -> dict:
         space = self.zfs.pool_space()
         if space is None:

@@ -280,6 +280,64 @@ def delete_snapshot(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/{disk_id}/snapshots/{name}/merge-into-base", response_model=GameDiskOut)
+def merge_into_base(
+    disk_id: int,
+    name: str,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """
+    Make a version the new @base: every older version is deleted and this one
+    is renamed to `base` (e.g. @base, @v2, @v3, @v4 → @base with @v4's content).
+    Refused while an older version is active, pinned or still used by a PC.
+    """
+    disk = _get(db, disk_id)
+    _published(disk)
+    versions = _versions(prov, disk)
+    names = [v["name"] for v in versions]
+    if name not in names:
+        not_found("Snapshot", f"{disk.name}@{name}")
+    older = versions[: names.index(name)]
+    if not older and name == "base":
+        conflict(f"{disk.name}@base is already the only base version")
+    older_names = {v["name"] for v in older}
+    if disk.snapshot in older_names:
+        conflict(f"{disk.name}@{disk.snapshot} is the active version and would be deleted; "
+                 f"make @{name} or a newer version active first")
+    pinned = sorted(f"{m.name} (@{m.pinned_snapshot})" for m in disk.machines
+                    if m.pinned_snapshot in older_names)
+    if pinned:
+        conflict(f"Older versions are pinned on {', '.join(pinned)}; unpin them first")
+    if any(v["clones"] for v in older):
+        by_clone = _machines_by_clone(db)
+        users = sorted({by_clone[c].name if c in by_clone else c
+                        for v in older for c in v["clones"]})
+        conflict(f"Older versions are still used by {', '.join(users)}; "
+                 "they move off them at their next reboot")
+    try:
+        prov.merge_into_base(disk.zvol_path, name)
+    except ProvisioningError as e:
+        host_failed(str(e))
+
+    if name != "base":
+        old_path, new_path = f"{disk.zvol_path}@{name}", f"{disk.zvol_path}@base"
+        if disk.snapshot == name:
+            disk.snapshot = "base"
+        for m in db.scalars(select(Machine).where(or_(
+                Machine.clone_snapshot == old_path, Machine.os_clone_snapshot == old_path))):
+            if m.clone_snapshot == old_path:
+                m.clone_snapshot = new_path
+            if m.os_clone_snapshot == old_path:
+                m.os_clone_snapshot = new_path
+        for m in disk.machines:
+            if m.pinned_snapshot == name:
+                m.pinned_snapshot = "base"
+    db.commit()
+    logger.info("%s: @%s merged into @base", disk.name, name)
+    return disk
+
+
 @router.get("/{disk_id}/writebacks", response_model=list[WritebackOut])
 def list_writebacks(
     disk_id: int,

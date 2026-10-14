@@ -442,6 +442,89 @@ def test_delete_version_failure_keeps_the_hold(client, host, disk):
     assert host.snapshots[f"{MASTER}@base"] == {"ggnet:protected"}
 
 
+# ── Merge into base ───────────────────────────────────────────────────
+
+def _merge(client, disk, name):
+    return client.post(f"/api/v1/game-disks/{disk['id']}/snapshots/{name}/merge-into-base")
+
+
+def test_merge_newest_version_into_base(client, host, disk):
+    keeper = _keeper(client, disk)
+    other = _machine(client, disk, "pc02")
+    client.post(f"/api/v1/machines/{keeper['id']}/apply-writebacks")   # @v2
+    client.post(f"/api/v1/machines/{keeper['id']}/apply-writebacks")   # @v3 (active)
+
+    r = _merge(client, disk, "v3")
+    assert r.status_code == 409 and "pc02" in r.text     # pc02 still runs on @base
+    assert {f"{MASTER}@base", f"{MASTER}@v2", f"{MASTER}@v3"} <= set(host.snapshots)
+
+    client.post(f"/api/v1/machines/{other['id']}/discard-writeback")   # pc02 moves to @v3
+    r = _merge(client, disk, "v3")
+    assert r.status_code == 200, r.text
+    assert r.json()["snapshot"] == "base"
+    assert [s for s in host.snapshots if s.startswith(f"{MASTER}@")] == [f"{MASTER}@base"]
+    assert host.snapshots[f"{MASTER}@base"] == {"ggnet:protected"}
+    # Both PCs ran @v3 and now run the same snapshot under its new name.
+    for m, zvol in ((keeper, "pc01"), (other, "pc02")):
+        assert host.datasets[f"tank/ggnet/writebacks/{zvol}"]["origin"] == f"{MASTER}@base"
+        got = _get(client, m)
+        assert (got["clone_snapshot"], got["outdated"]) == (f"{MASTER}@base", False)
+    assert [(v["name"], v["active"], v["machines"]) for v in _versions(client, disk)] == [
+        ("base", True, ["pc01", "pc02"]),
+    ]
+
+    # The next change is @v2 again.
+    r = client.post(f"/api/v1/machines/{keeper['id']}/apply-writebacks")
+    assert r.json()["clone_snapshot"] == f"{MASTER}@v2"
+
+
+def test_merge_keeps_newer_versions_and_moves_the_pin(client, host, disk):
+    keeper, other = _two_versions(client, disk)
+    client.post(f"/api/v1/machines/{other['id']}/discard-writeback")   # pc02 moves to @v2
+    client.post(f"/api/v1/machines/{keeper['id']}/apply-writebacks")   # @v3 (active)
+    client.put(f"/api/v1/machines/{other['id']}/pin", json={"snapshot": "v2"})
+
+    r = _merge(client, disk, "v2")
+    assert r.status_code == 200, r.text
+    assert r.json()["snapshot"] == "v3"
+    assert [s.partition("@")[2] for s in host.snapshots if s.startswith(f"{MASTER}@")] == ["base", "v3"]
+    got = _get(client, other)
+    assert (got["pinned_snapshot"], got["clone_snapshot"], got["outdated"]) == (
+        "base", f"{MASTER}@base", False)
+
+
+def test_merge_refusals(client, host, disk):
+    keeper, other = _two_versions(client, disk)
+    assert _merge(client, disk, "v9").status_code == 404
+    assert _merge(client, disk, "base").status_code == 409
+
+    client.post(f"/api/v1/machines/{other['id']}/discard-writeback")   # pc02 moves to @v2
+    client.put(f"/api/v1/game-disks/{disk['id']}/active-snapshot", json={"snapshot": "base"})
+    r = _merge(client, disk, "v2")
+    assert r.status_code == 409 and "active version" in r.text
+
+    client.put(f"/api/v1/game-disks/{disk['id']}/active-snapshot", json={"snapshot": "v2"})
+    client.put(f"/api/v1/machines/{other['id']}/pin", json={"snapshot": "base"})
+    r = _merge(client, disk, "v2")
+    assert r.status_code == 409 and "pinned on pc02" in r.text
+    assert {f"{MASTER}@base", f"{MASTER}@v2"} <= set(host.snapshots)
+
+
+def test_merge_failure_can_be_run_again(client, host, disk):
+    keeper, other = _two_versions(client, disk)
+    client.post(f"/api/v1/machines/{other['id']}/discard-writeback")   # pc02 moves to @v2
+    host.fail_on[("zfs", "rename", f"{MASTER}@v2")] = "pool I/O is currently suspended"
+    r = _merge(client, disk, "v2")
+    assert r.status_code == 502 and "suspended" in r.text
+    assert f"{MASTER}@base" not in host.snapshots                       # deleted before the rename
+    assert client.get(f"/api/v1/game-disks/{disk['id']}").json()["snapshot"] == "v2"
+
+    del host.fail_on[("zfs", "rename", f"{MASTER}@v2")]
+    r = _merge(client, disk, "v2")
+    assert r.status_code == 200 and r.json()["snapshot"] == "base"
+    assert _get(client, keeper)["clone_snapshot"] == f"{MASTER}@base"
+
+
 def test_writebacks_of_a_disk(client, host, disk):
     m = _keeper(client, disk)
     _machine(client, disk, "pc02")

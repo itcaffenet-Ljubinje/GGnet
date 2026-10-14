@@ -241,6 +241,9 @@ class FakeHost:
             if dst in self.snapshots:
                 return self._err(f"cannot rename to '{dst}': dataset already exists")
             self.snapshots = {(dst if k == src else k): v for k, v in self.snapshots.items()}
+            for p in self.datasets.values():
+                if p["origin"] == src:
+                    p["origin"] = dst
             return self._ok()
 
         if sub == "destroy":
