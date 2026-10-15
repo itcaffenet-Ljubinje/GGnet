@@ -173,9 +173,13 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
 
   async function apply(m: Machine) {
     const msg =
-      `Apply the writeback of ${m.name} to "${diskName(m.game_disk_id)}"?\n\n` +
-      "It becomes the new version of the game disk. Every other PC gets it at its next reboot.\n\n" +
-      `${m.name} must be powered off.`;
+      m.mode === "boot"
+        ? `Apply the writebacks of ${m.name} to "${diskName(m.os_disk_id ?? null)}" and "${diskName(m.game_disk_id)}"?\n\n` +
+          "They become the new versions of the OS image and the game disk. Every other PC gets them at its next reboot.\n\n" +
+          `${m.name} must be powered off.`
+        : `Apply the writeback of ${m.name} to "${diskName(m.game_disk_id)}"?\n\n` +
+          "It becomes the new version of the game disk. Every other PC gets it at its next reboot.\n\n" +
+          `${m.name} must be powered off.`;
     if (!window.confirm(msg)) return;
     await run(`apply-${m.id}`, () => api.applyWritebacks(m.id));
     await reload();

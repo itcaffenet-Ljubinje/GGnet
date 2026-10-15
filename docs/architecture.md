@@ -312,7 +312,10 @@ above). A Boot Mode machine is assigned an OS image and a game disk together (`o
 gets two writebacks: `<writebacks>/<name>-os` (mapped LUN 0) and `<writebacks>/<name>` (mapped LUN 1; the same
 path as a Disk Mode game writeback). Machine names may not end in `-os`, so the two never collide. Both
 writebacks are discarded together, by the same rules as in Disk Mode, and the OS writeback always follows the OS
-image's active version (no pin yet). Apply Writebacks is not available for Boot Mode PCs yet.
+image's active version (no pin yet). Apply Writebacks of a Boot Mode PC with Keep Writeback turns its OS
+writeback into the OS image's next version and its game writeback into the game disk's next version
+(`{"os": false}` or `{"game": false}` applies only one; the other stays kept as it is). The fresh OS writeback
+is set up as the PC again.
 
 The router stays the DHCP server for IP addresses. dnsmasq on the Proxmox host only answers PXE requests
 (proxyDHCP) and serves the iPXE binary over TFTP. Only one PXE server may run in the LAN.

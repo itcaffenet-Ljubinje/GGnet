@@ -217,6 +217,12 @@ class KeepWriteback(BaseModel):
     enabled: bool
 
 
+class ApplyWritebacks(BaseModel):
+    """Which kept writebacks become versions; `os` only counts in Boot Mode."""
+    os: bool = True
+    game: bool = True
+
+
 class MachinePin(BaseModel):
     snapshot: str | None   # a version of the machine's game disk; None follows the active one
 

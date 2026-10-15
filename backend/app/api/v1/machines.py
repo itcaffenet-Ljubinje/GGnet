@@ -15,7 +15,7 @@ Writebacks are discarded automatically by the server after every disconnect
 
 A Boot Mode machine gets two writebacks: one of its OS image (`os_disk_id`,
 mapped LUN 0) and one of its game disk (mapped LUN 1). Both are provisioned,
-discarded and removed together.
+discarded and removed together; /apply-writebacks applies either or both.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from app.api.deps import get_provisioner, get_traffic_monitor, get_wol_sender
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     BOOT_MODE_LETTER,
+    ApplyWritebacks,
     BulkAction,
     BulkResult,
     DriveLetterAll,
@@ -50,7 +51,13 @@ from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatu
 from app.db.session import get_db
 from app.services import discovery
 from app.services.os_setup import os_setup_for
-from app.services.provisioning import ClientDisk, Provisioner, ProvisioningError
+from app.services.provisioning import (
+    ClientDisk,
+    PartialApplyError,
+    Provisioner,
+    ProvisioningError,
+    WritebackApply,
+)
 from app.services.traffic import TrafficMonitor
 from app.services.writebacks import discard
 
@@ -546,6 +553,7 @@ def discard_writeback(
 @router.post("/{machine_id}/apply-writebacks", response_model=MachineOut)
 def apply_writebacks(
     machine_id: int,
+    body: ApplyWritebacks | None = None,
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
 ):
@@ -554,40 +562,74 @@ def apply_writebacks(
     version of its game disk (base → v2 → v3 ...) and that version becomes
     active. Every other machine moves to it at its next discard, i.e. its
     next reboot. The machine must keep its writeback and be powered off.
+
+    A Boot Mode machine has two writebacks; `os` and `game` choose which of
+    them become versions (both by default). One that is not applied stays
+    kept as it is.
     """
+    body = body or ApplyWritebacks()
     machine = _get(db, machine_id)
-    if machine.mode is MachineMode.BOOT:
-        conflict(f"'{machine.name}' is in boot mode; Apply Writebacks is not available there yet")
+    boot = machine.mode is MachineMode.BOOT
     if not machine.keep_writeback:
         conflict(f"'{machine.name}' does not keep its writeback; nothing to apply")
     if machine.status is not MachineStatus.PROVISIONED or machine.game_disk_id is None:
         conflict(f"'{machine.name}' has no provisioned game disk")
-    disk = _published_disk(db, machine.game_disk_id)
-    if machine.clone_snapshot != disk.snapshot_path:
-        conflict(
-            f"'{machine.name}' runs {machine.clone_snapshot}, but the active version is "
-            f"{disk.snapshot_path}; changes made on an older version cannot be applied"
-        )
+    if not body.game and not (boot and body.os):
+        conflict("Nothing to apply; choose the OS writeback, the game writeback or both")
+
+    # (disk, writeback) pairs; each writeback must come from its disk's active version.
+    targets: list[tuple[GameDisk, str]] = []
+    if body.game:
+        targets.append((_published_disk(db, machine.game_disk_id), machine.clone_zvol))
+    if boot and body.os:
+        if machine.os_disk_id is None or machine.os_clone_zvol is None:
+            conflict(f"'{machine.name}' has no provisioned OS image")
+        targets.append((_published_disk(db, machine.os_disk_id, DiskKind.OS), machine.os_clone_zvol))
+    runs = {machine.clone_zvol: machine.clone_snapshot, machine.os_clone_zvol: machine.os_clone_snapshot}
+    for disk, clone in targets:
+        if runs[clone] != disk.snapshot_path:
+            conflict(
+                f"'{machine.name}' runs {runs[clone]}, but the active version is "
+                f"{disk.snapshot_path}; changes made on an older version cannot be applied"
+            )
     session = prov.session_active(machine.initiator_iqn, machine.iscsi_target_iqn)
     if session is None:
         host_failed(f"Cannot read the iSCSI session state of '{machine.name}'")
     if session:
         conflict(f"'{machine.name}' is still connected; shut it down first")
 
+    applies = [WritebackApply(clone, disk.zvol_path, disk.snapshot) for disk, clone in targets]
     try:
-        disk.snapshot = prov.apply_writebacks(machine.name, machine.initiator_iqn,
-                                              machine.clone_zvol, disk.zvol_path, disk.snapshot)
+        news = prov.apply_writebacks(machine.name, machine.initiator_iqn, applies,
+                                     machine.clone_zvol, machine.os_clone_zvol if boot else None)
+    except PartialApplyError as e:
+        for disk, _ in targets:
+            disk.snapshot = e.applied.get(disk.zvol_path, disk.snapshot)
+        _fail(db, machine, e)
     except ProvisioningError as e:
         host_failed(str(e), machine_id=machine.id)
-    # The PC made the new version; it continues on it, not on an old pin.
-    machine.pinned_snapshot = None
+    for (disk, _), new in zip(targets, news):
+        disk.snapshot = new
+    if body.game:
+        # The PC made the new version; it continues on it, not on an old pin.
+        machine.pinned_snapshot = None
     db.commit()
 
-    # The kept writeback now equals the new version; re-clone it from there
-    # so the next round of changes starts from the active version.
+    # An applied writeback now equals the new version; re-clone it from there
+    # so the next round of changes starts from the active version. One that
+    # was not applied is only mapped again.
+    keep = frozenset(
+        name for name, clone in (("game", machine.clone_zvol), ("os", machine.os_clone_zvol))
+        if clone is not None and clone not in {c for _, c in targets}
+    )
+    game_snap = machine.clone_snapshot if "game" in keep else machine.target_snapshot_path
+    os_clone = machine.os_clone_zvol if boot else None
+    os_snap = None
+    if os_clone is not None:
+        os_snap = machine.os_clone_snapshot if "os" in keep else machine.os_snapshot_path
     try:
-        cd = prov.reset(machine.name, machine.initiator_iqn, machine.clone_zvol,
-                        disk.snapshot_path)
+        cd = prov.reset(machine.name, machine.initiator_iqn, machine.clone_zvol, game_snap,
+                        os_clone, os_snap, os_setup_for(machine) if os_clone else None, keep)
     except ProvisioningError as e:
         _fail(db, machine, e)
     _set_provisioned(machine, cd)

@@ -25,6 +25,26 @@ class ProvisioningError(Exception):
     """A host operation failed. The message is shown to the user."""
 
 
+class PartialApplyError(ProvisioningError):
+    """
+    Apply Writebacks failed after some writebacks already became versions.
+    `applied` maps each such master to its new snapshot name; those clones
+    are gone (they are the masters now), so the machine needs a reset.
+    """
+
+    def __init__(self, msg: str, applied: dict[str, str]):
+        super().__init__(msg)
+        self.applied = applied
+
+
+@dataclass(frozen=True)
+class WritebackApply:
+    """One kept writeback and the master whose next version it becomes."""
+    clone_zvol: str
+    master: str
+    base_snap: str     # the master's active snapshot the clone was made from
+
+
 _VERSION_RE = re.compile(r"^v(\d+)$")
 
 
@@ -282,7 +302,7 @@ class Provisioner:
     def reset(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str, snapshot_path: str,
         os_clone_zvol: str | None = None, os_snapshot_path: str | None = None,
-        os_setup: OsSetup | None = None,
+        os_setup: OsSetup | None = None, keep: frozenset[str] = frozenset(),
     ) -> ClientDisk:
         """
         Order: detach (ACL + backstores) → destroy clones → clone → attach.
@@ -290,6 +310,8 @@ class Provisioner:
         the machine to the newest version of the master. Boot Mode passes the
         OS clone and snapshot too; both writebacks are reset together, and
         `os_setup` is written into the fresh OS clone before it is mapped.
+        `keep` names writebacks ("game", "os") that are only mapped again,
+        not re-cloned; their snapshot argument is then the one they came from.
         The client must be powered off or disconnected.
         """
         if (os_clone_zvol is None) != (os_snapshot_path is None):
@@ -297,11 +319,12 @@ class Provisioner:
         with self.lock:
             self._clear()
             self._detach(machine_name, initiator_iqn)
-            if not self.zfs.reset_clone(clone_zvol, snapshot_path):
+            if "game" not in keep and not self.zfs.reset_clone(clone_zvol, snapshot_path):
                 raise self._fail(f"Resetting clone {clone_zvol} failed")
-            if os_clone_zvol is not None and not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
+            reset_os = os_clone_zvol is not None and "os" not in keep
+            if reset_os and not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
                 raise self._fail(f"Resetting clone {os_clone_zvol} failed")
-            problem = self._set_up_os(os_clone_zvol, os_setup)
+            problem = self._set_up_os(os_clone_zvol, os_setup) if reset_os else None
             iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol))
             if iqn is None:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
@@ -347,26 +370,42 @@ class Provisioner:
                     raise self._fail(f"Setting sync on {clone} failed")
 
     def apply_writebacks(
-        self, machine_name: str, initiator_iqn: str, clone_zvol: str, master: str, base_snap: str
-    ) -> str:
+        self, machine_name: str, initiator_iqn: str, applies: list[WritebackApply],
+        clone_zvol: str, os_clone_zvol: str | None = None,
+    ) -> list[str]:
         """
-        Make the clone's content the next version of `master` (ggRock
-        "Apply Writebacks"). Returns the new snapshot name. The machine must
-        be powered off. The clone itself becomes the master, so it is
+        Make each clone's content the next version of its master (ggRock
+        "Apply Writebacks"); Boot Mode applies the OS writeback, the game
+        writeback or both. Returns the new snapshot names, in the order of
+        `applies`. The machine must be powered off. A clone becomes its
+        master, so the machine's disks (`clone_zvol`, `os_clone_zvol`) are
         unmapped first; the caller re-clones the machine from the new
-        version. On failure the clone is mapped again.
+        versions. When the first apply fails, the disks are mapped again;
+        when a later one fails, PartialApplyError says what was applied.
         """
         with self.lock:
             self._clear()
-            snaps = self.zfs.list_snapshots(master)
-            if snaps is None:
-                raise self._fail(f"Listing versions of {master} failed")
-            new = next_version(snaps)
+            news = []
+            for a in applies:
+                snaps = self.zfs.list_snapshots(a.master)
+                if snaps is None:
+                    raise self._fail(f"Listing versions of {a.master} failed")
+                news.append(next_version(snaps))
             self._detach(machine_name, initiator_iqn)
-            if not self.zfs.apply_clone(clone_zvol, master, base_snap, new):
-                err = self._fail(f"Applying {clone_zvol} to {master} failed")
+            applied: dict[str, str] = {}
+            for a, new in zip(applies, news):
+                if self.zfs.apply_clone(a.clone_zvol, a.master, a.base_snap, new):
+                    applied[a.master] = new
+                    continue
+                err = self._fail(f"Applying {a.clone_zvol} to {a.master} failed")
+                if applied:
+                    raise PartialApplyError(
+                        f"{err}; applied before the failure: "
+                        + ", ".join(f"{m}@{s}" for m, s in applied.items())
+                        + ". Reset the machine.", applied)
                 if self.iscsi.attach(machine_name, initiator_iqn,
-                                     [Disk("game", self.zfs.zvol_device_path(clone_zvol))]) is None:
-                    logger.error("Apply failed and %s could not be mapped again", clone_zvol)
+                                     self._disks(clone_zvol, os_clone_zvol)) is None:
+                    logger.error("Apply failed and the writebacks of %s could not be mapped again",
+                                 machine_name)
                 raise err
-        return new
+        return news
