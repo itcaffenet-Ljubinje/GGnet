@@ -20,6 +20,7 @@ only names the PC's own initiator IQN, which the ACL is bound to.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -28,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_provisioner, get_writeback_settings
+from app.config import get_config
 from app.api.v1.schemas import _mac
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
@@ -49,17 +51,41 @@ def exit_script(message: str) -> PlainTextResponse:
     return _script(f"echo {message}", "sleep 5", "exit")
 
 
-def sanboot_script(m: Machine, portal_ip: str, portal_port: int, target_iqn: str) -> PlainTextResponse:
+def boot_gateway(cfg: dict | None = None) -> str | None:
+    """
+    `[boot] gateway` in config.toml: the gateway iPXE puts into the iBFT for
+    Windows. Windows routes to the iSCSI portal through it even when the
+    portal is on the same subnet, and many routers do not send that traffic
+    back, so Windows loses its disk as it takes over from iPXE. "none" leaves
+    it empty (0.0.0.0: the portal is reached directly, but the PC has no
+    default route); an IP (the ggNet server with IP forwarding, as ggRock
+    does) replaces it. Unset keeps the DHCP gateway.
+    """
+    value = str(((cfg if cfg is not None else get_config()).get("boot") or {}).get("gateway") or "").strip()
+    if not value:
+        return None
+    if value == "none":
+        return "0.0.0.0"
+    try:
+        return str(ipaddress.IPv4Address(value))
+    except ValueError:
+        logger.error("Ignoring invalid [boot] gateway %r", value)
+        return None
+
+
+def sanboot_script(m: Machine, portal_ip: str, portal_port: int, target_iqn: str,
+                   gateway: str | None = None) -> PlainTextResponse:
     """
     No `--no-describe`: Windows needs the iBFT table iPXE writes to keep
     booting from iSCSI. `initiator-iqn` must be the PC's ACL, or LIO refuses
-    the login.
+    the login. `gateway` (boot_gateway()) replaces the DHCP gateway in it.
     """
     host = f"[{portal_ip}]" if ":" in portal_ip else portal_ip
     os_disk, game = m.os_disk, m.game_disk
     os_version = (m.os_clone_snapshot or "").partition("@")[2]
     game_version = (m.clone_snapshot or "").partition("@")[2]
     return _script(
+        *([f"set netX/gateway {gateway}"] if gateway else []),
         f"set initiator-iqn {m.initiator_iqn}",
         f"set root-path iscsi:{host}::{portal_port}:0:{target_iqn}",
         f"echo ggNet: booting {m.name} ({os_disk.name} {os_version}, {game.name} {game_version})",
@@ -109,4 +135,5 @@ def ipxe_script(
         logger.error("iPXE request from %s: %s", m.name, m.last_error)
         return exit_script(f"ggNet: {m.name} cannot boot from the network: {m.last_error}")
     logger.info("iPXE: %s boots %s + %s", m.name, m.os_clone_snapshot, m.clone_snapshot)
-    return sanboot_script(m, prov.iscsi.portal_ip, prov.iscsi.portal_port, m.iscsi_target_iqn)
+    return sanboot_script(m, prov.iscsi.portal_ip, prov.iscsi.portal_port, m.iscsi_target_iqn,
+                          boot_gateway())

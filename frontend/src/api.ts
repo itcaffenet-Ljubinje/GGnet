@@ -131,6 +131,7 @@ export interface Machine {
   initiator_iqn: string;
   mac: string | null;
   game_disk_id: number | null;
+  os_disk_id?: number | null;      // Boot Mode: the OS image
   editing_disk_id: number | null;
   drive_letter: string;
   reported_drive_letter: string | null;

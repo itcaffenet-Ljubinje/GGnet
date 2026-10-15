@@ -312,7 +312,10 @@ above). A Boot Mode machine is assigned an OS image and a game disk together (`o
 gets two writebacks: `<writebacks>/<name>-os` (mapped LUN 0) and `<writebacks>/<name>` (mapped LUN 1; the same
 path as a Disk Mode game writeback). Machine names may not end in `-os`, so the two never collide. Both
 writebacks are discarded together, by the same rules as in Disk Mode, and the OS writeback always follows the OS
-image's active version (no pin yet). Apply Writebacks is not available for Boot Mode PCs yet.
+image's active version (no pin yet). Apply Writebacks of a Boot Mode PC with Keep Writeback turns its OS
+writeback into the OS image's next version and its game writeback into the game disk's next version
+(`{"os": false}` or `{"game": false}` applies only one; the other stays kept as it is). The fresh OS writeback
+is set up as the PC again.
 
 The router stays the DHCP server for IP addresses. dnsmasq on the Proxmox host only answers PXE requests
 (proxyDHCP) and serves the iPXE binary over TFTP. Only one PXE server may run in the LAN.
@@ -378,6 +381,7 @@ reboot
 - No `--no-describe`: Windows needs the iBFT table iPXE writes to continue booting from iSCSI.
 - `initiator-iqn` must equal the PC's ACL IQN, otherwise LIO refuses the login.
 - Only LUN 0 is named in the root path. Windows sees LUN 1 (the game disk) through the same iSCSI session.
+- `[boot] gateway` in config.toml replaces the DHCP gateway in the iBFT: `"none"` (0.0.0.0, portal reached directly, no default route) or an IP (the server with IP forwarding, as ggRock does). Windows routes to the portal through the iBFT gateway even on the same subnet.
 
 Unknown MAC (not registered, or registration window open):
 
@@ -474,6 +478,7 @@ network throughput of the iSCSI interface.
 | PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |
 | Boot Mode: per-PC OS writeback setup before boot (computer name, environment variables) | done |
 | Boot Mode: agent installed into the OS image by the server | planned |
+| Maintenance VM: the installer offers one Proxmox VM (UEFI, TPM, no disk, stopped; its ID in config.toml); Images → OS image → Edit in VM attaches the image, Finish makes a new version | planned |
 | Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
 | Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |

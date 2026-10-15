@@ -183,11 +183,83 @@ def test_keep_writeback_keeps_both(client, host, disks):
     assert synced == {OS_CLONE, GAME_CLONE}
 
 
-def test_apply_writebacks_not_in_boot_mode_yet(client, disks):
+# ── Apply Writebacks ──────────────────────────────────────────────────
+
+def _boot_keeper(client, disks) -> dict:
     m = _boot_machine(client, disks)
-    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True})
+    r = client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True})
+    assert r.status_code == 200, r.text
+    return m
+
+
+def test_apply_writebacks_makes_both_next_versions(client, host, disks, windows):
+    m = _boot_keeper(client, disks)
+    windows.done.clear()
     r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks")
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["os_clone_snapshot"] == "tank/ggnet/images/win11@v2"
+    assert out["clone_snapshot"] == "tank/ggnet/images/cs2@v2"
+    assert client.get(f"/api/v1/game-disks/{disks[0]['id']}").json()["snapshot"] == "v2"
+    assert client.get(f"/api/v1/game-disks/{disks[1]['id']}").json()["snapshot"] == "v2"
+    assert host.datasets[OS_CLONE]["origin"] == "tank/ggnet/images/win11@v2"
+    assert host.datasets[GAME_CLONE]["origin"] == "tank/ggnet/images/cs2@v2"
+    # Both writebacks are still kept, and the fresh OS one is this PC again.
+    assert {host.datasets[c]["props"]["sync"] for c in (OS_CLONE, GAME_CLONE)} == {"standard"}
+    assert [d for d, _, _ in windows.done] == [f"/dev/zvol/{OS_CLONE}"]
+    assert host.visible(IQN) == [f"/dev/zvol/{OS_CLONE}", f"/dev/zvol/{GAME_CLONE}"]
+
+
+def test_apply_only_the_os_writeback_keeps_the_game_one(client, host, disks, windows):
+    m = _boot_keeper(client, disks)
+    windows.done.clear()
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"game": False})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["os_clone_snapshot"] == "tank/ggnet/images/win11@v2"
+    assert out["clone_snapshot"] == "tank/ggnet/images/cs2@base"
+    assert client.get(f"/api/v1/game-disks/{disks[1]['id']}").json()["snapshot"] == "base"
+    # The game writeback was mapped again as it was, not re-cloned.
+    assert ["zfs", "destroy", "-r", GAME_CLONE] not in host.calls
+    assert host.datasets[GAME_CLONE]["origin"] == "tank/ggnet/images/cs2@base"
+    assert [d for d, _, _ in windows.done] == [f"/dev/zvol/{OS_CLONE}"]
+    assert host.visible(IQN) == [f"/dev/zvol/{OS_CLONE}", f"/dev/zvol/{GAME_CLONE}"]
+
+
+def test_apply_only_the_game_writeback_keeps_the_os_one(client, host, disks, windows):
+    m = _boot_keeper(client, disks)
+    windows.done.clear()
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"os": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["os_clone_snapshot"] == "tank/ggnet/images/win11@base"
+    assert r.json()["clone_snapshot"] == "tank/ggnet/images/cs2@v2"
+    assert ["zfs", "destroy", "-r", OS_CLONE] not in host.calls
+    assert windows.done == []          # the kept OS writeback is already this PC
+
+
+def test_apply_nothing_is_refused(client, host, disks):
+    m = _boot_keeper(client, disks)
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"os": False, "game": False})
     assert r.status_code == 409
+    assert "tank/ggnet/images/win11@v2" not in host.snapshots
+
+
+def test_apply_os_refused_when_the_image_moved_on(client, host, disks):
+    m = _boot_keeper(client, disks)
+    host.snapshots["tank/ggnet/images/win11@manual"] = set()
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"game": False})
+    assert r.status_code == 502 and "not the newest version" in r.json()["detail"]["error"]
+    # Nothing was applied, so the PC gets its writebacks back.
+    assert host.visible(IQN) == [f"/dev/zvol/{OS_CLONE}", f"/dev/zvol/{GAME_CLONE}"]
+
+
+def test_apply_failing_on_the_second_disk_records_the_first(client, host, disks):
+    m = _boot_keeper(client, disks)
+    host.snapshots["tank/ggnet/images/win11@manual"] = set()   # the OS apply fails
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks")
+    assert r.status_code == 502 and "Reset the machine" in r.json()["detail"]["error"]
+    assert client.get(f"/api/v1/game-disks/{disks[1]['id']}").json()["snapshot"] == "v2"
+    assert _get(client, m)["status"] == "error"
 
 
 # ── Writeback discard ─────────────────────────────────────────────────
@@ -338,3 +410,27 @@ def test_disk_mode_pcs_are_never_set_up(client, disks, windows):
     r = client.post("/api/v1/machines", json={"name": "pc01", "game_disk_id": game["id"]})
     assert r.status_code == 201
     assert windows.done == []
+
+
+# ── [boot] gateway ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("value, line", [
+    (None, None),
+    ("", None),
+    ("none", "set netX/gateway 0.0.0.0"),
+    ("192.168.10.1", "set netX/gateway 192.168.10.1"),
+    ("not-an-ip", None),
+])
+def test_boot_gateway(value, line):
+    from app.api.v1.boot import boot_gateway
+    cfg = {} if value is None else {"boot": {"gateway": value}}
+    assert boot_gateway(cfg) == (line.split()[-1] if line else None)
+
+
+def test_the_gateway_goes_before_the_sanboot(client, disks, monkeypatch):
+    from app.api.v1 import boot
+    monkeypatch.setattr(boot, "boot_gateway", lambda: "0.0.0.0")
+    _boot_machine(client, disks)
+    lines = _ipxe(client).splitlines()
+    assert lines[1] == "set netX/gateway 0.0.0.0"
+    assert lines.index("set netX/gateway 0.0.0.0") < next(i for i, l in enumerate(lines) if l.startswith("sanboot"))
