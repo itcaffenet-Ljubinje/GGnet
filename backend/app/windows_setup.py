@@ -11,6 +11,12 @@ an extra reboot:
     Control\\ComputerName\\ComputerName   ComputerName = PC-07
     Services\\Tcpip\\Parameters           Hostname, NV Hostname = pc-07
     Control\\Session Manager\\Environment  GGNET_SERVER, GGNET_MACHINE_ID, GGNET_MACHINE_NAME
+    Services\\Tcpip\\Parameters\\Interfaces\\{...}
+                                        a fixed IPv4 address becomes DHCP again
+
+An image made from a PC with a fixed address would give every PC that
+address; the PC that owns it then loses its iSCSI disk whenever another one
+is on. Windows takes the boot NIC's address from the iBFT anyway.
 
 The Windows partition of the clone is mounted with ntfs-3g and the hive is
 merged with hivexregedit (both ship with Proxmox VE). Only the PC's clone is
@@ -29,7 +35,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Sequence
 
 from app.runner import CommandRunner
 
@@ -40,6 +46,7 @@ HIVE = ("Windows", "System32", "config", "SYSTEM")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,14}$")
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _CURRENT_RE = re.compile(r'^"Current"=dword:([0-9a-fA-F]{8})\s*$', re.M)
+_IFACE_RE = re.compile(r"\\Interfaces\\(\{[0-9A-Fa-f-]{36}\})\]$")
 
 
 @dataclass(frozen=True)
@@ -57,7 +64,34 @@ def _reg_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def registry_patch(setup: OsSetup, control_set: int) -> str:
+def static_interfaces(export: str) -> list[str]:
+    """
+    The TCP/IP interfaces in a `hivexregedit --export` of
+    Services\\Tcpip\\Parameters\\Interfaces that have a fixed IPv4 address
+    (EnableDHCP 0 and an IPAddress other than 0.0.0.0).
+    """
+    found = []
+    for block in export.replace("\\\r\n  ", "").replace("\\\n  ", "").split("\n["):
+        lines = block.strip().splitlines()
+        m = _IFACE_RE.search(lines[0].rstrip("\r")) if lines else None
+        if not m:
+            continue
+        values = dict(line.rstrip("\r").split("=", 1) for line in lines[1:] if "=" in line)
+        if values.get('"EnableDHCP"') != "dword:00000000":
+            continue
+        raw = values.get('"IPAddress"', "")
+        if not raw.startswith("hex(7):"):
+            continue
+        try:
+            text = bytes(int(x, 16) for x in raw[7:].split(",") if x).decode("utf-16-le")
+        except ValueError:
+            continue
+        if any(a and a != "0.0.0.0" for a in text.split("\0")):
+            found.append(m.group(1))
+    return found
+
+
+def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = ()) -> str:
     """The .reg text hivexregedit merges into the SYSTEM hive."""
     if not _NAME_RE.match(setup.computer_name):
         raise ValueError(f"Invalid computer name: {setup.computer_name!r}")
@@ -78,6 +112,12 @@ def registry_patch(setup: OsSetup, control_set: int) -> str:
             if not _ENV_KEY_RE.match(key):
                 raise ValueError(f"Invalid environment variable name: {key!r}")
             lines.append(f"{_reg_string(key)}={_reg_string(value)}")
+    for iface in dhcp_interfaces:
+        lines += [
+            "", f"[{cs}\\Services\\Tcpip\\Parameters\\Interfaces\\{iface}]",
+            '"EnableDHCP"=dword:00000001',
+            '"IPAddress"=-', '"SubnetMask"=-', '"DefaultGateway"=-', '"DefaultGatewayMetric"=-',
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -116,6 +156,12 @@ class WindowsSetup:
         ok, out, _ = self._run(["hivexregedit", "--export", str(hive), "\\Select"], quiet=True)
         m = _CURRENT_RE.search(out) if ok else None
         return int(m.group(1), 16) if m and int(m.group(1), 16) > 0 else 1
+
+    def static_interfaces(self, hive: Path, control_set: int) -> list[str]:
+        """Interfaces with a fixed IPv4 address in the hive; none when unreadable."""
+        key = f"\\ControlSet{control_set:03d}\\Services\\Tcpip\\Parameters\\Interfaces"
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
+        return static_interfaces(out) if ok else []
 
     def personalize(self, device: str, setup: OsSetup) -> str | None:
         """Write the PC's identity into its OS clone. None when done, else why not."""
@@ -160,7 +206,9 @@ class WindowsSetup:
         return "; ".join(reasons)
 
     def _merge(self, hive: Path, setup: OsSetup) -> str | None:
-        patch = registry_patch(setup, self.control_set(hive))
+        control_set = self.control_set(hive)
+        fixed = self.static_interfaces(hive, control_set)
+        patch = registry_patch(setup, control_set, fixed)
         reg = self.run_dir / f"{setup.computer_name}.reg"
         try:
             reg.write_text(patch, encoding="utf-8")
@@ -170,6 +218,9 @@ class WindowsSetup:
         if not ok:
             return f"editing the registry failed: {err.strip()}"
         logger.info("Windows on %s set up as %s", hive, setup.computer_name)
+        if fixed:
+            logger.info("Fixed IPv4 addresses switched to DHCP on %s: %s", setup.computer_name,
+                        ", ".join(fixed))
         return None
 
 

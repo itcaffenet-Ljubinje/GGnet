@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.windows_setup import OsSetup, WindowsSetup, registry_patch
+from app.windows_setup import OsSetup, WindowsSetup, registry_patch, static_interfaces
 
 from .conftest import FakeRunner
 
@@ -99,6 +99,8 @@ def test_personalize_merges_into_the_windows_partition(windows, runner):
         ["lsblk", "-J", "-b", "-p", "-o", "PATH,TYPE,FSTYPE,SIZE", DEVICE],
         ["ntfs-3g", "-o", "rw,noatime", "/dev/zd16p3", mount],   # the big NTFS partition
         ["hivexregedit", "--export", str(hive), "\\Select"],
+        ["hivexregedit", "--export", str(hive),
+         "\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces"],
         ["hivexregedit", "--merge", str(hive), str(windows.run_dir / "vip-05.reg")],
         ["umount", mount],
     ]
@@ -177,3 +179,63 @@ def test_partitions_listed_next_to_the_disk(windows, runner):
         {"path": "/dev/zd64p2", "type": "part", "fstype": "ntfs", "size": 161042399232},
     ]}), "")
     assert windows.ntfs_partitions(DEVICE) == ["/dev/zd64p2"]
+
+
+# ── Fixed IPv4 addresses become DHCP ─────────────────────────────────
+
+def _multi_sz(*items: str) -> str:
+    raw = ("\0".join(items) + "\0\0").encode("utf-16-le")
+    return "hex(7):" + ",".join(f"{b:02x}" for b in raw)
+
+
+FIXED = "{ce61fd57-992d-4f05-86b6-c4d2b5b7ea91}"
+DHCP = "{0b0c1e05-dc82-44aa-ab40-16c8ae66f8a0}"
+UNSET = "{11111111-2222-3333-4444-555555555555}"
+INTERFACES = (
+    "Windows Registry Editor Version 5.00\r\n\r\n"
+    "[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces]\r\n\r\n"
+    f"[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{DHCP}]\r\n"
+    '"EnableDHCP"=dword:00000001\r\n\r\n'
+    # vip-05's NIC as Disk2vhd captured it: a fixed address, wrapped like hivexregedit does
+    f"[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{FIXED}]\r\n"
+    f'"DefaultGateway"={_multi_sz("192.168.0.254")}\r\n'
+    '"EnableDHCP"=dword:00000000\r\n'
+    f'"IPAddress"={_multi_sz("192.168.0.25")[:40]}\\\r\n  {_multi_sz("192.168.0.25")[40:]}\r\n'
+    f'"SubnetMask"={_multi_sz("255.255.255.0")}\r\n\r\n'
+    f"[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{FIXED}\\{{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}}]\r\n"
+    '"EnableDHCP"=dword:00000000\r\n\r\n'
+    f"[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{UNSET}]\r\n"
+    '"EnableDHCP"=dword:00000000\r\n'
+    f'"IPAddress"={_multi_sz("0.0.0.0")}\r\n'
+)
+
+
+def test_static_interfaces_finds_only_fixed_addresses():
+    assert static_interfaces(INTERFACES) == [FIXED]
+    assert static_interfaces("") == []
+
+
+def test_registry_patch_switches_interfaces_to_dhcp():
+    patch = registry_patch(SETUP, 2, [FIXED])
+    assert patch.endswith(
+        f"[\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{FIXED}]\n"
+        '"EnableDHCP"=dword:00000001\n'
+        '"IPAddress"=-\n"SubnetMask"=-\n"DefaultGateway"=-\n"DefaultGatewayMetric"=-\n'
+    )
+
+
+def test_personalize_turns_a_fixed_address_into_dhcp(windows, runner):
+    _windows_on(windows)
+    select = runner.responses[("hivexregedit", "--export")]
+    merged = {}
+
+    def export(cmd):
+        return (True, INTERFACES, "") if cmd[-1].endswith("\\Interfaces") else select
+
+    def merge(cmd):
+        merged["reg"] = Path(cmd[3]).read_text(encoding="utf-8")
+        return True, "", ""
+    runner.responses[("hivexregedit", "--export")] = export
+    runner.responses[("hivexregedit", "--merge")] = merge
+    assert windows.personalize(DEVICE, SETUP) is None
+    assert merged["reg"] == registry_patch(SETUP, 2, [FIXED])

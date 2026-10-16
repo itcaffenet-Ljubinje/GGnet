@@ -13,6 +13,12 @@ snapshot. Nobody clicks "Reset". Three triggers:
             faster than the grace period.
   iPXE      a Boot Mode PC asks for its boot script (app.api.v1.boot).
 
+A Boot Mode PC is booting for `boot_window` after its iPXE request: iPXE's
+iSCSI session ends when Windows takes over, and Windows logs in by itself
+only later (tens of seconds on a busy server). The watcher leaves it alone
+in that window, or it would remove the PC's ACL just as Windows logs in
+(INACCESSIBLE_BOOT_DEVICE).
+
 Machines with `keep_writeback` are never discarded. A clean writeback (not
 written since it was cloned) on the active snapshot is left alone, so an idle
 PC does not get re-cloned over and over.
@@ -45,6 +51,7 @@ class WritebackSettings:
     auto_discard: bool = True
     grace: timedelta = timedelta(seconds=30)
     poll: timedelta = timedelta(seconds=5)
+    boot_window: timedelta = timedelta(seconds=300)
 
     @classmethod
     def from_config(cls, cfg: Mapping[str, Any]) -> "WritebackSettings":
@@ -53,6 +60,7 @@ class WritebackSettings:
             auto_discard=bool(wb.get("auto_discard", True)),
             grace=timedelta(seconds=int(wb.get("grace_seconds", 30))),
             poll=timedelta(seconds=int(wb.get("poll_seconds", 5))),
+            boot_window=timedelta(seconds=int(wb.get("boot_window_seconds", 300))),
         )
 
 
@@ -123,10 +131,18 @@ def observe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSetti
         db.commit()
         return
     db.commit()
+    if _booting(m, settings, now):
+        return
     if (settings.auto_discard and _needs_discard(m)
             and m.session_changed_at is not None
             and now - m.session_changed_at >= settings.grace):
         discard(db, prov, m, "client disconnected")
+
+
+def _booting(m: Machine, settings: WritebackSettings, now: datetime) -> bool:
+    """A Boot Mode PC between its iPXE request and Windows' own iSCSI login."""
+    return (m.mode is MachineMode.BOOT and m.ipxe_at is not None
+            and now - m.ipxe_at < settings.boot_window)
 
 
 def on_heartbeat(db: Session, prov: Provisioner, m: Machine, booted_at: datetime | None,
@@ -159,13 +175,21 @@ def on_heartbeat(db: Session, prov: Provisioner, m: Machine, booted_at: datetime
     discard(db, prov, m, "client rebooted")
 
 
-def on_ipxe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSettings) -> bool:
+def on_ipxe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSettings,
+            now: datetime | None = None) -> bool:
     """
     Boot Mode: iPXE asks for its script, so the PC is booting. Its writebacks
     are discarded before it logs in, unless it keeps them or LIO still shows
     a session (the old one has not timed out yet; booting on the current
-    writeback is the safe choice then). False only when a discard failed.
+    writeback is the safe choice then). The request time starts the boot
+    window in which the watcher leaves the PC alone. False only when a
+    discard failed.
     """
+    # Observed state, not an edit of the machine: keep updated_at.
+    db.execute(update(Machine).where(Machine.id == m.id)
+               .values(ipxe_at=now or _now(), updated_at=Machine.updated_at))
+    db.commit()
+    db.refresh(m)
     if not (settings.auto_discard and _managed(m) and _needs_discard(m)):
         return True
     if prov.session_active(m.initiator_iqn, m.iscsi_target_iqn) is not False:

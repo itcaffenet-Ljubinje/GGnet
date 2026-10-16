@@ -412,6 +412,11 @@ writeback offline before it is mapped, so Windows comes up as that PC without an
    - `Services\Tcpip\Parameters`: `Hostname`, `NV Hostname` = the machine name (pc-07)
    - `Control\Session Manager\Environment`: `GGNET_SERVER`, `GGNET_MACHINE_ID`, `GGNET_MACHINE_NAME`, so the
      agent and other software on the PC need no configuration in the image
+   - `Services\Tcpip\Parameters\Interfaces\{...}` with a fixed IPv4 address (`EnableDHCP` 0): `EnableDHCP` = 1,
+     `IPAddress`, `SubnetMask`, `DefaultGateway` removed. An image captured from a PC with a fixed address
+     (vip-05: 192.168.0.25) gave every PC that address, and the PC owning it lost its iSCSI disk (0x7B) as soon
+     as another one booted. The boot NIC gets its address from the iBFT anyway; a PC that must keep one address
+     gets a DHCP reservation on the router.
 4. Unmount.
 
 It runs whenever an OS writeback is cloned fresh (assign, reset, every discard) and never touches the image.

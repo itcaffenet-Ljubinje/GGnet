@@ -26,7 +26,8 @@ DEV_DEFAULTS: dict[str, Any] = {
     "web": {"bind": "127.0.0.1", "port": 8088, "frontend_dist": "../frontend/dist"},
     "paths": {"data_dir": "./data", "database": "sqlite:///./data/ggnet.db"},
     # Dev mode never discards anything on its own.
-    "writebacks": {"auto_discard": False, "grace_seconds": 30, "poll_seconds": 5},
+    "writebacks": {"auto_discard": False, "grace_seconds": 30, "poll_seconds": 5,
+                   "boot_window_seconds": 300},
     # ... and never runs the retention job (it deletes versions and writebacks).
     "retention": {"job": False},
 }
