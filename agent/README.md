@@ -15,6 +15,10 @@ Every 30 seconds (and at startup) the agent:
    - **disconnect** a target the server no longer assigns (disk removed or switched in the UI);
    - **rename the initiator** to the IQN the server's ACL expects, before connecting
      (domain PCs use `iqn.1991-05.com.microsoft:<fqdn>`). Turn off with `ManageInitiatorName`.
+4. in Boot Mode, once per start: takes the PC's own disks offline (NVMe, SATA, SAS, RAID, ...; not iSCSI, USB,
+   or the disk Windows boots from), so games are not installed on a local disk that only this PC sees.
+   The offline state lives in the booted Windows (the writeback), not on the disk, so the PC's local
+   Windows still sees its disk. Turn off with `HideLocalDisks`.
 
 If the server is unreachable the disk stays connected, so players keep playing.
 When the service stops the disk stays connected, so restarting or updating the agent does not pull it
@@ -57,7 +61,7 @@ Logs: Event Viewer → Windows Logs → Application, source `ggnet-agent`.
 The same command updates an existing install. `scripts/uninstall.ps1` removes it.
 
 Settings (`C:\Program Files\ggnet-agent\appsettings.json`, section `Agent`):
-`ServerUrl`, `DriveLetter` (D-Z), `HeartbeatSeconds` (5-3600), `ManageInitiatorName`.
+`ServerUrl`, `DriveLetter` (D-Z), `HeartbeatSeconds` (5-3600), `ManageInitiatorName`, `HideLocalDisks`.
 
 ## Build and test
 

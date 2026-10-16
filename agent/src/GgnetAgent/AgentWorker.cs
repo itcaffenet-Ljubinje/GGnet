@@ -16,7 +16,8 @@ public sealed class AgentWorker(
     TimeProvider time,
     Func<TimeSpan>? uptime = null,
     IInventory? inventory = null,
-    IPowerControl? power = null) : BackgroundService
+    IPowerControl? power = null,
+    ILocalDisks? localDisks = null) : BackgroundService
 {
     internal static readonly string Version =
         typeof(AgentWorker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -42,6 +43,8 @@ public sealed class AgentWorker(
     private Inventory? _inventory;
     private DateTimeOffset? _inventoryAt;
     private string? _portalIp;
+    // Boot Mode: local disks are taken offline once per service start.
+    private bool _disksHidden;
 
         /// <summary>The ggNet target this agent connected (sessions are not persistent across reboots).</summary>
     internal string? ConnectedTarget { get; private set; }
@@ -115,6 +118,8 @@ public sealed class AgentWorker(
                 logger.LogWarning("Server {Server} unreachable: {Error}", _options.ServerUrl, e.Message);
             }
 
+            await HideLocalDisksAsync(config, ct);
+
             var actions = Planner.Plan(config, new LocalState(initiator, ConnectedTarget, RequestedLetter),
                 _options.ManageInitiatorName, _options.DriveLetter);
             foreach (var action in actions)
@@ -130,6 +135,25 @@ public sealed class AgentWorker(
         catch (Exception e)
         {
             logger.LogError("{Error}", e.Message);
+        }
+    }
+
+    private async Task HideLocalDisksAsync(AgentConfig? config, CancellationToken ct)
+    {
+        if (_disksHidden || localDisks is null || !_options.HideLocalDisks || config?.Mode != "boot") return;
+        try
+        {
+            var hidden = await localDisks.HideAsync(ct);
+            _disksHidden = true;
+            foreach (var disk in hidden)
+            {
+                logger.LogInformation("Boot Mode: local disk {Disk} taken offline", disk);
+            }
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Retried on the next heartbeat.
+            logger.LogWarning("Taking the local disks offline failed: {Error}", e.Message);
         }
     }
 

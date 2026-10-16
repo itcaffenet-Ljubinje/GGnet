@@ -25,6 +25,7 @@ builder.Services.AddSingleton<IScriptRunner, PowerShellRunner>();
 builder.Services.AddSingleton<IIscsiInitiator, WindowsIscsiInitiator>();
 builder.Services.AddSingleton<IInventory, WindowsInventory>();
 builder.Services.AddSingleton<IPowerControl, WindowsPowerControl>();
+builder.Services.AddSingleton<ILocalDisks, WindowsLocalDisks>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<AgentWorker>();
 
