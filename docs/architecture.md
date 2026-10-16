@@ -381,7 +381,7 @@ reboot
 - No `--no-describe`: Windows needs the iBFT table iPXE writes to continue booting from iSCSI.
 - `initiator-iqn` must equal the PC's ACL IQN, otherwise LIO refuses the login.
 - Only LUN 0 is named in the root path. Windows sees LUN 1 (the game disk) through the same iSCSI session.
-- `[boot] gateway` in config.toml replaces the DHCP gateway in the iBFT: `"none"` (0.0.0.0, portal reached directly, no default route) or an IP (the server with IP forwarding, as ggRock does). Windows routes to the portal through the iBFT gateway even on the same subnet.
+- The iBFT gateway is 0.0.0.0 by default (`set netX/gateway 0.0.0.0` before `sanboot`). With the router's gateway in the iBFT, Windows lost its iSCSI disk as it took over from iPXE (0x7B on vip-05, A/B tested on the same image on 2026-10-16); with 0.0.0.0 it boots and still gets its default route and internet afterwards. `[boot] gateway` in config.toml: `"none"` (the default), `"dhcp"` (keep the router's gateway) or an IP (e.g. the server with IP forwarding, as ggRock does).
 
 Unknown MAC (not registered, or registration window open):
 
