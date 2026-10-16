@@ -105,6 +105,19 @@ internal sealed class FakeInventory : IInventory
     }
 }
 
+internal sealed class FakeLocalDisks : ILocalDisks
+{
+    public int Calls { get; private set; }
+    public Exception? Fail { get; set; }
+
+    public Task<IReadOnlyList<string>> HideAsync(CancellationToken ct)
+    {
+        Calls++;
+        if (Fail is not null) throw Fail;
+        return Task.FromResult<IReadOnlyList<string>>(["0: KINGSTON SNV2S500G (NVMe)"]);
+    }
+}
+
 internal sealed class FakePower : IPowerControl
 {
     public List<string> Commands { get; } = [];

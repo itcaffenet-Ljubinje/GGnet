@@ -56,6 +56,7 @@ $settings = [ordered]@{
         DriveLetter = $DriveLetter
         HeartbeatSeconds = 30
         ManageInitiatorName = $true
+        HideLocalDisks = $true
     }
     Logging = @{ EventLog = @{ LogLevel = @{ Default = 'Information'; Microsoft = 'Warning'; 'System.Net.Http.HttpClient' = 'Warning' } } }
 }

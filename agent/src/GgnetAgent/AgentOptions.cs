@@ -19,6 +19,9 @@ public sealed class AgentOptions
     /// </summary>
     public bool ManageInitiatorName { get; set; } = true;
 
+    /// <summary>Boot Mode: take the PC's own disks offline (see ILocalDisks).</summary>
+    public bool HideLocalDisks { get; set; } = true;
+
     /// <summary>Returns the problems with these settings; empty when they are valid.</summary>
     public IReadOnlyList<string> Validate()
     {
