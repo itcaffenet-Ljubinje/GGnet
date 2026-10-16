@@ -466,11 +466,12 @@ def test_disk_mode_pcs_are_never_set_up(client, disks, windows):
 # ── [boot] gateway ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("value, line", [
-    (None, None),
-    ("", None),
+    (None, "set netX/gateway 0.0.0.0"),      # the default: the router's gateway broke the boot
+    ("", "set netX/gateway 0.0.0.0"),
     ("none", "set netX/gateway 0.0.0.0"),
+    ("dhcp", None),                          # keep the router's gateway
     ("192.168.10.1", "set netX/gateway 192.168.10.1"),
-    ("not-an-ip", None),
+    ("not-an-ip", "set netX/gateway 0.0.0.0"),
 ])
 def test_boot_gateway(value, line):
     from app.api.v1.boot import boot_gateway

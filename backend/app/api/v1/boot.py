@@ -51,26 +51,31 @@ def exit_script(message: str) -> PlainTextResponse:
     return _script(f"echo {message}", "sleep 5", "exit")
 
 
+NO_GATEWAY = "0.0.0.0"
+
+
 def boot_gateway(cfg: dict | None = None) -> str | None:
     """
-    `[boot] gateway` in config.toml: the gateway iPXE puts into the iBFT for
-    Windows. Windows routes to the iSCSI portal through it even when the
-    portal is on the same subnet, and many routers do not send that traffic
-    back, so Windows loses its disk as it takes over from iPXE. "none" leaves
-    it empty (0.0.0.0: the portal is reached directly, but the PC has no
-    default route); an IP (the ggNet server with IP forwarding, as ggRock
-    does) replaces it. Unset keeps the DHCP gateway.
+    The gateway iPXE puts into the iBFT for Windows; None keeps the DHCP one.
+
+    By default 0.0.0.0. With the router's gateway in the iBFT, Windows lost
+    its iSCSI disk as it took over from iPXE (INACCESSIBLE_BOOT_DEVICE;
+    vip-05, 2026-10-16, A/B on the same image); with 0.0.0.0 it boots, and
+    Windows still gets its default route and internet afterwards.
+    `[boot] gateway` in config.toml: "none" (the default), "dhcp" (the
+    router's gateway), or an IP (e.g. the ggNet server with IP forwarding,
+    as ggRock does). An invalid value falls back to the default.
     """
     value = str(((cfg if cfg is not None else get_config()).get("boot") or {}).get("gateway") or "").strip()
-    if not value:
+    if value in ("", "none"):
+        return NO_GATEWAY
+    if value == "dhcp":
         return None
-    if value == "none":
-        return "0.0.0.0"
     try:
         return str(ipaddress.IPv4Address(value))
     except ValueError:
-        logger.error("Ignoring invalid [boot] gateway %r", value)
-        return None
+        logger.error("Ignoring invalid [boot] gateway %r; using %s", value, NO_GATEWAY)
+        return NO_GATEWAY
 
 
 def sanboot_script(m: Machine, portal_ip: str, portal_port: int, target_iqn: str,
