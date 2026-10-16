@@ -196,6 +196,10 @@ class Machine(Base):
     session_changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
     # Windows boot time reported by the agent; a newer value means a new boot.
     booted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
+    # Boot Mode: when iPXE last asked for this PC's script. iPXE's own iSCSI
+    # session ends when Windows takes over, before Windows logs in itself;
+    # the watcher must not take that gap for a shutdown.
+    ipxe_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
 
     # Reported by ggnet-agent in its heartbeat; never used for provisioning.
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)

@@ -280,6 +280,57 @@ def test_watcher_discards_both_writebacks(client, host, prov, disks, db_url):
     assert _get(client, m)["writeback_dirty"] is False
 
 
+def _set_ipxe_at(db_url, when: datetime) -> None:
+    engine = make_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE machines SET ipxe_at = :t"), {"t": when})
+    engine.dispose()
+
+
+def _boot_then_handover(make_session, prov, host, start: datetime) -> None:
+    """iPXE's session comes and goes; Windows has not logged in yet."""
+    host.sessions.add(IQN)
+    writebacks.tick(make_session, prov, SETTINGS, now=start + timedelta(seconds=1))
+    host.sessions.discard(IQN)
+    writebacks.tick(make_session, prov, SETTINGS, now=start + timedelta(seconds=10))
+
+
+def test_watcher_leaves_a_booting_pc_alone(client, host, prov, disks, db_url):
+    """The gap between iPXE's session and Windows' own login is not a shutdown."""
+    _boot_machine(client, disks)
+    _set_ipxe_at(db_url, T0)
+    engine = make_engine(db_url)
+    make_session = sessionmaker(bind=engine, expire_on_commit=False)
+    _boot_then_handover(make_session, prov, host, T0)
+    host.calls.clear()
+    writebacks.tick(make_session, prov, SETTINGS, now=T0 + timedelta(seconds=60))
+    engine.dispose()
+    assert _clones_made(host) == []
+    assert ["targetcli", "/iscsi/" + TARGET + "/tpg1/acls", "delete", IQN] not in host.calls
+    assert host.visible(IQN) == [f"/dev/zvol/{OS_CLONE}", f"/dev/zvol/{GAME_CLONE}"]
+
+
+def test_watcher_discards_a_boot_pc_after_the_boot_window(client, host, prov, disks, db_url):
+    _boot_machine(client, disks)
+    _set_ipxe_at(db_url, T0)
+    engine = make_engine(db_url)
+    make_session = sessionmaker(bind=engine, expire_on_commit=False)
+    _boot_then_handover(make_session, prov, host, T0 + timedelta(minutes=10))
+    host.calls.clear()
+    writebacks.tick(make_session, prov, SETTINGS, now=T0 + timedelta(minutes=11))
+    engine.dispose()
+    assert sorted(_clones_made(host)) == [GAME_CLONE, OS_CLONE]
+
+
+def test_ipxe_request_starts_the_boot_window(client, host, disks, db_url):
+    _boot_machine(client, disks)
+    _ipxe(client)
+    engine = make_engine(db_url)
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT ipxe_at FROM machines")).scalar() is not None
+    engine.dispose()
+
+
 # ── iPXE script ───────────────────────────────────────────────────────
 
 def test_ipxe_sanboots_a_boot_machine(client, disks):

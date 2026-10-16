@@ -337,9 +337,12 @@ http_port = 80
 [writebacks]
 # Discard each client's writeback after it disconnects (shutdown/restart),
 # unless the machine has Keep Writeback. grace_seconds rides out network blips.
+# boot_window_seconds: after a Boot Mode PC's iPXE request, its iSCSI session
+# drops while Windows takes over from iPXE; no discard during that window.
 auto_discard = true
 grace_seconds = 30
 poll_seconds = 5
+boot_window_seconds = 300
 
 [web]
 bind = "$WEB_BIND"
