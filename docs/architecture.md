@@ -486,10 +486,13 @@ network throughput of the iSCSI interface.
 | Boot Mode: OS images, OS + game writebacks per PC, per-MAC iPXE script | done |
 | PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |
 | Boot Mode: per-PC OS writeback setup before boot (computer name, environment variables) | done |
+| Boot Mode: Apply Writebacks for the OS image (OS only / game only / both), watcher boot window after iPXE | done |
+| Boot Mode: fixed IPv4 → DHCP and old drive letters forgotten in each OS writeback; agent hides local disks | done |
 | Boot Mode: agent installed into the OS image by the server | planned |
 | Maintenance VM: the installer offers one Proxmox VM (UEFI, TPM, no disk, stopped; its ID in config.toml); Images → OS image → Edit in VM attaches the image, Finish makes a new version | planned |
-| Boot Mode: proxyDHCP (dnsmasq), iPXE build, first diskless boot | planned |
-| Boot Mode: import `.vhdx` into an OS image, Secure Boot (shim + MOK) | planned |
+| Boot Mode: first diskless boot on real PCs (dev dnsmasq + `snponly.efi`, 4 PCs, 2 board types) | done |
+| Boot Mode: proxyDHCP / TFTP managed by ggNet and the installer (MACs from the machine list) | planned |
+| Boot Mode: import `.vhdx` into an OS image (new GUIDs, boot-start iSCSI, NDIS NIC driver), Add hardware, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |
 | Boot Mode: OS images, proxyDHCP, iPXE build, per-MAC script, Add Machines wizard | after Disk Mode |
 | JWT auth + TLS | last |
