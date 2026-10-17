@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from app.windows_setup import OsSetup, WindowsSetup, registry_patch, static_interfaces
+from app.windows_setup import (
+    OsSetup,
+    WindowsSetup,
+    registry_patch,
+    reserved_letters,
+    static_interfaces,
+)
 
 from .conftest import FakeRunner
 
@@ -101,6 +107,7 @@ def test_personalize_merges_into_the_windows_partition(windows, runner):
         ["hivexregedit", "--export", str(hive), "\\Select"],
         ["hivexregedit", "--export", str(hive),
          "\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces"],
+        ["hivexregedit", "--export", str(hive), "\\MountedDevices"],
         ["hivexregedit", "--merge", str(hive), str(windows.run_dir / "vip-05.reg")],
         ["umount", mount],
     ]
@@ -239,3 +246,46 @@ def test_personalize_turns_a_fixed_address_into_dhcp(windows, runner):
     runner.responses[("hivexregedit", "--merge")] = merge
     assert windows.personalize(DEVICE, SETUP) is None
     assert merged["reg"] == registry_patch(SETUP, 2, [FIXED])
+
+
+# ── Drive letters of the PC the image was made on are forgotten ──────
+
+MOUNTED = (
+    "Windows Registry Editor Version 5.00\r\n\r\n"
+    "[\\MountedDevices]\r\n"
+    '"\\\\??\\\\Volume{6f0a2e2c-1111-2222-3333-444455556666}"=hex(3):44,4d,49,4f\r\n'
+    '"\\\\DosDevices\\\\C:"=hex(3):44,4d,49,4f,3a,49,44,3a,42,5c\r\n'
+    '"\\\\DosDevices\\\\D:"=hex(3):44,4d,49,4f,3a,49,44,3a,30,25\r\n'
+    '"\\\\DosDevices\\\\F:"=hex(3):44,4d,49,4f,3a,49,44,3a,6e,fb\r\n'
+    '"\\\\DosDevices\\\\E:"=hex(3):44,4d,49,4f,3a,49,44,3a,54,b8\r\n'
+)
+
+
+def test_reserved_letters_keeps_c():
+    assert reserved_letters(MOUNTED) == ["D", "E", "F"]
+    assert reserved_letters("") == []
+
+
+def test_registry_patch_forgets_letters():
+    patch = registry_patch(SETUP, 2, forget_letters=["D", "E"])
+    assert patch.endswith('[\\MountedDevices]\n"\\\\DosDevices\\\\D:"=-\n"\\\\DosDevices\\\\E:"=-\n')
+    for bad in (["C"], ["DE"], ["1"]):
+        with pytest.raises(ValueError):
+            registry_patch(SETUP, 2, forget_letters=bad)
+
+
+def test_personalize_forgets_the_image_pcs_letters(windows, runner):
+    _windows_on(windows)
+    select = runner.responses[("hivexregedit", "--export")]
+    merged = {}
+
+    def export(cmd):
+        return (True, MOUNTED, "") if cmd[-1] == "\\MountedDevices" else select
+
+    def merge(cmd):
+        merged["reg"] = Path(cmd[3]).read_text(encoding="utf-8")
+        return True, "", ""
+    runner.responses[("hivexregedit", "--export")] = export
+    runner.responses[("hivexregedit", "--merge")] = merge
+    assert windows.personalize(DEVICE, SETUP) is None
+    assert merged["reg"] == registry_patch(SETUP, 2, forget_letters=["D", "E", "F"])

@@ -417,6 +417,10 @@ writeback offline before it is mapped, so Windows comes up as that PC without an
      (vip-05: 192.168.0.25) gave every PC that address, and the PC owning it lost its iSCSI disk (0x7B) as soon
      as another one booted. The boot NIC gets its address from the iBFT anyway; a PC that must keep one address
      gets a DHCP reservation on the router.
+   - `MountedDevices`: every `\DosDevices\X:` but C: is removed. The image remembered the letters of the PC it
+     was made on (vip-05's local D:, E:, F:); elsewhere those volumes do not exist, yet Windows kept the letters,
+     so the agent could not give the game disk D: (`Set-Partition` 42012). Windows letters present volumes again
+     at boot, and the agent then gives the game disk its letter on every PC.
 4. Unmount.
 
 It runs whenever an OS writeback is cloned fresh (assign, reset, every discard) and never touches the image.

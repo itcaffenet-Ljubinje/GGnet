@@ -57,6 +57,15 @@ public class ScriptTests
     }
 
     [Fact]
+    public void Connect_script_never_takes_the_disk_windows_boots_from()
+    {
+        // Boot Mode: the session holds the OS disk (LUN 0) too. Picking it made the
+        // script try to move C: to D: (Set-Partition 42012 on pc-05, 2026-10-16).
+        var script = WindowsIscsiInitiator.Scripts.Connect("192.168.0.10", 3260, Target, "D");
+        Assert.Contains("Where-Object { -not $_.IsBoot -and -not $_.IsSystem } | Select-Object -First 1", script);
+    }
+
+    [Fact]
     public void Connect_script_falls_back_to_a_free_letter_when_the_preferred_is_taken()
     {
         var script = WindowsIscsiInitiator.Scripts.Connect("192.168.0.10", 3260, Target, "F");
