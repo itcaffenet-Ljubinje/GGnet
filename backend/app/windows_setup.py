@@ -13,10 +13,16 @@ an extra reboot:
     Control\\Session Manager\\Environment  GGNET_SERVER, GGNET_MACHINE_ID, GGNET_MACHINE_NAME
     Services\\Tcpip\\Parameters\\Interfaces\\{...}
                                         a fixed IPv4 address becomes DHCP again
+    MountedDevices                      every drive letter but C: is forgotten
 
 An image made from a PC with a fixed address would give every PC that
 address; the PC that owns it then loses its iSCSI disk whenever another one
 is on. Windows takes the boot NIC's address from the iBFT anyway.
+
+The image also remembers the letters of the PC it was made on (vip-05's
+local D:, E:, F:). On another PC those volumes do not exist, yet Windows
+keeps the letters for them, so the agent could not give the game disk D:
+(Set-Partition 42012). Windows gives present volumes letters again at boot.
 
 The Windows partition of the clone is mounted with ntfs-3g and the hive is
 merged with hivexregedit (both ship with Proxmox VE). Only the PC's clone is
@@ -47,6 +53,7 @@ _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,14}$")
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _CURRENT_RE = re.compile(r'^"Current"=dword:([0-9a-fA-F]{8})\s*$', re.M)
 _IFACE_RE = re.compile(r"\\Interfaces\\(\{[0-9A-Fa-f-]{36}\})\]$")
+_LETTER_RE = re.compile(r'^"\\\\DosDevices\\\\([A-Za-z]):"=', re.M)
 
 
 @dataclass(frozen=True)
@@ -91,7 +98,14 @@ def static_interfaces(export: str) -> list[str]:
     return found
 
 
-def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = ()) -> str:
+def reserved_letters(export: str) -> list[str]:
+    """Drive letters other than C: in a `hivexregedit --export` of MountedDevices."""
+    letters = {m.group(1).upper() for m in _LETTER_RE.finditer(export)}
+    return sorted(letters - {"C"})
+
+
+def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = (),
+                   forget_letters: Sequence[str] = ()) -> str:
     """The .reg text hivexregedit merges into the SYSTEM hive."""
     if not _NAME_RE.match(setup.computer_name):
         raise ValueError(f"Invalid computer name: {setup.computer_name!r}")
@@ -118,6 +132,12 @@ def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[s
             '"EnableDHCP"=dword:00000001',
             '"IPAddress"=-', '"SubnetMask"=-', '"DefaultGateway"=-', '"DefaultGatewayMetric"=-',
         ]
+    if forget_letters:
+        lines += ["", "[\\MountedDevices]"]
+        for letter in forget_letters:
+            if len(letter) != 1 or not letter.isalpha() or letter.upper() == "C":
+                raise ValueError(f"Invalid drive letter to forget: {letter!r}")
+            lines.append(f'"\\\\DosDevices\\\\{letter.upper()}:"=-')
     return "\n".join(lines) + "\n"
 
 
@@ -162,6 +182,11 @@ class WindowsSetup:
         key = f"\\ControlSet{control_set:03d}\\Services\\Tcpip\\Parameters\\Interfaces"
         ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
         return static_interfaces(out) if ok else []
+
+    def reserved_letters(self, hive: Path) -> list[str]:
+        """Drive letters other than C: the hive remembers; none when unreadable."""
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive), "\\MountedDevices"], quiet=True)
+        return reserved_letters(out) if ok else []
 
     def personalize(self, device: str, setup: OsSetup) -> str | None:
         """Write the PC's identity into its OS clone. None when done, else why not."""
@@ -208,7 +233,8 @@ class WindowsSetup:
     def _merge(self, hive: Path, setup: OsSetup) -> str | None:
         control_set = self.control_set(hive)
         fixed = self.static_interfaces(hive, control_set)
-        patch = registry_patch(setup, control_set, fixed)
+        letters = self.reserved_letters(hive)
+        patch = registry_patch(setup, control_set, fixed, letters)
         reg = self.run_dir / f"{setup.computer_name}.reg"
         try:
             reg.write_text(patch, encoding="utf-8")
@@ -221,6 +247,8 @@ class WindowsSetup:
         if fixed:
             logger.info("Fixed IPv4 addresses switched to DHCP on %s: %s", setup.computer_name,
                         ", ".join(fixed))
+        if letters:
+            logger.info("Drive letters forgotten on %s: %s", setup.computer_name, ", ".join(letters))
         return None
 
 
