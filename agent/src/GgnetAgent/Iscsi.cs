@@ -140,11 +140,14 @@ public sealed class WindowsIscsiInitiator(IScriptRunner runner) : IIscsiInitiato
                     Connect-IscsiTarget -NodeAddress '{{targetIqn}}' -TargetPortalAddress '{{portalIp}}' -TargetPortalPortNumber {{portalPort}} -IsPersistent $false | Out-Null
                 }
 
-                # Windows needs a moment to show the disk after the login.
+                # Windows needs a moment to show the disk after the login. In Boot
+                # Mode the session also holds the disk Windows runs from (LUN 0);
+                # the game disk is the other one, so never touch the boot disk.
                 $disk = $null
                 for ($i = 0; $i -lt {{DiskWaitSeconds}} -and -not $disk; $i++) {
                     $disk = Get-IscsiSession | Where-Object TargetNodeAddress -eq '{{targetIqn}}' |
-                        Get-Disk -ErrorAction SilentlyContinue | Select-Object -First 1
+                        Get-Disk -ErrorAction SilentlyContinue |
+                        Where-Object { -not $_.IsBoot -and -not $_.IsSystem } | Select-Object -First 1
                     if (-not $disk) { Start-Sleep -Seconds 1 }
                 }
                 if (-not $disk) { throw "Connected to {{targetIqn}} but no disk appeared" }
