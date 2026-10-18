@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useState, type FormEvent } from "react";
+import { HardDrive, Monitor, Radar, Zap } from "lucide-react";
 
 import {
   api,
+  type ApplyChoice,
   type BulkKind,
   type BulkResult,
   type Discovered,
@@ -38,9 +40,11 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   const { busy, error, setError, run } = useAsyncAction();
   const [name, setName] = useState("");
   const [mac, setMac] = useState("");
-  const [iqn, setIqn] = useState("");
   const [mode, setMode] = useState<MachineMode>("disk");
   const [diskId, setDiskId] = useState("");
+  const [osDiskId, setOsDiskId] = useState("");
+  // Boot Mode: which kept writebacks Apply Writebacks turns into versions, per machine.
+  const [applyWhat, setApplyWhat] = useState<Record<number, ApplyKey>>({});
   const [allLetter, setAllLetter] = useState("D");
   // The machine whose hardware and network are shown.
   const [open, setOpen] = useState<number | null>(null);
@@ -71,7 +75,8 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   // Versions of each game disk in use, for the pin drop-down.
   const [versions, setVersions] = useState<Record<number, string[]>>({});
 
-  const published = disks.filter((d) => d.published);
+  const published = disks.filter((d) => d.published && d.kind !== "os");
+  const osImages = disks.filter((d) => d.published && d.kind === "os");
   const inUse = published.filter((d) => machines.some((m) => m.game_disk_id === d.id));
   // Re-read when a disk gets a new version (Apply Writebacks, Make active).
   const versionKey = inUse.map((d) => `${d.id}@${d.snapshot}`).join(",");
@@ -100,15 +105,14 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
       api.createMachine({
         name: name.trim(),
         mode,
-        mac: mac.trim() || null,
-        initiator_iqn: iqn.trim() || null,
-        game_disk_id: mode === "disk" && diskId ? Number(diskId) : null,
+        mac: mac.trim(),
+        game_disk_id: diskId ? Number(diskId) : null,
+        os_disk_id: mode === "boot" && osDiskId ? Number(osDiskId) : null,
       }),
     );
     if (ok) {
       setName("");
       setMac("");
-      setIqn("");
     }
     await reload();
   }
@@ -172,16 +176,22 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   }
 
   async function apply(m: Machine) {
+    const what: ApplyKey = m.mode === "boot" ? (applyWhat[m.id] ?? "both") : "game";
+    const targets = [
+      ...(what !== "game" ? [`the OS image "${diskName(m.os_disk_id ?? null)}"`] : []),
+      ...(what !== "os" ? [`the game disk "${diskName(m.game_disk_id)}"`] : []),
+    ];
+    const kept =
+      m.mode === "boot" && what !== "both"
+        ? `\n\nThe ${what === "os" ? "game" : "OS"} writeback is not applied and stays kept as it is.`
+        : "";
     const msg =
-      m.mode === "boot"
-        ? `Apply the writebacks of ${m.name} to "${diskName(m.os_disk_id ?? null)}" and "${diskName(m.game_disk_id)}"?\n\n` +
-          "They become the new versions of the OS image and the game disk. Every other PC gets them at its next reboot.\n\n" +
-          `${m.name} must be powered off.`
-        : `Apply the writeback of ${m.name} to "${diskName(m.game_disk_id)}"?\n\n` +
-          "It becomes the new version of the game disk. Every other PC gets it at its next reboot.\n\n" +
-          `${m.name} must be powered off.`;
+      `Apply the writebacks of ${m.name} to ${targets.join(" and ")}?\n\n` +
+      "They become new versions. Every other PC gets them at its next reboot." +
+      kept +
+      `\n\n${m.name} must be powered off.`;
     if (!window.confirm(msg)) return;
-    await run(`apply-${m.id}`, () => api.applyWritebacks(m.id));
+    await run(`apply-${m.id}`, () => api.applyWritebacks(m.id, m.mode === "boot" ? APPLY[what] : undefined));
     await reload();
   }
 
@@ -194,6 +204,8 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   return (
     <section>
       <ErrorBanner message={error} onClose={() => setError(null)} />
+
+      <MachineKpis machines={machines} discovered={discovered.length} />
 
       <DiscoveredPanel discovered={discovered} busy={busy !== null} run={run} reload={reload} />
 
@@ -210,32 +222,36 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
         </label>
         <label>
           MAC
-          <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="identifies the PC" />
-        </label>
-        <label>
-          Initiator IQN
           <input
-            value={iqn}
-            onChange={(e) => setIqn(e.target.value)}
-            placeholder={
-              mac.trim() ? "from the MAC" : `iqn.1991-05.com.microsoft:${name.trim().toLowerCase() || "<name>"}`
-            }
+            value={mac}
+            onChange={(e) => setMac(e.target.value)}
+            placeholder="e.g. 10:ff:e0:66:be:3a"
+            required
           />
         </label>
         <label>
           Mode
           <select value={mode} onChange={(e) => setMode(e.target.value as MachineMode)}>
-            <option value="disk">Disk</option>
-            <option value="boot">Boot (later)</option>
+            <option value="disk">Disk (local Windows)</option>
+            <option value="boot">Boot (diskless)</option>
           </select>
         </label>
+        {mode === "boot" && (
+          <label>
+            OS image
+            <select value={osDiskId} onChange={(e) => setOsDiskId(e.target.value)} required>
+              <option value="">Choose…</option>
+              {osImages.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Game disk
-          <select
-            value={diskId}
-            onChange={(e) => setDiskId(e.target.value)}
-            disabled={mode !== "disk"}
-          >
+          <select value={diskId} onChange={(e) => setDiskId(e.target.value)} required={mode === "boot"}>
             <option value="">None</option>
             {published.map((d) => (
               <option key={d.id} value={d.id}>
@@ -319,7 +335,7 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                   </td>
                   <td>
                     <div className="strong">{m.name}</div>
-                    <div className="mono muted small">{m.initiator_iqn}</div>
+                    {m.reported_ip && <div className="mono muted small">{m.reported_ip}</div>}
                   </td>
                   <td>{m.mode === "disk" ? "Disk" : "Boot"}</td>
                   <td className="mono">{m.mac ?? "—"}</td>
@@ -341,7 +357,7 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                         ))}
                       </select>
                     ) : (
-                      <span className="muted">—</span>
+                      <BootDisks machine={m} diskName={diskName} />
                     )}
                     {m.mode === "disk" && m.game_disk_id !== null && m.status !== "editing" && (
                       <div className="image-version">
@@ -410,7 +426,7 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                       aria-label={`Keep writeback of ${m.name}`}
                       checked={m.keep_writeback}
                       onChange={(e) => keep(m, e.target.checked)}
-                      disabled={busy !== null || m.mode !== "disk"}
+                      disabled={busy !== null}
                     />
                   </td>
                   <td className="actions">
@@ -451,6 +467,18 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                       >
                         {busy === `power-${m.id}` ? "Waking…" : "Turn on"}
                       </button>
+                    )}
+                    {m.keep_writeback && m.status === "provisioned" && m.mode === "boot" && (
+                      <select
+                        aria-label={`What to apply from ${m.name}`}
+                        value={applyWhat[m.id] ?? "both"}
+                        onChange={(e) => setApplyWhat({ ...applyWhat, [m.id]: e.target.value as ApplyKey })}
+                        disabled={busy !== null}
+                      >
+                        <option value="both">OS + game</option>
+                        <option value="os">OS only</option>
+                        <option value="game">Game only</option>
+                      </select>
                     )}
                     {m.keep_writeback && m.status === "provisioned" && (
                       <button
@@ -646,6 +674,59 @@ function BulkReport({ label, results, onClose }: { label: string; results: BulkR
       <button type="button" className="link" aria-label="Close" onClick={onClose}>
         ×
       </button>
+    </div>
+  );
+}
+
+type ApplyKey = "both" | "os" | "game";
+const APPLY: Record<ApplyKey, ApplyChoice> = {
+  both: { os: true, game: true },
+  os: { os: true, game: false },
+  game: { os: false, game: true },
+};
+
+/** Boot Mode: the OS image and game disk a PC runs, with their versions. */
+function BootDisks({ machine: m, diskName }: { machine: Machine; diskName: (id: number | null) => string }) {
+  const version = (snap: string | null | undefined) => (snap ? `@${snap.split("@")[1]}` : "");
+  return (
+    <div className="small">
+      <div>
+        <span className="muted">OS </span>
+        {diskName(m.os_disk_id ?? null)} <span className="muted">{version(m.os_clone_snapshot)}</span>
+      </div>
+      <div>
+        <span className="muted">Game </span>
+        {diskName(m.game_disk_id)} <span className="muted">{version(m.clone_snapshot)}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Summary cards above the machine list. */
+function MachineKpis({ machines, discovered }: { machines: Machine[]; discovered: number }) {
+  const online = machines.filter((m) => isOnline(m)).length;
+  const writebacks = machines.filter((m) => m.keep_writeback || m.writeback_dirty).length;
+  const boot = machines.filter((m) => m.mode === "boot").length;
+  const cards = [
+    { title: "Machines", value: machines.length, sub: `${boot} Boot Mode · ${machines.length - boot} Disk Mode`, icon: Monitor, tone: "blue" },
+    { title: "Online", value: online, sub: `${machines.length - online} off or not reporting`, icon: Zap, tone: "green" },
+    { title: "Writebacks", value: writebacks, sub: "written since the last reset, or kept", icon: HardDrive, tone: "amber" },
+    { title: "New PCs", value: discovered, sub: "knocked but not registered", icon: Radar, tone: "purple" },
+  ];
+  return (
+    <div className="kpi-grid">
+      {cards.map(({ title, value, sub, icon: Icon, tone }) => (
+        <div key={title} className="kpi-card">
+          <div className="kpi-info">
+            <span className="kpi-title">{title}</span>
+            <span className="kpi-value">{value}</span>
+            <span className="kpi-subtitle">{sub}</span>
+          </div>
+          <div className={`kpi-icon-box ${tone}`}>
+            <Icon size={22} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
