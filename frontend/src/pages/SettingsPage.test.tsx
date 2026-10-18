@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { Retention, RetentionAction, Storage } from "../api";
+import type { PxeStatus, Retention, RetentionAction, Storage } from "../api";
 import { calls } from "../test/fixtures";
 import { SettingsPage } from "./SettingsPage";
 
@@ -29,6 +29,16 @@ const STORAGE: Storage = {
   warning: false,
 };
 
+const PXE: PxeStatus = {
+  unit: "ggnet-pxe",
+  installed: true,
+  state: "active",
+  sub_state: "running",
+  since: null,
+  tftp_root: "/var/lib/ggnet/tftp",
+  files: {},
+};
+
 const PLAN: RetentionAction[] = [
   { kind: "snapshot", target: "cs2@v2", reason: "not used, 30 days old", done: false, error: null },
 ];
@@ -41,6 +51,9 @@ function stubHost(retention: Retention = DEFAULTS) {
     if (method === "PUT") body = { ...JSON.parse(init!.body as string), saved: true, last_run: null };
     if (url.endsWith("/preview")) body = PLAN;
     if (url.endsWith("/run")) body = { at: "2026-10-09T13:00:00Z", dry_run: false, actions: [] };
+    // Settings → Network boot, tested in NetworkBoot.test.tsx.
+    if (url.endsWith("/settings/boot")) body = { gateway: "none", unregistered: "wait", saved: false };
+    if (url.endsWith("/pxe")) body = PXE;
     return new Response(JSON.stringify(body), { status: 200 });
   });
   vi.stubGlobal("fetch", mock);
@@ -65,7 +78,7 @@ describe("SettingsPage", () => {
     render(<SettingsPage storage={STORAGE} reload={vi.fn().mockResolvedValue(undefined)} />);
 
     await userEvent.click(await screen.findByLabelText("Run automatically every hour"));
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(within(screen.getByLabelText("Retention")).getByRole("button", { name: "Save" }));
     expect(confirm.mock.calls[0][0]).toContain("Reserve 15 % (1.50 TB) of pool STORAGE-01");
     expect(confirm.mock.calls[0][0]).toContain("Proxmox VMs");
     expect(actions(mock)).toEqual([

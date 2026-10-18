@@ -1,0 +1,156 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { RefreshCw, RotateCw, Save } from "lucide-react";
+
+import { api, type BootSettings, type BootSettingsOut, type PxeStatus } from "../api";
+import { useAsyncAction } from "../useAsyncAction";
+import { ErrorBanner } from "./ErrorBanner";
+
+type GatewayChoice = "none" | "dhcp" | "ip";
+
+const choiceOf = (gateway: string): GatewayChoice =>
+  gateway === "none" || gateway === "dhcp" ? gateway : "ip";
+
+/**
+ * Settings → Network boot: the PXE service (proxyDHCP + TFTP) and what iPXE
+ * gets. The router stays the DHCP server; ggNet only answers PXE.
+ */
+export function NetworkBoot() {
+  const { busy, error, setError, run } = useAsyncAction();
+  const [status, setStatus] = useState<PxeStatus | null>(null);
+  const [saved, setSaved] = useState<BootSettingsOut | null>(null);
+  const [choice, setChoice] = useState<GatewayChoice>("none");
+  const [ip, setIp] = useState("");
+  const [unregistered, setUnregistered] = useState<BootSettings["unregistered"]>("wait");
+  const [done, setDone] = useState(false);
+
+  function show(s: BootSettingsOut) {
+    setSaved(s);
+    setChoice(choiceOf(s.gateway));
+    setIp(choiceOf(s.gateway) === "ip" ? s.gateway : "");
+    setUnregistered(s.unregistered);
+  }
+
+  useEffect(() => {
+    run("load", async () => {
+      show(await api.getBootSettings());
+      setStatus(await api.getPxe());
+    });
+  }, [run]);
+
+  async function refresh() {
+    await run("refresh", async () => setStatus(await api.getPxe()));
+  }
+
+  async function restart() {
+    const msg =
+      `Restart ${status?.unit ?? "the PXE service"}?\n\n` +
+      "PCs starting from the network right now try again; running PCs are not affected.";
+    if (!window.confirm(msg)) return;
+    await run("restart", async () => setStatus(await api.restartPxe()));
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setDone(false);
+    const gateway = choice === "ip" ? ip.trim() : choice;
+    const ok = await run("save", async () => show(await api.saveBootSettings({ gateway, unregistered })));
+    if (ok) setDone(true);
+  }
+
+  const running = status?.state === "active";
+  const missing = status ? Object.entries(status.files).filter(([, there]) => !there).map(([f]) => f) : [];
+
+  return (
+    <div className="card" aria-label="Network boot">
+      <h3 className="card-title">Network boot (PXE)</h3>
+      <ErrorBanner message={error} onClose={() => setError(null)} />
+
+      {status && (
+        <div className="pxe-status">
+          <span
+            className={`badge ${running ? "badge-provisioned" : status.state === "failed" ? "badge-error" : "badge-warn"}`}
+          >
+            {!status.installed ? "Not installed" : running ? "Running" : status.state === "failed" ? "Failed" : "Stopped"}
+          </span>
+          <span className="mono small">{status.unit}</span>
+          {running && status.since && (
+            <span className="muted small">since {new Date(status.since).toLocaleString()}</span>
+          )}
+          <span className="pxe-actions">
+            <button type="button" className="icon-btn" onClick={refresh} disabled={busy !== null} aria-label="Refresh">
+              <RefreshCw size={14} />
+            </button>
+            <button
+              type="button"
+              className="secondary small"
+              onClick={restart}
+              disabled={busy !== null || !status.installed}
+            >
+              <RotateCw size={13} />
+              {busy === "restart" ? "Restarting…" : "Restart"}
+            </button>
+          </span>
+        </div>
+      )}
+      {status && (
+        <p className="muted small">
+          TFTP {status.tftp_root}:{" "}
+          {Object.entries(status.files).map(([f, there], i) => (
+            <span key={f}>
+              {i > 0 && ", "}
+              <span className={there ? undefined : "error-text"}>
+                {f} {there ? "✓" : "missing"}
+              </span>
+            </span>
+          ))}
+          {missing.length > 0 && " (run the installer again to put them back)"}
+        </p>
+      )}
+
+      {saved && (
+        <form onSubmit={save}>
+          {!saved.saved && (
+            <p className="small muted">Not saved in the web UI yet: these are the values from config.toml.</p>
+          )}
+          <div className="settings-grid">
+            <label>
+              Gateway for Windows (iBFT)
+              <select value={choice} onChange={(e) => setChoice(e.target.value as GatewayChoice)}>
+                <option value="none">None, 0.0.0.0 (recommended)</option>
+                <option value="dhcp">The router's (from DHCP)</option>
+                <option value="ip">Another address…</option>
+              </select>
+              <span className="muted small">
+                With the router's gateway some PCs stopped at 0x7B; Windows gets its internet route anyway.
+              </span>
+            </label>
+            {choice === "ip" && (
+              <label>
+                Gateway address
+                <input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="e.g. 192.168.0.40" required />
+              </label>
+            )}
+            <label>
+              Unregistered PCs
+              <select
+                value={unregistered}
+                onChange={(e) => setUnregistered(e.target.value as BootSettings["unregistered"])}
+              >
+                <option value="wait">Wait on screen until added (as ggRock)</option>
+                <option value="local">Boot from their own disk</option>
+              </select>
+              <span className="muted small">A waiting PC boots as soon as it is added in Machines → New PCs.</span>
+            </label>
+          </div>
+          <div className="actions-row">
+            <button type="submit" disabled={busy !== null}>
+              <Save size={14} />
+              {busy === "save" ? "Saving…" : "Save"}
+            </button>
+            {done && <span className="save-success-tag">Saved: applies to the next PC that boots</span>}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}

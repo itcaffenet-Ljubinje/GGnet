@@ -69,8 +69,8 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 |---|---|
 | Client app: agent download and one-line install | done |
 | Retention: reserved space, warning threshold, unused version age, newest versions kept, dry-run preview, run now | done |
-| Boot: proxyDHCP / TFTP state, served iPXE binary (`snponly.efi`), iBFT gateway | todo |
-| Restart services: ZFS, iSCSI target, PXE (dnsmasq) | todo |
+| Network boot: PXE service state and restart, TFTP files (`snponly.efi`, `ipxe.efi`, `autoexec.ipxe`), iBFT gateway, unregistered PCs wait / boot locally (saved values override `[boot]` in config.toml) | done |
+| Restart services: ZFS, iSCSI target (PXE: done, in Network boot) | todo |
 | Secure Boot: signed iPXE (shim + MOK), certificate download, auto-enrollment, BIOS how-to per vendor | todo |
 | Login and HTTPS | todo |
 
