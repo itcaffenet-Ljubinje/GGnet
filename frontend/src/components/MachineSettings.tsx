@@ -22,14 +22,15 @@ const LETTERS = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 /**
  * Everything about one PC in one place (ggRock's machine settings). Save
  * sends only what changed: name (a PC with disks is renamed on the server
- * too, so it asks first), mode, MAC and drive letter; the disks (which
- * re-clones the writebacks, so it asks first); Keep Writeback; the pinned version.
+ * too, so it asks first) and drive letter; the mode (with disks: they are
+ * taken away and given again, after a confirmation); the disks (which
+ * re-clones the writebacks, so it asks first); Keep Writeback; the pinned
+ * version. The MAC is the PC's identity and only shown, as in ggRock.
  */
 export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
   const [tab, setTab] = useState<Tab>("general");
   const [name, setName] = useState(m.name);
-  const [mac, setMac] = useState(m.mac ?? "");
   const [mode, setMode] = useState<MachineMode>(m.mode);
   const [osDiskId, setOsDiskId] = useState(m.os_disk_id ? String(m.os_disk_id) : "");
   const [diskId, setDiskId] = useState(m.game_disk_id ? String(m.game_disk_id) : "");
@@ -61,8 +62,8 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
     setSaved(false);
     const patch: Record<string, string | null> = {};
     if (name.trim() !== m.name) patch.name = name.trim();
-    if (mode !== m.mode) patch.mode = mode;
-    if ((mac.trim() || null) !== m.mac) patch.mac = mac.trim() || null;
+    const modeChanged = mode !== m.mode;
+    if (modeChanged && !hasDisk) patch.mode = mode;
     if (mode === "disk" && letter !== m.drive_letter) patch.drive_letter = letter;
     if (patch.name && hasDisk) {
       const msg =
@@ -70,7 +71,17 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
         "Windows gets the new name at its next boot.\n\nThe PC must be powered off.";
       if (!window.confirm(msg)) return;
     }
-    if (disksChanged && m.game_disk_id !== null) {
+    if (modeChanged && hasDisk) {
+      if (mode === "boot" && (!osDiskId || !diskId)) {
+        setError("A Boot Mode PC needs an OS image and a game disk: pick both on the Disks tab.");
+        return;
+      }
+      const msg =
+        `Switch ${m.name} to ${mode === "boot" ? "Boot Mode (diskless)" : "Disk Mode (local Windows)"}? ` +
+        "Its writebacks are removed and made again for the new mode, so everything the PC wrote is lost." +
+        "\n\nThe PC must be powered off.";
+      if (!window.confirm(msg)) return;
+    } else if (disksChanged && m.game_disk_id !== null) {
       const msg =
         `Change the disks of ${m.name}? Its writebacks are cloned again from the new disks, ` +
         "so everything the PC wrote is lost.\n\nThe PC must be powered off or disconnected.";
@@ -78,7 +89,18 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
     }
     const ok = await run("save", async () => {
       if (Object.keys(patch).length > 0) await api.updateMachine(m.id, patch as Parameters<typeof api.updateMachine>[1]);
-      if (disksChanged) {
+      if (modeChanged && hasDisk) {
+        // The mode can only change without disks: take them away, switch, give the new ones.
+        await api.assignDisk(m.id, null);
+        await api.updateMachine(m.id, { mode });
+        if (diskId) {
+          await api.assignDisk(
+            m.id,
+            Number(diskId),
+            mode === "boot" ? Number(osDiskId) : undefined,
+          );
+        }
+      } else if (disksChanged) {
         await api.assignDisk(
           m.id,
           diskId ? Number(diskId) : null,
@@ -86,7 +108,9 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
         );
       }
       if (keep !== m.keep_writeback) await api.setKeepWriteback(m.id, keep);
-      if (!disksChanged && (pin || null) !== m.pinned_snapshot) await api.pinSnapshot(m.id, pin || null);
+      if (!disksChanged && !modeChanged && (pin || null) !== m.pinned_snapshot) {
+        await api.pinSnapshot(m.id, pin || null);
+      }
     });
     await reload();
     if (ok) setSaved(true);
@@ -179,8 +203,7 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                   <select
                     value={mode}
                     onChange={(e) => setMode(e.target.value as MachineMode)}
-                    disabled={hasDisk}
-                    title={hasDisk ? "Remove its disks first" : undefined}
+                    title={hasDisk ? "Changing it makes the writebacks again; the PC must be powered off" : undefined}
                   >
                     <option value="disk">Disk (local Windows)</option>
                     <option value="boot">Boot (diskless)</option>
@@ -222,7 +245,7 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                     </select>
                   </label>
                 )}
-                {m.game_disk_id !== null && !disksChanged && (
+                {m.game_disk_id !== null && !disksChanged && mode === m.mode && (
                   <label>
                     Game disk version
                     <select value={pin} onChange={(e) => setPin(e.target.value)}>
@@ -240,10 +263,13 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
 
             {tab === "network" && (
               <div className="form-grid-2">
-                <label>
-                  MAC (identifies the PC)
-                  <input value={mac} onChange={(e) => setMac(e.target.value)} placeholder="e.g. 10:ff:e0:66:be:3a" />
-                </label>
+                <div>
+                  <div className="muted small">MAC (the PC's identity)</div>
+                  <div className="mono">{m.mac ?? "—"}</div>
+                  <div className="muted small">
+                    Fixed, as in ggRock. A PC with a new network card is deleted and added again from New PCs.
+                  </div>
+                </div>
                 <div>
                   <div className="muted small">Reported by the agent</div>
                   <div>IP {m.reported_ip ?? "—"}</div>
@@ -265,6 +291,8 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                 <dd>{hw?.memory_bytes ? formatBytes(hw.memory_bytes) : "—"}</dd>
                 <dt>Network card</dt>
                 <dd>{hw?.nic ?? "—"}</dd>
+                <dt>Windows started</dt>
+                <dd>{m.booted_at ? new Date(m.booted_at).toLocaleString() : "—"}</dd>
                 <dt>Agent</dt>
                 <dd>{m.agent_version ?? "not installed"}</dd>
               </dl>

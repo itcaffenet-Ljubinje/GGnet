@@ -1,5 +1,19 @@
-import { Fragment, useEffect, useState, type FormEvent } from "react";
-import { HardDrive, Monitor, Radar, Zap } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import {
+  CheckCircle2,
+  HardDrive,
+  Monitor,
+  Plus,
+  Power,
+  Radar,
+  RotateCw,
+  Search,
+  Settings as SettingsIcon,
+  Trash2,
+  Upload,
+  X,
+  Zap,
+} from "lucide-react";
 
 import {
   api,
@@ -16,7 +30,6 @@ import { AgentState, isOnline } from "../components/AgentState";
 import { DiscoveredPanel } from "../components/DiscoveredPanel";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ImageStatus } from "../components/ImageStatus";
-import { MachineDetails } from "../components/MachineDetails";
 import { MachineSettings } from "../components/MachineSettings";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatBytes, formatRate } from "../format";
@@ -37,18 +50,17 @@ const CLIENT_OFF = "The client PC must be powered off or disconnected.";
 const LETTERS = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const MOVES_NOW = "Running PCs move the game disk within a minute; close games on them first.";
 
+type Filter = "all" | "online" | "offline" | "writeback";
+const hasWriteback = (m: Machine) => m.keep_writeback || m.writeback_dirty || m.status === "editing";
+
 export function MachinesPage({ disks, machines, traffic = {}, discovered = [], reload }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
-  const [name, setName] = useState("");
-  const [mac, setMac] = useState("");
-  const [mode, setMode] = useState<MachineMode>("disk");
-  const [diskId, setDiskId] = useState("");
-  const [osDiskId, setOsDiskId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   // Boot Mode: which kept writebacks Apply Writebacks turns into versions, per machine.
   const [applyWhat, setApplyWhat] = useState<Record<number, ApplyKey>>({});
   const [allLetter, setAllLetter] = useState("D");
-  // The machine whose hardware and network are shown.
-  const [open, setOpen] = useState<number | null>(null);
   // The machine whose settings dialog is open.
   const [editing, setEditing] = useState<number | null>(null);
   // Bulk operations: the selected machines and the last result.
@@ -79,7 +91,6 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   const [versions, setVersions] = useState<Record<number, string[]>>({});
 
   const published = disks.filter((d) => d.published && d.kind !== "os");
-  const osImages = disks.filter((d) => d.published && d.kind === "os");
   const inUse = published.filter((d) => machines.some((m) => m.game_disk_id === d.id));
   // Re-read when a disk gets a new version (Apply Writebacks, Make active).
   const versionKey = inUse.map((d) => `${d.id}@${d.snapshot}`).join(",");
@@ -102,23 +113,23 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   }, [versionKey]); // inUse is derived from versionKey
   const diskName = (id: number | null) => disks.find((d) => d.id === id)?.name ?? "—";
 
-  async function create(e: FormEvent) {
-    e.preventDefault();
-    const ok = await run("create", () =>
-      api.createMachine({
-        name: name.trim(),
-        mode,
-        mac: mac.trim(),
-        game_disk_id: diskId ? Number(diskId) : null,
-        os_disk_id: mode === "boot" && osDiskId ? Number(osDiskId) : null,
-      }),
+  const online = machines.filter((m) => isOnline(m));
+  const counts: Record<Filter, number> = {
+    all: machines.length,
+    online: online.length,
+    offline: machines.length - online.length,
+    writeback: machines.filter(hasWriteback).length,
+  };
+  const needle = search.trim().toLowerCase();
+  const shown = machines.filter((m) => {
+    if (filter === "online" && !isOnline(m)) return false;
+    if (filter === "offline" && isOnline(m)) return false;
+    if (filter === "writeback" && !hasWriteback(m)) return false;
+    if (!needle) return true;
+    return [m.name, m.mac, m.reported_ip, diskName(m.game_disk_id), diskName(m.os_disk_id ?? null)].some((v) =>
+      v?.toLowerCase().includes(needle),
     );
-    if (ok) {
-      setName("");
-      setMac("");
-    }
-    await reload();
-  }
+  });
 
   async function assign(m: Machine, value: string) {
     const target = value ? Number(value) : null;
@@ -162,12 +173,12 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
     await reload();
   }
 
-    async function pin(m: Machine, value: string) {
+  async function pin(m: Machine, value: string) {
     await run(`pin-${m.id}`, () => api.pinSnapshot(m.id, value || null));
     await reload();
   }
 
-    async function keep(m: Machine, enabled: boolean) {
+  async function keep(m: Machine, enabled: boolean) {
     if (!enabled) {
       const msg =
         `Stop keeping the writeback of ${m.name}?\n\n` +
@@ -212,8 +223,10 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
     await reload();
   }
 
+  const allShownSelected = shown.length > 0 && shown.every((m) => selected.has(m.id));
+
   return (
-    <section>
+    <section className={picked.length > 0 ? "has-bulk-dock" : undefined}>
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
       <MachineKpis machines={machines} discovered={discovered.length} />
@@ -227,351 +240,529 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
         />
       )}
 
-      <DiscoveredPanel discovered={discovered} disks={disks} busy={busy !== null} run={run} reload={reload} />
-
-      <form className="card form-row" onSubmit={create}>
-        <label>
-          Name
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. pc-01"
-            required
-            maxLength={15}
-          />
-        </label>
-        <label>
-          MAC
-          <input
-            value={mac}
-            onChange={(e) => setMac(e.target.value)}
-            placeholder="e.g. 10:ff:e0:66:be:3a"
-            required
-          />
-        </label>
-        <label>
-          Mode
-          <select value={mode} onChange={(e) => setMode(e.target.value as MachineMode)}>
-            <option value="disk">Disk (local Windows)</option>
-            <option value="boot">Boot (diskless)</option>
-          </select>
-        </label>
-        {mode === "boot" && (
-          <label>
-            OS image
-            <select value={osDiskId} onChange={(e) => setOsDiskId(e.target.value)} required>
-              <option value="">Choose…</option>
-              {osImages.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          Game disk
-          <select value={diskId} onChange={(e) => setDiskId(e.target.value)} required={mode === "boot"}>
-            <option value="">None</option>
-            {published.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" disabled={busy !== null}>
-          {busy === "create" ? "Adding…" : "Add machine"}
-        </button>
-      </form>
-
-      {machines.some((m) => m.mode === "disk") && (
-        <div className="card form-row">
-          <label>
-            Game disk letter for all Disk Mode PCs
-            <select value={allLetter} onChange={(e) => setAllLetter(e.target.value)}>
-              {LETTERS.map((l) => (
-                <option key={l} value={l}>
-                  {l}:
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={setLetterAll} disabled={busy !== null}>
-            {busy === "letter-all" ? "Applying…" : "Apply to all"}
-          </button>
-        </div>
+      {adding && (
+        <AddMachine disks={disks} busy={busy !== null} run={run} reload={reload} onClose={() => setAdding(false)} />
       )}
 
+      <DiscoveredPanel discovered={discovered} disks={disks} busy={busy !== null} run={run} reload={reload} />
+
+      <div className="toolbar">
+        <div className="toolbar-left">
+          <div className="search-box">
+            <Search size={15} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search by name, IP, MAC, disk…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search machines"
+            />
+          </div>
+          <div className="filter-pills" role="group" aria-label="Filter machines">
+            {FILTERS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`filter-pill ${filter === id ? "active" : ""}`}
+                aria-pressed={filter === id}
+                onClick={() => setFilter(id)}
+              >
+                {label} ({counts[id]})
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="toolbar-right">
+          {machines.some((m) => m.mode === "disk") && (
+            <div className="bulk-disk-assign">
+              <select
+                aria-label="Game disk letter for all Disk Mode PCs"
+                title="Game disk letter for all Disk Mode PCs"
+                value={allLetter}
+                onChange={(e) => setAllLetter(e.target.value)}
+              >
+                {LETTERS.map((l) => (
+                  <option key={l} value={l}>
+                    {l}:
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="secondary small" onClick={setLetterAll} disabled={busy !== null}>
+                {busy === "letter-all" ? "Applying…" : "Apply to all"}
+              </button>
+            </div>
+          )}
+          <button type="button" onClick={() => setAdding(true)}>
+            <Plus size={16} />
+            Add machine
+          </button>
+        </div>
+      </div>
+
       {picked.length > 0 && (
-        <BulkBar
+        <BulkDock
           machines={picked}
+          total={machines.length}
           disks={published}
           versions={versions}
           busy={busy !== null}
           run={runBulk}
+          select={(ids) => setSelected(new Set(ids))}
+          all={shown}
           clear={() => setSelected(new Set())}
         />
       )}
       {bulkReport && <BulkReport {...bulkReport} onClose={() => setBulkReport(null)} />}
 
-      {machines.length === 0 ? (
-        <p className="empty">No machines yet.</p>
+      {shown.length === 0 ? (
+        <div className="card empty">
+          <Monitor size={36} className="empty-icon" />
+          <p className="strong">{machines.length === 0 ? "No machines yet." : "No machines match the filter."}</p>
+          <span className="muted small">
+            {machines.length === 0
+              ? "Start a PC from the network (PXE) and add it from New PCs, or use Add machine."
+              : "Clear the search or pick another filter."}
+          </span>
+        </div>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  aria-label="Select all machines"
-                  checked={machines.length > 0 && selected.size === machines.length}
-                  onChange={(e) => setSelected(new Set(e.target.checked ? machines.map((m) => m.id) : []))}
-                />
-              </th>
-              <th>Name</th>
-              <th>Mode</th>
-              <th>MAC</th>
-              <th>Game disk</th>
-              <th>Drive</th>
-              <th>Status</th>
-              <th>Agent</th>
-              <th title="Since the PC's writeback was last cloned">Traffic</th>
-              <th>Keep writeback</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {machines.map((m) => (
-              <Fragment key={m.id}>
-                <tr className={selected.has(m.id) ? "selected" : undefined}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${m.name}`}
-                      checked={selected.has(m.id)}
-                      onChange={() => toggle(m.id)}
-                    />
-                  </td>
-                  <td>
-                    <div className="strong">{m.name}</div>
-                    {m.reported_ip && <div className="mono muted small">{m.reported_ip}</div>}
-                  </td>
-                  <td>{m.mode === "disk" ? "Disk" : "Boot"}</td>
-                  <td className="mono">{m.mac ?? "—"}</td>
-                  <td>
-                    {m.status === "editing" ? (
-                      <span className="muted">Editing {diskName(m.editing_disk_id)}</span>
-                    ) : m.mode === "disk" ? (
-                      <select
-                        aria-label={`Game disk for ${m.name}`}
-                        value={m.game_disk_id ?? ""}
-                        onChange={(e) => assign(m, e.target.value)}
-                        disabled={busy !== null}
-                      >
-                        <option value="">None</option>
-                        {published.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <BootDisks machine={m} diskName={diskName} />
-                    )}
-                    {m.mode === "disk" && m.game_disk_id !== null && m.status !== "editing" && (
-                      <div className="image-version">
-                        <select
-                          aria-label={`Version for ${m.name}`}
-                          value={m.pinned_snapshot ?? ""}
-                          onChange={(e) => pin(m, e.target.value)}
-                          disabled={busy !== null}
-                        >
-                          <option value="">
-                            Follow active (@{disks.find((d) => d.id === m.game_disk_id)?.snapshot})
-                          </option>
-                          {(versions[m.game_disk_id] ?? (m.pinned_snapshot ? [m.pinned_snapshot] : [])).map(
-                            (v) => (
-                              <option key={v} value={v}>
-                                Pin @{v}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                        <ImageStatus machine={m} disk={disks.find((d) => d.id === m.game_disk_id)} />
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {m.mode === "disk" ? (
-                      <select
-                        aria-label={`Drive letter for ${m.name}`}
-                        value={m.drive_letter}
-                        onChange={(e) => setLetter(m, e.target.value)}
-                        disabled={busy !== null}
-                      >
-                        {LETTERS.map((l) => (
-                          <option key={l} value={l}>
-                            {l}:
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="muted">D:</span>
-                    )}
-                    {m.reported_drive_letter && m.reported_drive_letter !== m.drive_letter && (
-                      <div>
+        <div className="table-wrapper">
+          <table className="machines-table">
+            <thead>
+              <tr>
+                <th className="th-select">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all machines"
+                    checked={allShownSelected}
+                    onChange={(e) => setSelected(new Set(e.target.checked ? shown.map((m) => m.id) : []))}
+                  />
+                </th>
+                <th>Station</th>
+                <th>MAC</th>
+                <th>Disks</th>
+                <th>Writeback</th>
+                <th title="Since the PC's writeback was last cloned">Network I/O</th>
+                <th>Agent</th>
+                <th className="th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((m) => {
+                const up = isOnline(m);
+                const commandBusy = busy !== null || m.pending_command !== null;
+                return (
+                  <tr key={m.id} className={selected.has(m.id) ? "row-selected" : undefined}>
+                    <td className="td-select">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${m.name}`}
+                        checked={selected.has(m.id)}
+                        onChange={() => toggle(m.id)}
+                      />
+                    </td>
+
+                    <td>
+                      <div className="station">
                         <span
-                          className="badge badge-warn"
-                          title={`${m.drive_letter}: is taken on this PC, so the game disk got ${m.reported_drive_letter}:`}
-                        >
-                          Got {m.reported_drive_letter}:
-                        </span>
+                          className={`status-dot ${up ? "online" : "offline"}`}
+                          title={up ? "Online: the agent reports" : "Offline or not reporting"}
+                        />
+                        <div>
+                          <div className="station-name">
+                            <button
+                              type="button"
+                              className="btn-text"
+                              onClick={() => setEditing(m.id)}
+                              title={`Settings of ${m.name}`}
+                            >
+                              {m.name}
+                            </button>
+                            <span
+                              className={`mode-pill ${m.mode === "boot" ? "mode-pill-boot" : "mode-pill-disk"}`}
+                              title={m.mode === "boot" ? "Boot Mode: diskless" : "Disk Mode: local Windows"}
+                            >
+                              {m.mode === "boot" ? "BOOT" : "DISK"}
+                            </span>
+                          </div>
+                          <div className="mono muted small">{m.reported_ip ?? "No IP reported"}</div>
+                          {m.status !== "provisioned" && <StatusBadge status={m.status} />}
+                          {m.last_error && <div className="error-text small">{m.last_error}</div>}
+                        </div>
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    <StatusBadge status={m.status} />
-                    {m.last_error && <div className="error-text small">{m.last_error}</div>}
-                  </td>
-                  <td>
-                    <AgentState machine={m} />
-                  </td>
-                  <td className="small">
-                    <TrafficCell traffic={traffic[m.id]} />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`Keep writeback of ${m.name}`}
-                      checked={m.keep_writeback}
-                      onChange={(e) => keep(m, e.target.checked)}
-                      disabled={busy !== null}
-                    />
-                  </td>
-                  <td className="actions">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(m.id)}
-                      aria-label={`Settings of ${m.name}`}
-                    >
-                      Settings
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      aria-expanded={open === m.id}
-                      onClick={() => setOpen(open === m.id ? null : m.id)}
-                    >
-                      {open === m.id ? "Hide details" : "Details"}
-                    </button>
-                    {isOnline(m) ? (
-                      <>
+                    </td>
+
+                    <td className="mono small">{m.mac ?? "—"}</td>
+
+                    <td>
+                      {m.status === "editing" ? (
+                        <span className="badge badge-warn">Editing {diskName(m.editing_disk_id)}</span>
+                      ) : m.mode === "boot" ? (
+                        <BootDisks machine={m} diskName={diskName} />
+                      ) : (
+                        <div className="disk-cell">
+                          <div className="disk-line">
+                            <select
+                              aria-label={`Drive letter for ${m.name}`}
+                              className="letter-select"
+                              value={m.drive_letter}
+                              onChange={(e) => setLetter(m, e.target.value)}
+                              disabled={busy !== null}
+                            >
+                              {LETTERS.map((l) => (
+                                <option key={l} value={l}>
+                                  {l}:
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              aria-label={`Game disk for ${m.name}`}
+                              className={m.game_disk_id ? "disk-select assigned" : "disk-select"}
+                              value={m.game_disk_id ?? ""}
+                              onChange={(e) => assign(m, e.target.value)}
+                              disabled={busy !== null}
+                            >
+                              <option value="">None</option>
+                              {published.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {m.reported_drive_letter && m.reported_drive_letter !== m.drive_letter && (
+                            <span
+                              className="badge badge-warn"
+                              title={`${m.drive_letter}: is taken on this PC, so the game disk got ${m.reported_drive_letter}:`}
+                            >
+                              Got {m.reported_drive_letter}:
+                            </span>
+                          )}
+                          {m.game_disk_id !== null && (
+                            <div className="image-version">
+                              <select
+                                aria-label={`Version for ${m.name}`}
+                                value={m.pinned_snapshot ?? ""}
+                                onChange={(e) => pin(m, e.target.value)}
+                                disabled={busy !== null}
+                              >
+                                <option value="">
+                                  Follow active (@{disks.find((d) => d.id === m.game_disk_id)?.snapshot})
+                                </option>
+                                {(versions[m.game_disk_id] ?? (m.pinned_snapshot ? [m.pinned_snapshot] : [])).map(
+                                  (v) => (
+                                    <option key={v} value={v}>
+                                      Pin @{v}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                              <ImageStatus machine={m} disk={disks.find((d) => d.id === m.game_disk_id)} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    <td>
+                      {m.status === "idle" ? (
+                        <span className="muted">—</span>
+                      ) : m.status !== "editing" && (
+                        <div className="writeback-cell">
+                          <label className="check small" title="Changes survive reboots; for installing and updating">
+                            <input
+                              type="checkbox"
+                              aria-label={`Keep writeback of ${m.name}`}
+                              checked={m.keep_writeback}
+                              onChange={(e) => keep(m, e.target.checked)}
+                              disabled={busy !== null}
+                            />
+                            Keep
+                          </label>
+                          {m.keep_writeback ? (
+                            <span className="badge badge-warn">Kept</span>
+                          ) : m.writeback_dirty ? (
+                            <span className="badge" title="The PC wrote to its disks since the last reset">
+                              Changed
+                            </span>
+                          ) : (
+                            <span className="badge badge-provisioned">
+                              <CheckCircle2 size={12} />
+                              Clean
+                            </span>
+                          )}
+                          {m.keep_writeback && m.status === "provisioned" && (
+                            <div className="apply-line">
+                              {m.mode === "boot" && (
+                                <select
+                                  aria-label={`What to apply from ${m.name}`}
+                                  value={applyWhat[m.id] ?? "both"}
+                                  onChange={(e) => setApplyWhat({ ...applyWhat, [m.id]: e.target.value as ApplyKey })}
+                                  disabled={busy !== null}
+                                >
+                                  <option value="both">OS + game</option>
+                                  <option value="os">OS only</option>
+                                  <option value="game">Game only</option>
+                                </select>
+                              )}
+                              <button
+                                type="button"
+                                className="small"
+                                onClick={() => apply(m)}
+                                disabled={busy !== null || m.session_active === true}
+                                title={m.session_active ? `Shut down ${m.name} first` : "Make them new versions"}
+                              >
+                                <Upload size={13} />
+                                {busy === `apply-${m.id}` ? "Applying…" : "Apply writebacks"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="small">
+                      <TrafficCell traffic={traffic[m.id]} />
+                    </td>
+
+                    <td>
+                      <AgentState machine={m} />
+                    </td>
+
+                    <td>
+                      <div className="actions-cell">
+                        {up ? (
+                          <>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              onClick={() => power(m, "reboot")}
+                              disabled={commandBusy}
+                              aria-label={`Restart ${m.name}`}
+                              title="Restart"
+                            >
+                              <RotateCw size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn-danger"
+                              onClick={() => power(m, "shutdown")}
+                              disabled={commandBusy}
+                              aria-label={`Shut down ${m.name}`}
+                              title="Shut down"
+                            >
+                              <Power size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="icon-btn icon-btn-ok"
+                            onClick={() => power(m, "on")}
+                            disabled={busy !== null || (!m.mac && !m.reported_mac)}
+                            aria-label={`Turn on ${m.name}`}
+                            title={!m.mac && !m.reported_mac ? "No MAC address yet" : "Turn on (Wake-on-LAN)"}
+                          >
+                            <Zap size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="secondary"
-                          onClick={() => power(m, "shutdown")}
-                          disabled={busy !== null || m.pending_command !== null}
+                          className="icon-btn"
+                          onClick={() => setEditing(m.id)}
+                          aria-label={`Settings of ${m.name}`}
+                          title="Settings"
                         >
-                          Shutdown
+                          <SettingsIcon size={14} />
                         </button>
                         <button
                           type="button"
-                          className="secondary"
-                          onClick={() => power(m, "reboot")}
-                          disabled={busy !== null || m.pending_command !== null}
+                          className="icon-btn icon-btn-danger"
+                          onClick={() => remove(m)}
+                          disabled={busy !== null || m.status === "editing"}
+                          aria-label={`Delete ${m.name}`}
+                          title={m.status === "editing" ? "Finish editing the game disk first" : "Delete"}
                         >
-                          Reboot
+                          <Trash2 size={14} />
                         </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => power(m, "on")}
-                        disabled={busy !== null || (!m.mac && !m.reported_mac)}
-                        title={!m.mac && !m.reported_mac ? "No MAC address yet" : "Wake-on-LAN"}
-                      >
-                        {busy === `power-${m.id}` ? "Waking…" : "Turn on"}
-                      </button>
-                    )}
-                    {m.keep_writeback && m.status === "provisioned" && m.mode === "boot" && (
-                      <select
-                        aria-label={`What to apply from ${m.name}`}
-                        value={applyWhat[m.id] ?? "both"}
-                        onChange={(e) => setApplyWhat({ ...applyWhat, [m.id]: e.target.value as ApplyKey })}
-                        disabled={busy !== null}
-                      >
-                        <option value="both">OS + game</option>
-                        <option value="os">OS only</option>
-                        <option value="game">Game only</option>
-                      </select>
-                    )}
-                    {m.keep_writeback && m.status === "provisioned" && (
-                      <button
-                        type="button"
-                        onClick={() => apply(m)}
-                        disabled={busy !== null || m.session_active === true}
-                        title={m.session_active ? `Shut down ${m.name} first` : undefined}
-                      >
-                        {busy === `apply-${m.id}` ? "Applying…" : "Apply writebacks"}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => remove(m)}
-                      disabled={busy !== null || m.status === "editing"}
-                      title={m.status === "editing" ? "Finish editing the game disk first" : undefined}
-                    >
-                      {busy === `delete-${m.id}` ? "Deleting…" : "Delete"}
-                    </button>
-                  </td>
-                </tr>
-                {open === m.id && (
-                  <tr>
-                    <td colSpan={9}>
-                      <MachineDetails machine={m} />
+                      </div>
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
 }
 
+const FILTERS: [Filter, string][] = [
+  ["all", "All"],
+  ["online", "Online"],
+  ["offline", "Offline"],
+  ["writeback", "Writeback"],
+];
+
+interface AddMachineProps {
+  disks: GameDisk[];
+  busy: boolean;
+  run: ReturnType<typeof useAsyncAction>["run"];
+  reload: () => Promise<void>;
+  onClose: () => void;
+}
+
+/** Register a PC by hand, by its MAC. A PC started from the network shows up under New PCs instead. */
+function AddMachine({ disks, busy, run, reload, onClose }: AddMachineProps) {
+  const [name, setName] = useState("");
+  const [mac, setMac] = useState("");
+  const [mode, setMode] = useState<MachineMode>("disk");
+  const [diskId, setDiskId] = useState("");
+  const [osDiskId, setOsDiskId] = useState("");
+  const gameDisks = disks.filter((d) => d.published && d.kind !== "os");
+  const osImages = disks.filter((d) => d.published && d.kind === "os");
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    const ok = await run("create", () =>
+      api.createMachine({
+        name: name.trim(),
+        mode,
+        mac: mac.trim(),
+        game_disk_id: diskId ? Number(diskId) : null,
+        os_disk_id: mode === "boot" && osDiskId ? Number(osDiskId) : null,
+      }),
+    );
+    await reload();
+    if (ok) onClose();
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content" role="dialog" aria-label="Add machine" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-sheet-grabber" />
+        <div className="modal-header">
+          <h2>Add machine</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={create}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label htmlFor="add-name">Name</label>
+              <input
+                id="add-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. pc-01"
+                required
+                maxLength={15}
+                autoFocus
+              />
+              <div className="form-hint">Windows gets this computer name in Boot Mode.</div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="add-mac">MAC</label>
+              <input
+                id="add-mac"
+                value={mac}
+                onChange={(e) => setMac(e.target.value)}
+                placeholder="e.g. 10:ff:e0:66:be:3a"
+                required
+              />
+              <div className="form-hint">The PC's identity: network boot and Wake-on-LAN find it by this.</div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="add-mode">Mode</label>
+              <select id="add-mode" value={mode} onChange={(e) => setMode(e.target.value as MachineMode)}>
+                <option value="disk">Disk (local Windows)</option>
+                <option value="boot">Boot (diskless)</option>
+              </select>
+            </div>
+            {mode === "boot" && (
+              <div className="form-group">
+                <label htmlFor="add-os">OS image</label>
+                <select id="add-os" value={osDiskId} onChange={(e) => setOsDiskId(e.target.value)} required>
+                  <option value="">Choose…</option>
+                  {osImages.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-hint">C:, loaded over the network.</div>
+              </div>
+            )}
+            <div className="form-group">
+              <label htmlFor="add-disk">Game disk</label>
+              <select
+                id="add-disk"
+                value={diskId}
+                onChange={(e) => setDiskId(e.target.value)}
+                required={mode === "boot"}
+              >
+                <option value="">None</option>
+                {gameDisks.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <div className="footer-left" />
+            <div className="footer-right">
+              <button type="button" className="secondary" onClick={onClose} disabled={busy}>
+                Cancel
+              </button>
+              <button type="submit" disabled={busy}>
+                <Plus size={14} />
+                {busy ? "Adding…" : "Add"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /** ggRock's Sent / Received / Speed for one machine. */
 function TrafficCell({ traffic: t }: { traffic: MachineTraffic | undefined }) {
-  if (!t) return <span className="muted">—</span>;
+  if (!t) return <span className="muted">Idle</span>;
   return (
     <div aria-label="Traffic">
       <div>
         Sent {formatBytes(t.sent_bytes)} · Received {formatBytes(t.received_bytes)}
       </div>
       {t.sent_bps !== null && t.received_bps !== null && (
-        <div className="muted">
-          ↓ {formatRate(t.sent_bps)} · ↑ {formatRate(t.received_bps)}
+        <div>
+          <span className="rate-down">↓ {formatRate(t.sent_bps)}</span>
+          <span className="muted"> · </span>
+          <span className="rate-up">↑ {formatRate(t.received_bps)}</span>
         </div>
       )}
     </div>
   );
 }
 
-interface BulkBarProps {
+interface BulkDockProps {
   machines: Machine[];
+  total: number;
   disks: GameDisk[];
   versions: Record<number, string[]>;
   busy: boolean;
   run: (label: string, action: BulkKind, extra?: Parameters<typeof api.bulk>[2], confirmText?: string) => void;
+  /** The machines shown now, for the quick selections. */
+  all: Machine[];
+  select: (ids: number[]) => void;
   clear: () => void;
 }
 
-/** ggRock's bulk operations on the selected machines. */
-function BulkBar({ machines, disks, versions, busy, run, clear }: BulkBarProps) {
+/** ggRock's bulk operations on the selected machines, as a dock at the bottom of the screen. */
+function BulkDock({ machines, total, disks, versions, busy, run, all, select, clear }: BulkDockProps) {
   const [disk, setDisk] = useState("");
   const [version, setVersion] = useState("");
   const [letter, setLetter] = useState("D");
@@ -582,103 +773,135 @@ function BulkBar({ machines, disks, versions, busy, run, clear }: BulkBarProps) 
   const sharedVersions = shared !== null ? (versions[shared] ?? []) : [];
 
   return (
-    <div className="card bulk-bar" aria-label="Bulk actions">
-      <span className="strong">{n} selected</span>
-      <button type="button" className="secondary" disabled={busy} onClick={() => run("Turn on", "on")}>
-        Turn on
-      </button>
-      <button
-        type="button"
-        className="secondary"
-        disabled={busy}
-        onClick={() => run("Shutdown", "shutdown", {}, `Shut down ${n} PC(s)?`)}
-      >
-        Shutdown
-      </button>
-      <button
-        type="button"
-        className="secondary"
-        disabled={busy}
-        onClick={() => run("Reboot", "reboot", {}, `Restart ${n} PC(s)?`)}
-      >
-        Reboot
-      </button>
+    <div className="bulk-toolbar" role="region" aria-label="Bulk actions">
+      <div className="bulk-selection-info">
+        <span className="bulk-badge">
+          {n} of {total} selected
+        </span>
+        <div className="bulk-quick-selects">
+          <button type="button" className="bulk-quick-btn" onClick={() => select(all.map((m) => m.id))}>
+            All
+          </button>
+          <button
+            type="button"
+            className="bulk-quick-btn"
+            onClick={() => select(all.filter((m) => isOnline(m)).map((m) => m.id))}
+          >
+            Online
+          </button>
+          <button
+            type="button"
+            className="bulk-quick-btn"
+            onClick={() => select(all.filter((m) => !isOnline(m)).map((m) => m.id))}
+          >
+            Offline
+          </button>
+          <button type="button" className="bulk-quick-btn" aria-label="Clear selection" onClick={clear}>
+            <X size={12} />
+          </button>
+        </div>
+      </div>
 
-      <span className="bulk-group">
-        <select aria-label="Game disk for selected" value={disk} onChange={(e) => setDisk(e.target.value)}>
-          <option value="">Game disk…</option>
-          <option value="none">None (remove)</option>
-          {disks.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+      <div className="bulk-actions-group">
+        <button type="button" className="bulk-btn bulk-btn-wol" disabled={busy} onClick={() => run("Turn on", "on")}>
+          <Zap size={14} />
+          Turn on
+        </button>
         <button
           type="button"
-          disabled={busy || !disk}
-          onClick={() =>
-            run(
-              "Game disk",
-              "assign",
-              { game_disk_id: disk === "none" ? null : Number(disk) },
-              `Set the game disk of ${n} PC(s)? Everything they wrote is lost. ${CLIENT_OFF}`,
-            )
-          }
+          className="bulk-btn bulk-btn-poweroff"
+          disabled={busy}
+          onClick={() => run("Shutdown", "shutdown", {}, `Shut down ${n} PC(s)?`)}
         >
-          Apply
+          <Power size={14} />
+          Shutdown
         </button>
-      </span>
+        <button
+          type="button"
+          className="bulk-btn bulk-btn-reboot"
+          disabled={busy}
+          onClick={() => run("Reboot", "reboot", {}, `Restart ${n} PC(s)?`)}
+        >
+          <RotateCw size={14} />
+          Reboot
+        </button>
 
-      {shared !== null && (
-        <span className="bulk-group">
-          <select aria-label="Version for selected" value={version} onChange={(e) => setVersion(e.target.value)}>
-            <option value="">Version…</option>
-            <option value="follow">Follow active</option>
-            {sharedVersions.map((v) => (
-              <option key={v} value={v}>
-                Pin @{v}
+        <div className="bulk-disk-assign">
+          <select aria-label="Game disk for selected" value={disk} onChange={(e) => setDisk(e.target.value)}>
+            <option value="">Game disk…</option>
+            <option value="none">None (remove)</option>
+            {disks.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
               </option>
             ))}
           </select>
           <button
             type="button"
-            disabled={busy || !version}
-            onClick={() => run("Version", "pin", { snapshot: version === "follow" ? null : version })}
+            className="small"
+            disabled={busy || !disk}
+            onClick={() =>
+              run(
+                "Game disk",
+                "assign",
+                { game_disk_id: disk === "none" ? null : Number(disk) },
+                `Set the game disk of ${n} PC(s)? Everything they wrote is lost. ${CLIENT_OFF}`,
+              )
+            }
           >
             Apply
           </button>
-        </span>
-      )}
+        </div>
 
-      <span className="bulk-group">
-        <select aria-label="Drive letter for selected" value={letter} onChange={(e) => setLetter(e.target.value)}>
-          {LETTERS.map((l) => (
-            <option key={l} value={l}>
-              {l}:
-            </option>
-          ))}
-        </select>
+        {shared !== null && (
+          <div className="bulk-disk-assign">
+            <select aria-label="Version for selected" value={version} onChange={(e) => setVersion(e.target.value)}>
+              <option value="">Version…</option>
+              <option value="follow">Follow active</option>
+              {sharedVersions.map((v) => (
+                <option key={v} value={v}>
+                  Pin @{v}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="small"
+              disabled={busy || !version}
+              onClick={() => run("Version", "pin", { snapshot: version === "follow" ? null : version })}
+            >
+              Apply
+            </button>
+          </div>
+        )}
+
+        <div className="bulk-disk-assign">
+          <select aria-label="Drive letter for selected" value={letter} onChange={(e) => setLetter(e.target.value)}>
+            {LETTERS.map((l) => (
+              <option key={l} value={l}>
+                {l}:
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="small"
+            disabled={busy}
+            onClick={() => run("Drive letter", "drive_letter", { drive_letter: letter }, `${MOVES_NOW}`)}
+          >
+            Apply
+          </button>
+        </div>
+
         <button
           type="button"
-          disabled={busy}
-          onClick={() => run("Drive letter", "drive_letter", { drive_letter: letter }, `${MOVES_NOW}`)}
+          className="bulk-btn"
+          disabled={busy || !machines.some((m) => m.keep_writeback)}
+          onClick={() => run("Stop keeping writeback", "stop_keep_writeback")}
         >
-          Apply
+          Stop keeping writeback
         </button>
-      </span>
-
-      <button
-        type="button"
-        className="secondary"
-        disabled={busy || !machines.some((m) => m.keep_writeback)}
-        onClick={() => run("Stop keeping writeback", "stop_keep_writeback")}
-      >
-        Stop keeping writeback
-      </button>
-      <button type="button" className="link" aria-label="Clear selection" onClick={clear}>
-        ×
-      </button>
+      </div>
     </div>
   );
 }
@@ -712,18 +935,20 @@ const APPLY: Record<ApplyKey, ApplyChoice> = {
   game: { os: false, game: true },
 };
 
-/** Boot Mode: the OS image and game disk a PC runs, with their versions. */
+/** Boot Mode: the OS image (C:) and game disk (D:) a PC runs, with their versions. */
 function BootDisks({ machine: m, diskName }: { machine: Machine; diskName: (id: number | null) => string }) {
   const version = (snap: string | null | undefined) => (snap ? `@${snap.split("@")[1]}` : "");
   return (
-    <div className="small">
-      <div>
-        <span className="muted">OS </span>
-        {diskName(m.os_disk_id ?? null)} <span className="muted">{version(m.os_clone_snapshot)}</span>
+    <div className="disk-cell">
+      <div className="disk-line">
+        <span className="drive-os">C:</span>
+        <span className="code-badge">{diskName(m.os_disk_id ?? null)}</span>
+        <span className="muted small">{version(m.os_clone_snapshot)}</span>
       </div>
-      <div>
-        <span className="muted">Game </span>
-        {diskName(m.game_disk_id)} <span className="muted">{version(m.clone_snapshot)}</span>
+      <div className="disk-line">
+        <span className="drive-game">D:</span>
+        <span className="code-badge">{diskName(m.game_disk_id)}</span>
+        <span className="muted small">{version(m.clone_snapshot)}</span>
       </div>
     </div>
   );

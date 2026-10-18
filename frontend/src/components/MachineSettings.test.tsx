@@ -21,7 +21,7 @@ function open(m: Machine) {
 }
 
 describe("MachineSettings", () => {
-  it("renames a PC without disks and changes its MAC, sending only what changed", async () => {
+  it("renames a PC without disks, sending only what changed; the MAC is only shown", async () => {
     const fetchMock = stubFetch(200, machine());
     const { reload } = open(machine({ mac: "aa:bb:cc:dd:ee:01" }));
 
@@ -29,19 +29,16 @@ describe("MachineSettings", () => {
     await userEvent.clear(name);
     await userEvent.type(name, "pc-07");
     await userEvent.click(screen.getByRole("tab", { name: "Network" }));
-    const mac = screen.getByLabelText("MAC (identifies the PC)");
-    await userEvent.clear(mac);
-    await userEvent.type(mac, "aa:bb:cc:dd:ee:07");
+    expect(screen.getByText("aa:bb:cc:dd:ee:01")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /MAC/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(actions(fetchMock)).toEqual([
-      { url: "/api/v1/machines/1", method: "PATCH", body: { name: "pc-07", mac: "aa:bb:cc:dd:ee:07" } },
-    ]);
+    expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1", method: "PATCH", body: { name: "pc-07" } }]);
     expect(reload).toHaveBeenCalled();
     expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
-  it("renames a PC with disks after a confirmation; the mode stays locked", async () => {
+  it("renames a PC with disks after a confirmation", async () => {
     const fetchMock = stubFetch(200, machine());
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     open(machine({ game_disk_id: 1, status: "provisioned" }));
@@ -50,8 +47,6 @@ describe("MachineSettings", () => {
     expect(name).toBeEnabled();
     await userEvent.clear(name);
     await userEvent.type(name, "pc-13");
-    await userEvent.click(screen.getByRole("tab", { name: "Disks" }));
-    expect(screen.getByLabelText("Mode")).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(confirm.mock.calls[0][0]).toContain("must be powered off");
@@ -132,5 +127,33 @@ describe("MachineSettings", () => {
     expect(screen.getByText("Gigabyte H410M H")).toBeInTheDocument();
     expect(screen.getByText("0.1.11")).toBeInTheDocument();
     expect(screen.queryByText(/iqn\./)).toBeNull();
+  });
+
+  it("switches a Disk Mode PC with a disk to Boot Mode: disks off, mode, new disks", async () => {
+    const fetchMock = stubFetch(200, machine());
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    open(machine({ game_disk_id: 1, status: "provisioned" }));
+
+    await userEvent.click(screen.getByRole("tab", { name: "Disks" }));
+    await userEvent.selectOptions(screen.getByLabelText("Mode"), "boot");
+    await userEvent.selectOptions(screen.getByLabelText("OS image"), "5");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(confirm.mock.calls[0][0]).toContain("Switch pc01 to Boot Mode");
+    expect(actions(fetchMock)).toEqual([
+      { url: "/api/v1/machines/1/assign", method: "POST", body: { game_disk_id: null } },
+      { url: "/api/v1/machines/1", method: "PATCH", body: { mode: "boot" } },
+      { url: "/api/v1/machines/1/assign", method: "POST", body: { game_disk_id: 1, os_disk_id: 5 } },
+    ]);
+  });
+
+  it("does not switch to Boot Mode without an OS image", async () => {
+    const fetchMock = stubFetch(200, machine());
+    open(machine({ game_disk_id: 1, status: "provisioned" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Disks" }));
+    await userEvent.selectOptions(screen.getByLabelText("Mode"), "boot");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("needs an OS image and a game disk");
+    expect(actions(fetchMock)).toEqual([]);
   });
 });

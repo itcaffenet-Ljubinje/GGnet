@@ -32,17 +32,19 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Item | Status |
 |---|---|
 | KPI cards: total, online, offline, writebacks / dirty | done |
-| Table: name, MAC, mode (Disk / Boot), OS image + version, game disk + version, status, IP, link speed, uptime, agent version, sent / received | partial |
+| Table (ggNet2 layout): status dot, name (opens Settings), mode pill, IP, MAC, disks (C: / D: in Boot Mode; letter, game disk, version in Disk Mode), writeback, network I/O, agent, icon actions | done |
+| Search (name, IP, MAC, disk) and filters All / Online / Offline / Writeback with counts | done |
 | Boot state for Boot Mode PCs: booting (after iPXE), running, off | todo (`ipxe_at`, session state exist) |
 | Live traffic per PC (bps and totals) | backend |
 | Hardware drawer: CPU, GPU, RAM, board, NIC, link, agent, IP, MAC, iSCSI session | partial |
-| Settings per PC (dialog, tabs General / Disks / Network / Hardware): name and mode (while it has no disk), MAC, OS image, game disk, drive letter, version pin, Keep Writeback | done |
-| Add a PC: name, **MAC (required)**, mode, OS image (Boot Mode), game disk. No IQN field | done |
+| Settings per PC (dialog, tabs General / Disks / Network / Hardware): name and mode (also with disks, PC powered off), OS image, game disk, drive letter, version pin, Keep Writeback; MAC fixed | done |
+| Add a PC (dialog): name, **MAC (required)**, mode, OS image (Boot Mode), game disk. No IQN field | done |
 | Discovery: PCs that knocked (PXE or agent) — Claim (name, mode, disks) and Ignore | done |
 | Per PC: Wake-on-LAN, Shutdown, Reboot | done |
 | Per PC: Keep Writeback, Discard Writeback, Pin version | done |
 | Per PC: Apply Writebacks with a choice: OS only / game only / both (Boot Mode) | done |
-| Bulk: power, assign disk, pin, drive letter, stop keeping writebacks, delete | done |
+| Bulk dock at the bottom: quick select (all / online / offline), power, assign disk, pin, drive letter, stop keeping writebacks | done |
+| Bulk delete | todo (backend) |
 | Zones (e.g. Main Arena, VIP) for filtering and bulk actions | todo |
 | Fixed IP per PC (as a DHCP reservation hint, not in Windows) | todo |
 | Add hardware: a PC whose board the OS image does not know yet (see architecture, "Add hardware") | todo |
