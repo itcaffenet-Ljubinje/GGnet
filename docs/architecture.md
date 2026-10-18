@@ -322,8 +322,11 @@ The router stays the DHCP server for IP addresses. dnsmasq on the Proxmox host o
 
 The installer sets this up as the `ggnet-pxe` service (`dnsmasq-base`, config `/etc/ggnet/dnsmasq-pxe.conf`,
 TFTP root `/var/lib/ggnet/tftp`). It answers every PC: UEFI x64 PCs get `snponly.efi` (iPXE on the board's
-own UEFI network driver; iPXE's built-in Realtek driver stalled after ~30 MB on the RTL8168), then iPXE asks
-`/api/v1/boot/ipxe?mac=${net0/mac}`. What the PC gets depends on ggNet, not on dnsmasq:
+own UEFI network driver; iPXE's built-in Realtek driver stalled after ~30 MB on the RTL8168). iPXE first runs
+`autoexec.ipxe` from the same TFTP root, which the installer writes: get an address from the router (`dhcp`)
+and chain `/api/v1/boot/ipxe?mac=${net0/mac}` directly, trying again every 3 s until ggNet answers. Relying on
+the second ProxyDHCP reply (port 4011) instead failed often: with several PCs booting at once iPXE missed it
+and stopped with "No more network devices" (2026-10-18). What the PC gets depends on ggNet, not on dnsmasq:
 
 - a registered Boot Mode PC boots its OS image;
 - a Disk Mode PC, or a PC without a valid MAC, leaves iPXE and boots its local disk;
