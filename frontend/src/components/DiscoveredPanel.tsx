@@ -1,9 +1,11 @@
 import { useState } from "react";
 
-import { api, type Discovered, type MachineMode } from "../api";
+import { api, type Discovered, type GameDisk, type MachineMode } from "../api";
 
 interface Props {
   discovered: Discovered[];
+  /** All disks; published OS images and game disks are offered. */
+  disks: GameDisk[];
   busy: boolean;
   run: (key: string, fn: () => Promise<unknown>) => Promise<boolean>;
   reload: () => Promise<void>;
@@ -24,14 +26,15 @@ export function suggestName(hostname: string | null): string {
  * PC to Machines on its first network boot). Adding one keeps its MAC, so
  * its IQN is derived from the MAC and the name here becomes its identity.
  */
-export function DiscoveredPanel({ discovered, busy, run, reload }: Props) {
+export function DiscoveredPanel({ discovered, disks, busy, run, reload }: Props) {
   if (discovered.length === 0) return null;
   return (
     <div className="card">
-      <h2 className="card-title">Discovered PCs ({discovered.length})</h2>
+      <h2 className="card-title">New PCs ({discovered.length})</h2>
       <p className="muted small">
         These PCs asked the server for a disk but are not registered. Add one with the name it should have
-        (e.g. pc-01, vip-05), or ignore it.
+        (e.g. pc-01, vip-05) and its disks, or ignore it. A PC waiting on its network boot screen boots
+        within seconds of being added.
       </p>
       <table>
         <thead>
@@ -43,12 +46,13 @@ export function DiscoveredPanel({ discovered, busy, run, reload }: Props) {
             <th>Last seen</th>
             <th>Name</th>
             <th>Mode</th>
+            <th>Disks</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {discovered.map((d) => (
-            <DiscoveredRow key={d.id} d={d} busy={busy} run={run} reload={reload} />
+            <DiscoveredRow key={d.id} d={d} disks={disks} busy={busy} run={run} reload={reload} />
           ))}
         </tbody>
       </table>
@@ -56,13 +60,27 @@ export function DiscoveredPanel({ discovered, busy, run, reload }: Props) {
   );
 }
 
-function DiscoveredRow({ d, busy, run, reload }: { d: Discovered } & Omit<Props, "discovered">) {
+function DiscoveredRow({ d, disks, busy, run, reload }: { d: Discovered } & Omit<Props, "discovered">) {
   const [name, setName] = useState(suggestName(d.hostname));
   // A PC that booted from the network is a Boot Mode PC; one with an agent runs local Windows.
   const [mode, setMode] = useState<MachineMode>(d.source === "pxe" ? "boot" : "disk");
+  const osImages = disks.filter((x) => x.published && x.kind === "os");
+  const gameDisks = disks.filter((x) => x.published && x.kind !== "os");
+  // With a single choice there is nothing to pick.
+  const only = (list: GameDisk[]) => (list.length === 1 ? String(list[0].id) : "");
+  const [osDiskId, setOsDiskId] = useState(only(osImages));
+  const [diskId, setDiskId] = useState(only(gameDisks));
+  // A Boot Mode PC cannot boot without both.
+  const ready = !!name.trim() && (mode !== "boot" || (!!osDiskId && !!diskId));
 
   async function claim() {
-    if (await run(`claim-${d.id}`, () => api.claimDiscovered(d.id, { name: name.trim(), mode }))) {
+    const body = {
+      name: name.trim(),
+      mode,
+      ...(diskId ? { game_disk_id: Number(diskId) } : {}),
+      ...(mode === "boot" && osDiskId ? { os_disk_id: Number(osDiskId) } : {}),
+    };
+    if (await run(`claim-${d.id}`, () => api.claimDiscovered(d.id, body))) {
       await reload();
     }
   }
@@ -98,8 +116,28 @@ function DiscoveredRow({ d, busy, run, reload }: { d: Discovered } & Omit<Props,
           <option value="boot">Boot</option>
         </select>
       </td>
+      <td>
+        {mode === "boot" && (
+          <select aria-label={`OS image for ${d.mac}`} value={osDiskId} onChange={(e) => setOsDiskId(e.target.value)}>
+            <option value="">OS image…</option>
+            {osImages.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <select aria-label={`Game disk for ${d.mac}`} value={diskId} onChange={(e) => setDiskId(e.target.value)}>
+          <option value="">{mode === "boot" ? "Game disk…" : "No game disk"}</option>
+          {gameDisks.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+      </td>
       <td className="actions">
-        <button type="button" onClick={claim} disabled={busy || !name.trim()}>
+        <button type="button" onClick={claim} disabled={busy || !ready}>
           Add
         </button>
         <button type="button" className="secondary" onClick={ignore} disabled={busy}>

@@ -9,8 +9,12 @@ boot falls through to its next boot device instead of stopping in iPXE:
   Boot Mode PC with its disks   sanboot from the shared target, LUN 0 (OS);
                                 Windows sees LUN 1 (game disk) on the same session
   Boot Mode PC without disks    message, then exit
-  Disk Mode PC, unknown MAC     exit (boot from the local disk); an unknown
-                                MAC is listed in Discovery for the admin to add
+  Disk Mode PC                  exit (boot from the local disk)
+  unknown MAC                   listed in Discovery (Machines → New PCs) and,
+                                like ggRock, waits on screen until the admin
+                                registers it, asking iPXE again every 10 s; a
+                                key press boots the local disk instead.
+                                `[boot] unregistered = "local"` exits at once.
 
 Before it answers a provisioned PC, the server discards its writebacks like
 the watcher does after a disconnect (app.services.writebacks), unless the PC
@@ -49,6 +53,38 @@ def _script(*lines: str) -> PlainTextResponse:
 def exit_script(message: str) -> PlainTextResponse:
     """Leave iPXE: the firmware goes on with its next boot device."""
     return _script(f"echo {message}", "sleep 5", "exit")
+
+
+WAIT_SECONDS = 10
+
+
+def wait_script(mac: str, again_url: str) -> PlainTextResponse:
+    """
+    An unregistered PC waits until it is registered: every WAIT_SECONDS it
+    asks for its script again (the same URL), so it boots as soon as the admin
+    adds it, with no reboot. Any key leaves iPXE for the local disk.
+    """
+    return _script(
+        f"echo ggNet: this PC is not registered (MAC {mac}).",
+        "echo Register it in the ggNet web UI: Machines -> New PCs. It boots as soon as it is registered.",
+        ":wait",
+        f"prompt --timeout {WAIT_SECONDS * 1000} Waiting for registration. Press any key to boot from the local disk. "
+        "&& goto local || goto again",
+        ":again",
+        f"chain --replace --autofree {again_url} || goto wait",
+        ":local",
+        "echo Booting from the local disk.",
+        "exit",
+    )
+
+
+def unregistered_mode(cfg: dict | None = None) -> str:
+    """`[boot] unregistered`: "wait" (the default, as ggRock) or "local"."""
+    value = str(((cfg if cfg is not None else get_config()).get("boot") or {}).get("unregistered") or "wait")
+    if value not in ("wait", "local"):
+        logger.error("Ignoring invalid [boot] unregistered %r; using wait", value)
+        return "wait"
+    return value
 
 
 NO_GATEWAY = "0.0.0.0"
@@ -128,7 +164,10 @@ def ipxe_script(
         logger.info("iPXE request from unregistered MAC %s", mac)
         discovery.record(db, mac, DiscoverySource.PXE,
                          ip_address=request.client.host if request.client else None)
-        return exit_script(f"This PC is not registered in ggNet ({mac}). Booting from local disk.")
+        if unregistered_mode() == "local":
+            return exit_script(f"This PC is not registered in ggNet ({mac}). Booting from local disk.")
+        # ${net0/mac} is iPXE's, so the PC asks with its own MAC like the first time.
+        return wait_script(mac, f"{request.base_url}api/v1/boot/ipxe?mac=${{net0/mac}}")
     if m.mode is not MachineMode.BOOT:
         return exit_script(f"ggNet: {m.name} is in Disk Mode. Booting from local disk.")
     if m.status is not MachineStatus.PROVISIONED or m.os_clone_zvol is None:

@@ -215,7 +215,7 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
 
       <MachineKpis machines={machines} discovered={discovered.length} />
 
-      <DiscoveredPanel discovered={discovered} busy={busy !== null} run={run} reload={reload} />
+      <DiscoveredPanel discovered={discovered} disks={disks} busy={busy !== null} run={run} reload={reload} />
 
       <form className="card form-row" onSubmit={create}>
         <label>
