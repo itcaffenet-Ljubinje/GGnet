@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Discovered } from "../api";
-import { calls, machine, stubFetch } from "../test/fixtures";
+import { calls, disk, machine, stubFetch } from "../test/fixtures";
 import { useAsyncAction } from "../useAsyncAction";
 import { DiscoveredPanel, suggestName } from "./DiscoveredPanel";
 
@@ -23,9 +23,11 @@ function found(over: Partial<Discovered> = {}): Discovered {
   };
 }
 
+const DISKS = [disk(), disk({ id: 5, name: "win11", kind: "os" })];
+
 function Panel({ discovered, reload }: { discovered: Discovered[]; reload: () => Promise<void> }) {
   const { busy, run } = useAsyncAction();
-  return <DiscoveredPanel discovered={discovered} busy={busy !== null} run={run} reload={reload} />;
+  return <DiscoveredPanel discovered={discovered} disks={DISKS} busy={busy !== null} run={run} reload={reload} />;
 }
 
 describe("DiscoveredPanel", () => {
@@ -46,7 +48,7 @@ describe("DiscoveredPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(calls(fetchMock)).toEqual([
-      { url: "/api/v1/discovery/7/claim", method: "POST", body: { name: "vip-05", mode: "disk" } },
+      { url: "/api/v1/discovery/7/claim", method: "POST", body: { name: "vip-05", mode: "disk", game_disk_id: 1 } },
     ]);
     expect(reload).toHaveBeenCalled();
   });
@@ -70,5 +72,31 @@ describe("DiscoveredPanel", () => {
     expect(suggestName("-My PC_01")).toBe("my-pc-01");
     expect(suggestName("A-VERY-LONG-COMPUTER-NAME")).toHaveLength(15);
     expect(suggestName(null)).toBe("");
+  });
+
+  it("adds a network-booted PC in Boot Mode with its OS image and game disk", async () => {
+    const fetchMock = stubFetch(201, machine({ mode: "boot" }));
+    render(<Panel discovered={[found({ source: "pxe", hostname: null })]} reload={vi.fn().mockResolvedValue(undefined)} />);
+
+    expect(screen.getByRole("heading", { name: "New PCs (1)" })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Name for aa:bb:cc:dd:ee:01"), "pc-03");
+    // The only OS image and the only game disk are picked already.
+    expect(screen.getByLabelText("OS image for aa:bb:cc:dd:ee:01")).toHaveValue("5");
+    expect(screen.getByLabelText("Game disk for aa:bb:cc:dd:ee:01")).toHaveValue("1");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(calls(fetchMock)).toEqual([
+      {
+        url: "/api/v1/discovery/7/claim",
+        method: "POST",
+        body: { name: "pc-03", mode: "boot", game_disk_id: 1, os_disk_id: 5 },
+      },
+    ]);
+  });
+
+  it("does not add a Boot Mode PC without an OS image", async () => {
+    render(<Panel discovered={[found({ source: "pxe", hostname: null })]} reload={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("Name for aa:bb:cc:dd:ee:01"), "pc-03");
+    await userEvent.selectOptions(screen.getByLabelText("OS image for aa:bb:cc:dd:ee:01"), "");
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
   });
 });

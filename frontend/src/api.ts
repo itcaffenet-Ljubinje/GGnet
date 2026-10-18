@@ -194,6 +194,7 @@ export interface DiscoveryClaim {
   name: string;
   mode?: MachineMode;
   game_disk_id?: number | null;
+  os_disk_id?: number | null;     // Boot Mode: the OS image
 }
 
 export interface MachineCreate {
