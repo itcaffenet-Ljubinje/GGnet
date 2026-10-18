@@ -394,7 +394,7 @@ def test_ipxe_unknown_pc_waits_for_registration(client, disks):
 
 def test_ipxe_unknown_pc_boots_locally_when_configured(client, disks, monkeypatch):
     from app.api.v1 import boot
-    monkeypatch.setattr(boot, "unregistered_mode", lambda: "local")
+    monkeypatch.setattr(boot, "unregistered_mode", lambda cfg=None: "local")
     script = _ipxe(client, "aa-bb-cc-dd-ee-99")
     assert "not registered" in script and "prompt" not in script
     assert script.rstrip().endswith("exit")
@@ -527,8 +527,22 @@ def test_boot_gateway(value, line):
 
 def test_the_gateway_goes_before_the_sanboot(client, disks, monkeypatch):
     from app.api.v1 import boot
-    monkeypatch.setattr(boot, "boot_gateway", lambda: "0.0.0.0")
+    monkeypatch.setattr(boot, "boot_gateway", lambda cfg=None: "0.0.0.0")
     _boot_machine(client, disks)
     lines = _ipxe(client).splitlines()
     assert lines[1] == "set netX/gateway 0.0.0.0"
     assert lines.index("set netX/gateway 0.0.0.0") < next(i for i, l in enumerate(lines) if l.startswith("sanboot"))
+
+
+def test_settings_saved_in_the_web_ui_apply_to_the_next_boot(client, disks):
+    """Settings → Network boot overrides [boot] in config.toml, with no restart."""
+    _boot_machine(client, disks)
+    assert "set netX/gateway 0.0.0.0" in _ipxe(client)
+    r = client.put("/api/v1/settings/boot", json={"gateway": "192.168.0.40", "unregistered": "local"})
+    assert r.status_code == 200, r.text
+    assert "set netX/gateway 192.168.0.40" in _ipxe(client)
+    unknown = _ipxe(client, "aa-bb-cc-dd-ee-99")
+    assert "not registered" in unknown and "prompt" not in unknown
+    client.put("/api/v1/settings/boot", json={"gateway": "dhcp", "unregistered": "wait"})
+    assert "netX/gateway" not in _ipxe(client)
+    assert "prompt" in _ipxe(client, "aa-bb-cc-dd-ee-99")

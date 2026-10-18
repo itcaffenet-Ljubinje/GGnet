@@ -9,6 +9,7 @@ import {
 } from "../api";
 import { ClientApp } from "../components/ClientApp";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { NetworkBoot } from "../components/NetworkBoot";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 
@@ -203,6 +204,8 @@ export function SettingsPage({ storage, reload }: Props) {
           </button>
         </div>
       </form>
+
+      <NetworkBoot />
 
       <ClientApp />
 

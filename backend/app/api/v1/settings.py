@@ -1,6 +1,7 @@
 """
 API for settings changed in the web UI: retention (automated removal of old
-versions and inactive writebacks) and the pool's reserved space.
+versions and inactive writebacks), the pool's reserved space, and network
+boot (the boot settings and the PXE service's state, app.services.pxe).
 
 Nothing touches the host until the admin saves the settings: GET returns the
 defaults with `saved: false`.
@@ -14,9 +15,12 @@ from dataclasses import asdict
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner
+from app.api.deps import get_provisioner, get_pxe_service
 from app.api.v1.errors import conflict, host_failed
 from app.api.v1.schemas import (
+    BootSettingsIn,
+    BootSettingsOut,
+    PxeStatusOut,
     RetentionActionOut,
     RetentionIn,
     RetentionOut,
@@ -24,7 +28,8 @@ from app.api.v1.schemas import (
     StorageOut,
 )
 from app.db.session import get_db
-from app.services import retention
+from app.services import pxe, retention
+from app.services.pxe import PxeService
 from app.services.provisioning import Provisioner, ProvisioningError
 
 logger = logging.getLogger("ggnet.api.settings")
@@ -108,3 +113,32 @@ def get_storage(
         warning_percent=s.warning_percent,
         warning=percent >= s.warning_percent,
     )
+
+
+@router.get("/settings/boot", response_model=BootSettingsOut)
+def get_boot_settings(db: Session = Depends(get_db)):
+    s, saved = pxe.load_settings(db)
+    return BootSettingsOut(**asdict(s), saved=saved)
+
+
+@router.put("/settings/boot", response_model=BootSettingsOut)
+def put_boot_settings(body: BootSettingsIn, db: Session = Depends(get_db)):
+    """Applies to the next PC that asks for its iPXE script; nothing is restarted."""
+    pxe.save_settings(db, pxe.BootSettings(**body.model_dump()))
+    return get_boot_settings(db)
+
+
+@router.get("/pxe", response_model=PxeStatusOut)
+def get_pxe_status(service: PxeService = Depends(get_pxe_service)):
+    status = service.status()
+    if status is None:
+        host_failed(f"Cannot read the state of {service.unit}: {service.runner.last_error}")
+    return PxeStatusOut(**asdict(status))
+
+
+@router.post("/pxe/restart", response_model=PxeStatusOut)
+def restart_pxe(service: PxeService = Depends(get_pxe_service)):
+    """Restart the proxyDHCP + TFTP service, e.g. after a network change. PCs booting now retry."""
+    if not service.restart():
+        host_failed(f"Restarting {service.unit} failed: {service.runner.last_error}")
+    return get_pxe_status(service)

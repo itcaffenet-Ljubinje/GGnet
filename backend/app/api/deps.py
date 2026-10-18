@@ -51,3 +51,10 @@ def get_agent_package():
 def get_server_url() -> str:
     """The URL agents use to reach this server (service IP and web port)."""
     return server_url()
+
+
+def get_pxe_service():
+    """The PXE service (proxyDHCP + TFTP) named in config.toml."""
+    from app.services.pxe import PxeService
+
+    return PxeService.from_config()

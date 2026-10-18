@@ -2254,3 +2254,19 @@ section.has-bulk-dock {
     padding-bottom: 260px;
   }
 }
+
+/* Settings → Network boot */
+.pxe-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pxe-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}

@@ -86,6 +86,28 @@ export interface Retention extends RetentionSettings {
   last_run: RetentionReport | null;
 }
 
+/** Settings → Network boot: what iPXE gets; config.toml's until saved. */
+export interface BootSettings {
+  /** "none" (0.0.0.0), "dhcp" (the router's) or an IPv4 address. */
+  gateway: string;
+  unregistered: "wait" | "local";
+}
+
+export interface BootSettingsOut extends BootSettings {
+  saved: boolean;
+}
+
+/** The PXE service (proxyDHCP + TFTP) as systemd sees it. */
+export interface PxeStatus {
+  unit: string;
+  installed: boolean;
+  state: string;
+  sub_state: string;
+  since: string | null;
+  tftp_root: string;
+  files: Record<string, boolean>;
+}
+
 export interface Storage {
   pool: string;
   total_bytes: number;
@@ -279,6 +301,10 @@ export const api = {
   getAgentPackage: () => request<AgentPackage>("GET", "/v1/agent/package"),
   getStorage: () => request<Storage>("GET", "/v1/storage"),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),
+  getBootSettings: () => request<BootSettingsOut>("GET", "/v1/settings/boot"),
+  saveBootSettings: (body: BootSettings) => request<BootSettingsOut>("PUT", "/v1/settings/boot", body),
+  getPxe: () => request<PxeStatus>("GET", "/v1/pxe"),
+  restartPxe: () => request<PxeStatus>("POST", "/v1/pxe/restart"),
   saveRetention: (body: RetentionSettings) => request<Retention>("PUT", "/v1/settings/retention", body),
   previewRetention: (body: RetentionSettings) =>
     request<RetentionAction[]>("POST", "/v1/settings/retention/preview", body),

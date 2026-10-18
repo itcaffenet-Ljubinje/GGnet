@@ -343,6 +343,9 @@ gateway = "none"
 # A PC whose MAC is not registered: "wait" on screen until it is added in the
 # web UI (Machines -> New PCs), as ggRock does, or "local" to boot its own disk.
 unregistered = "wait"
+# Both are defaults: once saved in the web UI (Settings -> Network boot), the
+# saved values win. The PXE service the web UI shows and can restart:
+pxe_service = "ggnet-pxe"
 
 [writebacks]
 # Discard each client's writeback after it disconnects (shutdown/restart),

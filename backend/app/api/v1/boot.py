@@ -14,7 +14,8 @@ boot falls through to its next boot device instead of stopping in iPXE:
                                 like ggRock, waits on screen until the admin
                                 registers it, asking iPXE again every 10 s; a
                                 key press boots the local disk instead.
-                                `[boot] unregistered = "local"` exits at once.
+                                `[boot] unregistered = "local"` exits at once
+                                (also set in the web UI: Settings → Network boot).
 
 Before it answers a provisioned PC, the server discards its writebacks like
 the watcher does after a disconnect (app.services.writebacks), unless the PC
@@ -37,7 +38,7 @@ from app.config import get_config
 from app.api.v1.schemas import _mac
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
-from app.services import discovery
+from app.services import discovery, pxe
 from app.services.provisioning import Provisioner
 from app.services.writebacks import WritebackSettings, on_ipxe
 
@@ -159,12 +160,14 @@ def ipxe_script(
     if mac is None:
         return exit_script("ggNet: no valid MAC address in the request. Booting from local disk.")
 
+    # [boot] settings: config.toml's, or the ones saved in the web UI.
+    cfg = pxe.effective_config(db)
     m = _find(db, mac)
     if m is None:
         logger.info("iPXE request from unregistered MAC %s", mac)
         discovery.record(db, mac, DiscoverySource.PXE,
                          ip_address=request.client.host if request.client else None)
-        if unregistered_mode() == "local":
+        if unregistered_mode(cfg) == "local":
             return exit_script(f"This PC is not registered in ggNet ({mac}). Booting from local disk.")
         # ${net0/mac} is iPXE's, so the PC asks with its own MAC like the first time.
         return wait_script(mac, f"{request.base_url}api/v1/boot/ipxe?mac=${{net0/mac}}")
@@ -180,4 +183,4 @@ def ipxe_script(
         return exit_script(f"ggNet: {m.name} cannot boot from the network: {m.last_error}")
     logger.info("iPXE: %s boots %s + %s", m.name, m.os_clone_snapshot, m.clone_snapshot)
     return sanboot_script(m, prov.iscsi.portal_ip, prov.iscsi.portal_port, m.iscsi_target_iqn,
-                          boot_gateway())
+                          boot_gateway(cfg))

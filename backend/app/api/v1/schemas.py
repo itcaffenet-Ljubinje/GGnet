@@ -546,3 +546,35 @@ class DiscoveryClaim(BaseModel):
     @classmethod
     def check_drive_letter(cls, v: str) -> str:
         return _drive_letter(v)
+
+
+class BootSettingsIn(BaseModel):
+    # "none" (0.0.0.0 in the iBFT), "dhcp" (the router's gateway) or an IPv4 address.
+    gateway: str = "none"
+    unregistered: Literal["wait", "local"] = "wait"
+
+    @field_validator("gateway")
+    @classmethod
+    def _gateway(cls, v: str) -> str:
+        v = v.strip()
+        if v in ("none", "dhcp"):
+            return v
+        try:
+            return str(ipaddress.IPv4Address(v))
+        except ValueError:
+            raise ValueError('gateway must be "none", "dhcp" or an IPv4 address') from None
+
+
+class BootSettingsOut(BootSettingsIn):
+    # False: config.toml's values, never saved in the web UI.
+    saved: bool
+
+
+class PxeStatusOut(BaseModel):
+    unit: str
+    installed: bool
+    state: str
+    sub_state: str
+    since: datetime | None
+    tftp_root: str
+    files: dict[str, bool]
