@@ -352,12 +352,45 @@ def test_ipxe_finds_the_mac_the_agent_reported(client, disks):
     assert "sanboot" in _ipxe(client)
 
 
-@pytest.mark.parametrize("mac", ["aa-bb-cc-dd-ee-99", "not-a-mac", ""])
-def test_ipxe_unknown_pc_boots_locally(client, disks, mac):
+@pytest.mark.parametrize("mac", ["not-a-mac", ""])
+def test_ipxe_without_a_valid_mac_boots_locally(client, disks, mac):
     _boot_machine(client, disks)
     script = _ipxe(client, mac)
     assert script.rstrip().endswith("exit")
+    assert "sanboot" not in script and "prompt" not in script
+
+
+def test_ipxe_unknown_pc_waits_for_registration(client, disks):
+    """Like ggRock: an unregistered PC stays on screen until the admin adds it."""
+    _boot_machine(client, disks)
+    script = _ipxe(client, "aa-bb-cc-dd-ee-99")
+    assert "not registered (MAC aa:bb:cc:dd:ee:99)" in script
+    assert "Machines -> New PCs" in script
+    assert "prompt --timeout 10000 " in script and "&& goto local || goto again" in script
+    # It asks again with its own MAC, iPXE filling it in, and boots as soon as it is known.
+    assert "chain --replace --autofree http://testserver/api/v1/boot/ipxe?mac=${net0/mac} || goto wait" in script
+    assert script.rstrip().endswith("exit")       # a key press boots the local disk
     assert "sanboot" not in script
+    # Once registered as a Boot Mode PC, the same request boots it.
+    r = client.post("/api/v1/machines", json={
+        "name": "pc-99", "mode": "boot", "mac": "aa:bb:cc:dd:ee:99",
+        "game_disk_id": disks[1]["id"], "os_disk_id": disks[0]["id"]})
+    assert r.status_code == 201, r.text
+    assert "sanboot" in _ipxe(client, "aa-bb-cc-dd-ee-99")
+
+
+def test_ipxe_unknown_pc_boots_locally_when_configured(client, disks, monkeypatch):
+    from app.api.v1 import boot
+    monkeypatch.setattr(boot, "unregistered_mode", lambda: "local")
+    script = _ipxe(client, "aa-bb-cc-dd-ee-99")
+    assert "not registered" in script and "prompt" not in script
+    assert script.rstrip().endswith("exit")
+
+
+@pytest.mark.parametrize("value, mode", [(None, "wait"), ("wait", "wait"), ("local", "local"), ("nope", "wait")])
+def test_unregistered_mode(value, mode):
+    from app.api.v1.boot import unregistered_mode
+    assert unregistered_mode({} if value is None else {"boot": {"unregistered": value}}) == mode
 
 
 def test_ipxe_disk_mode_pc_boots_locally(client, disks):

@@ -320,6 +320,20 @@ is set up as the PC again.
 The router stays the DHCP server for IP addresses. dnsmasq on the Proxmox host only answers PXE requests
 (proxyDHCP) and serves the iPXE binary over TFTP. Only one PXE server may run in the LAN.
 
+The installer sets this up as the `ggnet-pxe` service (`dnsmasq-base`, config `/etc/ggnet/dnsmasq-pxe.conf`,
+TFTP root `/var/lib/ggnet/tftp`). It answers every PC: UEFI x64 PCs get `snponly.efi` (iPXE on the board's
+own UEFI network driver; iPXE's built-in Realtek driver stalled after ~30 MB on the RTL8168), then iPXE asks
+`/api/v1/boot/ipxe?mac=${net0/mac}`. What the PC gets depends on ggNet, not on dnsmasq:
+
+- a registered Boot Mode PC boots its OS image;
+- a Disk Mode PC, or a PC without a valid MAC, leaves iPXE and boots its local disk;
+- an unregistered PC is listed under Machines → New PCs and, as with ggRock, waits on screen: every 10 s it
+  asks for its script again, so it boots as soon as it is registered; a key press boots the local disk.
+  `[boot] unregistered = "local"` makes it boot the local disk at once instead.
+
+A PC whose BIOS tries the network before its disk therefore stops at the waiting screen until it is
+registered (or a key is pressed).
+
 `deploy/dnsmasq/ggnet-proxydhcp.conf`:
 
 ```ini
@@ -491,7 +505,7 @@ network throughput of the iSCSI interface.
 | Boot Mode: agent installed into the OS image by the server | planned |
 | Maintenance VM: the installer offers one Proxmox VM (UEFI, TPM, no disk, stopped; its ID in config.toml); Images → OS image → Edit in VM attaches the image, Finish makes a new version | planned |
 | Boot Mode: first diskless boot on real PCs (dev dnsmasq + `snponly.efi`, 4 PCs, 2 board types) | done |
-| Boot Mode: proxyDHCP / TFTP managed by ggNet and the installer (MACs from the machine list) | planned |
+| Boot Mode: proxyDHCP / TFTP set up by the installer (`ggnet-pxe`, answers every PC); unregistered PCs wait for registration | done |
 | Boot Mode: import `.vhdx` into an OS image (new GUIDs, boot-start iSCSI, NDIS NIC driver), Add hardware, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |
 | Boot Mode: OS images, proxyDHCP, iPXE build, per-MAC script, Add Machines wizard | after Disk Mode |

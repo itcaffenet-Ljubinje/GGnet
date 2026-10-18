@@ -15,6 +15,7 @@ DATA_DIR="/var/lib/ggnet"
 CONF_DIR="/etc/ggnet"
 CONF_FILE="$CONF_DIR/config.toml"
 UNIT_FILE="/etc/systemd/system/ggnet.service"
+PXE_UNIT_FILE="/etc/systemd/system/ggnet-pxe.service"
 
 PURGE=0
 ASSUME_YES=0
@@ -42,9 +43,10 @@ if [[ -f "$CONF_FILE" ]]; then
     ROOT_DS="$(awk -F'"' '/^root_dataset[[:space:]]*=/{print $2; exit}' "$CONF_FILE")"
 fi
 
-echo "==> Stopping ggNet service..."
+echo "==> Stopping ggNet services..."
 systemctl disable --now ggnet >/dev/null 2>&1 || true
-rm -f "$UNIT_FILE"
+systemctl disable --now ggnet-pxe >/dev/null 2>&1 || true
+rm -f "$UNIT_FILE" "$PXE_UNIT_FILE"
 systemctl daemon-reload
 
 echo "==> Removing $INSTALL_DIR..."
