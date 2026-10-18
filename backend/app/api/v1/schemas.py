@@ -10,6 +10,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.db.models import DiscoverySource, DiskKind, MachineMode, MachineStatus
+from app.zfs_manager import COMMENT_MAX, valid_comment
 
 # The disk name becomes part of a ZFS path, so only [a-z0-9-].
 _DISK_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
@@ -105,6 +106,25 @@ class SnapshotOut(BaseModel):
     active: bool              # PCs are cloned from it at their next discard
     machines: list[str]       # PCs whose writeback was cloned from it
     pinned: list[str]         # PCs pinned to it (they move to it at their next reboot)
+    comment: str | None = None   # who, when, what changed
+
+
+def _comment(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    if not valid_comment(v):
+        raise ValueError(f"comment: one line of at most {COMMENT_MAX} printable characters")
+    return v
+
+
+class SnapshotComment(BaseModel):
+    comment: str    # "" removes it
+
+    @field_validator("comment")
+    @classmethod
+    def _check(cls, v: str) -> str:
+        return _comment(v) or ""
 
 
 class ActiveSnapshot(BaseModel):
@@ -221,6 +241,12 @@ class ApplyWritebacks(BaseModel):
     """Which kept writebacks become versions; `os` only counts in Boot Mode."""
     os: bool = True
     game: bool = True
+    comment: str | None = None   # set on every version this makes
+
+    @field_validator("comment")
+    @classmethod
+    def _check(cls, v: str | None) -> str | None:
+        return _comment(v) or None
 
 
 class MachinePin(BaseModel):

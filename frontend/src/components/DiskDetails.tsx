@@ -38,6 +38,15 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     await Promise.all([load(), onChanged()]);
   }
 
+  async function editComment(s: Snapshot) {
+    const text = window.prompt(
+      `Comment on @${s.name} of ${disk.name} (who, when, what changed). Empty removes it.`,
+      s.comment ?? "",
+    );
+    if (text === null) return;
+    await act(`comment-${s.name}`, () => api.setSnapshotComment(disk.id, s.name, text.trim()));
+  }
+
   function makeActive(s: Snapshot) {
     const msg =
       `Make version ${s.name} of "${disk.name}" active?\n\n` +
@@ -103,6 +112,7 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
               <th>Data</th>
               <th>Only in this version</th>
               <th>Used by</th>
+              <th>Comment</th>
               <th />
             </tr>
           </thead>
@@ -127,7 +137,19 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                       <span className="muted">—</span>
                     )}
                   </td>
+                  <td>
+                    {s.comment ? <span className="small">{s.comment}</span> : <span className="muted">—</span>}
+                  </td>
                   <td className="actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => editComment(s)}
+                      disabled={busy !== null}
+                      aria-label={`Comment on @${s.name}`}
+                    >
+                      {busy === `comment-${s.name}` ? "Saving…" : "Comment"}
+                    </button>
                     {!s.active && (
                       <button type="button" onClick={() => makeActive(s)} disabled={busy !== null}>
                         {busy === `active-${s.name}` ? "Activating…" : "Make active"}

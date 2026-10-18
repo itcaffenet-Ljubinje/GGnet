@@ -610,6 +610,11 @@ def apply_writebacks(
         host_failed(str(e), machine_id=machine.id)
     for (disk, _), new in zip(targets, news):
         disk.snapshot = new
+        if body.comment:
+            try:
+                prov.set_comment(disk.zvol_path, new, body.comment)
+            except ProvisioningError as e:   # the version exists; only its comment is missing
+                logger.warning("%s", e)
     if body.game:
         # The PC made the new version; it continues on it, not on an old pin.
         machine.pinned_snapshot = None

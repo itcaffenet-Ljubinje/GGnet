@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -31,10 +31,10 @@ describe("GameDisksPage", () => {
     await userEvent.type(screen.getByLabelText("Name"), "cs2");
     await userEvent.clear(screen.getByLabelText("Size (GB)"));
     await userEvent.type(screen.getByLabelText("Size (GB)"), "50");
-    await userEvent.click(screen.getByRole("button", { name: "Create disk" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
 
     expect(calls(fetchMock)).toEqual([
-      { url: "/api/v1/game-disks", method: "POST", body: { name: "cs2", size_gb: 50 } },
+      { url: "/api/v1/game-disks", method: "POST", body: { name: "cs2", size_gb: 50, kind: "game" } },
     ]);
     expect(reload).toHaveBeenCalled();
     expect(screen.getByLabelText("Name")).toHaveValue("");
@@ -79,7 +79,7 @@ describe("GameDisksPage", () => {
       />,
     );
     const select = screen.getByLabelText("PC to edit cs2 on");
-    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["PC…", "pc01"]);
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["PC…", "pc01"]);
     expect(screen.getByRole("button", { name: "Edit on PC" })).toBeDisabled();
 
     await userEvent.selectOptions(select, "1");
@@ -127,5 +127,27 @@ describe("GameDisksPage", () => {
     const buttons = screen.getAllByRole("button", { name: "Details" });
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("lists OS images and game disks apart and creates an OS image", async () => {
+    const fetchMock = stubFetch(201, disk({ id: 3, name: "win11", kind: "os" }));
+    render(
+      <GameDisksPage
+        disks={[disk(), disk({ id: 3, name: "win11", kind: "os", zvol_path: "tank/ggnet/images/win11" })]}
+        machines={[machine({ mode: "boot", os_disk_id: 3, game_disk_id: 1 })]}
+        reload={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["OS images", "Game disks"]);
+    const [osTable, gameTable] = screen.getAllByRole("table");
+    expect(osTable).toHaveTextContent("win11");
+    expect(osTable).not.toHaveTextContent("cs2");
+    expect(gameTable).toHaveTextContent("cs2");
+
+    await userEvent.type(screen.getByLabelText("Name"), "win11-b");
+    await userEvent.selectOptions(screen.getByLabelText("Kind"), "os");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(calls(fetchMock).filter((c) => c.method === "POST")[0].body).toMatchObject({ kind: "os" });
   });
 });

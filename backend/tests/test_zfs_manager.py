@@ -310,15 +310,35 @@ def test_list_clients_parses_output_and_skips_parent(zfs, runner):
     assert "-p" in runner.calls[-1]
 
 
-def test_snapshot_details_parses_bytes_and_clones(zfs, runner):
+def test_snapshot_details_parses_bytes_clones_and_comment(zfs, runner):
     runner.on("zfs", "list", result=(True,
-        f"{MASTER}@base\t1760000000\t4096\t1073741824\t{CLIENT},tank/ggnet/writebacks/pc02\n"
-        f"{MASTER}@v2\t1760003600\t0\t2147483648\t-", ""))
+        f"{MASTER}@base\t1760000000\t4096\t1073741824\t{CLIENT},tank/ggnet/writebacks/pc02\t-\n"
+        f"{MASTER}@v2\t1760003600\t0\t2147483648\t-\tAB 18.10. Warzone update", ""))
     assert zfs.snapshot_details(MASTER) == [
         {"name": "base", "creation": 1760000000, "used": 4096, "referenced": 1073741824,
-         "clones": [CLIENT, "tank/ggnet/writebacks/pc02"]},
-        {"name": "v2", "creation": 1760003600, "used": 0, "referenced": 2147483648, "clones": []},
+         "clones": [CLIENT, "tank/ggnet/writebacks/pc02"], "comment": None},
+        {"name": "v2", "creation": 1760003600, "used": 0, "referenced": 2147483648, "clones": [],
+         "comment": "AB 18.10. Warzone update"},
     ]
+    assert runner.calls[0][-3:] == ["-d", "1", MASTER]
+    assert "name,creation,used,refer,clones,ggnet:comment" in runner.calls[0]
+
+
+def test_snapshot_comment_set_and_removed(zfs, runner):
+    assert zfs.set_snapshot_comment(f"{MASTER}@v2", "AB 18.10. Warzone update")
+    assert zfs.set_snapshot_comment(f"{MASTER}@v2", "")
+    assert runner.calls == [
+        ["zfs", "set", "ggnet:comment=AB 18.10. Warzone update", f"{MASTER}@v2"],
+        ["zfs", "inherit", "ggnet:comment", f"{MASTER}@v2"],
+    ]
+
+
+def test_snapshot_comment_refuses_bad_input(zfs, runner):
+    assert not zfs.set_snapshot_comment(f"{MASTER}@v2", "two\nlines")
+    assert not zfs.set_snapshot_comment(f"{MASTER}@v2", "x" * 201)
+    assert not zfs.set_snapshot_comment(MASTER, "no snapshot")
+    assert not zfs.set_snapshot_comment("rpool/data@v2", "unmanaged")
+    assert runner.calls == []
 
 
 def test_snapshot_details_rejects_unmanaged_dataset(zfs, runner):

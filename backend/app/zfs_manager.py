@@ -27,6 +27,10 @@ logger = logging.getLogger("ggnet.zfs")
 # than what ZFS accepts (no spaces, no '%'), and a component must not start
 # with '-' so it cannot be parsed as a command option.
 _COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
+# A version's comment (who, when, what changed), kept as a user property on
+# its snapshot so it travels with the snapshot (rename, promote, zfs send).
+COMMENT_PROP = "ggnet:comment"
+COMMENT_MAX = 200
 
 # Datasets under root_dataset that ggNet creates and manages.
 _CHILD_KEYS = ("images", "writebacks", "snapshots", "iscsi_targets")
@@ -53,6 +57,11 @@ class ZFSLayout:
         if missing:
             raise ValueError(f"[storage] is missing: {', '.join(missing)}")
         return cls(**{k: str(storage[k]) for k in keys})
+
+
+def valid_comment(comment: str) -> bool:
+    """One printable line (zfs list prints it between tabs), at most COMMENT_MAX characters."""
+    return len(comment) <= COMMENT_MAX and comment.isprintable()
 
 
 def _int(value: str) -> int:
@@ -573,14 +582,14 @@ class ZFSManager:
     def snapshot_details(self, dataset: str) -> Optional[list[dict]]:
         """
         Snapshots of one master, oldest first: name (after '@'), creation
-        (Unix time), used and referenced (bytes), and the clones made from
-        it. None if they cannot be listed.
+        (Unix time), used and referenced (bytes), the clones made from it and
+        its comment (None when unset). None if they cannot be listed.
         """
         if not self._is_managed(dataset, allow_snapshot=False):
             return None
         ok, out, _ = self._run([
             "zfs", "list", "-H", "-p", "-t", "snapshot",
-            "-o", "name,creation,used,refer,clones",
+            "-o", f"name,creation,used,refer,clones,{COMMENT_PROP}",
             "-s", "createtxg", "-d", "1", dataset,
         ])
         if not ok:
@@ -588,7 +597,7 @@ class ZFSManager:
         snaps = []
         for line in out.splitlines():
             parts = line.split("\t")
-            if len(parts) != 5 or "@" not in parts[0]:
+            if len(parts) != 6 or "@" not in parts[0]:
                 continue
             snaps.append({
                 "name": parts[0].partition("@")[2],
@@ -596,8 +605,20 @@ class ZFSManager:
                 "used": _int(parts[2]),
                 "referenced": _int(parts[3]),
                 "clones": [c for c in parts[4].split(",") if c and c != "-"],
+                "comment": None if parts[5] in ("", "-") else parts[5],
             })
         return snaps
+
+    def set_snapshot_comment(self, snapshot: str, comment: str) -> bool:
+        """Set a version's comment; an empty one removes it."""
+        if "@" not in snapshot or not self._is_managed(snapshot) or not valid_comment(comment):
+            return False
+        cmd = (["zfs", "set", f"{COMMENT_PROP}={comment}", snapshot] if comment
+               else ["zfs", "inherit", COMMENT_PROP, snapshot])
+        ok, _, err = self._run(cmd)
+        if not ok:
+            logger.error("Setting the comment of %s failed: %s", snapshot, err)
+        return ok
 
     def destroy_snapshot(self, snapshot: str, tag: str = "ggnet:protected") -> bool:
         """
