@@ -163,6 +163,13 @@ class Provisioner:
         """Every client clone on the host with its size and origin."""
         return self.zfs.list_clients()
 
+    def set_comment(self, zvol_path: str, name: str, comment: str) -> None:
+        """Set (or with "" remove) the comment of one version."""
+        with self.lock:
+            self._clear()
+            if not self.zfs.set_snapshot_comment(f"{zvol_path}@{name}", comment):
+                raise self._fail(f"Setting the comment of {zvol_path}@{name} failed")
+
     def delete_snapshot(self, zvol_path: str, name: str) -> None:
         with self.lock:
             self._clear()

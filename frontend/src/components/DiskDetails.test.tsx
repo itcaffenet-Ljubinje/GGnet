@@ -42,6 +42,7 @@ const SNAPSHOTS: Snapshot[] = [
     active: true,
     machines: ["pc01"],
     pinned: [],
+    comment: "AB 18.10. Warzone update",
   },
 ];
 
@@ -194,5 +195,28 @@ describe("DiskDetails", () => {
     const versions = await screen.findByRole("table", { name: "Versions of cs2" });
     await userEvent.click(within(versions).getAllByRole("button", { name: "Make active" })[0]);
     expect(actions(mock)).toEqual([]);
+  });
+
+  it("shows and edits a version's comment", async () => {
+    const fetchMock = stubHost();
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("  new notes ");
+    renderDetails();
+
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    expect(within(versions).getAllByRole("row")[4]).toHaveTextContent("AB 18.10. Warzone update");
+    await userEvent.click(within(versions).getByRole("button", { name: "Comment on @v2" }));
+    expect(prompt.mock.calls[0][1]).toBe("AB 18.10. Warzone update");
+    expect(actions(fetchMock)).toEqual([
+      { url: "/api/v1/game-disks/1/snapshots/v2/comment", method: "PUT", body: { comment: "new notes" } },
+    ]);
+  });
+
+  it("leaves the comment alone when the prompt is cancelled", async () => {
+    const fetchMock = stubHost();
+    vi.spyOn(window, "prompt").mockReturnValue(null);
+    renderDetails();
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    await userEvent.click(within(versions).getByRole("button", { name: "Comment on @base" }));
+    expect(actions(fetchMock)).toEqual([]);
   });
 });

@@ -20,6 +20,7 @@ class FakeHost:
     def __init__(self) -> None:
         self.datasets: dict[str, dict] = {}         # name → {"origin": snap|None, "readonly": bool}
         self.snapshots: dict[str, set[str]] = {}    # "ds@snap" → holds
+        self.snap_props: dict[str, dict[str, str]] = {}   # "ds@snap" → user properties
         self.backstores: dict[str, str] = {}        # name → /dev/zvol/...
         # iqn → {luns: {tpg lun: backstore}, acls: {initiator: {mapped: tpg lun}},
         #        portals: {"ip:port"}, attrs: {}}
@@ -96,6 +97,7 @@ class FakeHost:
             "refer": str(refer),
             "clones": ",".join(self.clones_of(name)) or "-",
             "origin": self.datasets.get(name, {}).get("origin") or "-",
+            "ggnet:comment": self.snap_props.get(name, {}).get("ggnet:comment", "-"),
         }
         return "\t".join(values[f] for f in fields)
 
@@ -163,6 +165,17 @@ class FakeHost:
             self.snapshots[snap].discard(tag)
             return self._ok()
 
+        if sub in ("set", "inherit") and "@" in a[2]:
+            prop, name = a[1], a[2]
+            if name not in self.snapshots:
+                return self._err(f"cannot open '{name}': dataset does not exist")
+            key, _, value = prop.partition("=")
+            if sub == "set":
+                self.snap_props.setdefault(name, {})[key] = value
+            else:
+                self.snap_props.get(name, {}).pop(key, None)
+            return self._ok()
+
         if sub == "set":
             prop, name = a[1], a[2]
             if name not in self.datasets:
@@ -202,6 +215,7 @@ class FakeHost:
             if any(r in self.snapshots for r in renames.values()):
                 return self._err(f"cannot promote '{clone}': snapshot name conflict")
             self.snapshots = {renames.get(k, k): v for k, v in self.snapshots.items()}
+            self.snap_props = {renames.get(k, k): v for k, v in self.snap_props.items()}
             for p in self.datasets.values():
                 if p["origin"] in renames:
                     p["origin"] = renames[p["origin"]]
@@ -229,6 +243,7 @@ class FakeHost:
             self.datasets = {(dst if k == src else k): v for k, v in self.datasets.items()}
             renames = {k: f"{dst}@{k.split('@')[1]}" for k in self.snapshots if k.split("@")[0] == src}
             self.snapshots = {renames.get(k, k): v for k, v in self.snapshots.items()}
+            self.snap_props = {renames.get(k, k): v for k, v in self.snap_props.items()}
             for p in self.datasets.values():
                 if p["origin"] in renames:
                     p["origin"] = renames[p["origin"]]
@@ -241,6 +256,7 @@ class FakeHost:
             if dst in self.snapshots:
                 return self._err(f"cannot rename to '{dst}': dataset already exists")
             self.snapshots = {(dst if k == src else k): v for k, v in self.snapshots.items()}
+            self.snap_props = {(dst if k == src else k): v for k, v in self.snap_props.items()}
             for p in self.datasets.values():
                 if p["origin"] == src:
                     p["origin"] = dst
@@ -257,6 +273,7 @@ class FakeHost:
                 if self.clones_of(name):
                     return self._err(f"cannot destroy '{name}': snapshot has dependent clones")
                 del self.snapshots[name]
+                self.snap_props.pop(name, None)
                 return self._ok()
             victims = [name] + (self._children(name) if recursive else [])
             snaps = [s for s in self.snapshots

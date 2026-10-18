@@ -123,6 +123,7 @@ describe("MachinesPage", () => {
   it("applies writebacks after confirmation", async () => {
     const fetchMock = stubFetch(200, machine());
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue("");
     const m = machine({ game_disk_id: 1, status: "provisioned", keep_writeback: true });
     render(<MachinesPage disks={DISKS} machines={[m]} reload={vi.fn()} />);
 
@@ -132,9 +133,20 @@ describe("MachinesPage", () => {
     ]);
   });
 
+  it("does not apply when the comment prompt is cancelled", async () => {
+    const fetchMock = stubFetch(200, machine());
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue(null);
+    const m = machine({ game_disk_id: 1, status: "provisioned", keep_writeback: true });
+    render(<MachinesPage disks={DISKS} machines={[m]} reload={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Apply writebacks" }));
+    expect(actions(fetchMock)).toEqual([]);
+  });
+
   it("a boot mode PC can apply only its OS writeback", async () => {
     const fetchMock = stubFetch(200, machine());
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue("  AB drivers  ");
     const m = machine({
       mode: "boot",
       game_disk_id: 1,
@@ -149,7 +161,11 @@ describe("MachinesPage", () => {
     expect(confirm.mock.calls[0][0]).toContain('the OS image "win11"');
     expect(confirm.mock.calls[0][0]).toContain("The game writeback is not applied");
     expect(actions(fetchMock)).toEqual([
-      { url: "/api/v1/machines/1/apply-writebacks", method: "POST", body: { os: true, game: false } },
+      {
+        url: "/api/v1/machines/1/apply-writebacks",
+        method: "POST",
+        body: { os: true, game: false, comment: "AB drivers" },
+      },
     ]);
   });
 

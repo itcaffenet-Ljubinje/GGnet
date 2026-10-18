@@ -638,3 +638,44 @@ def test_writebacks_show_the_pin(client, disk):
     client.put(f"/api/v1/machines/{other['id']}/pin", json={"snapshot": "base"})
     rows = {w["machine_name"]: w for w in client.get(f"/api/v1/game-disks/{disk['id']}/writebacks").json()}
     assert (rows["pc02"]["pinned_snapshot"], rows["pc02"]["outdated"]) == ("base", False)
+
+
+# ── Version comments ──────────────────────────────────────────────────
+
+def _by_name(client, disk) -> dict:
+    return {v["name"]: v for v in client.get(f"/api/v1/game-disks/{disk['id']}/snapshots").json()}
+
+
+def test_apply_writebacks_puts_the_comment_on_the_new_version(client, host, disk):
+    m = _keeper(client, disk)
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks",
+                    json={"comment": "  AB 18.10. Warzone update  "})
+    assert r.status_code == 200, r.text
+    versions = _by_name(client, disk)
+    assert versions["v2"]["comment"] == "AB 18.10. Warzone update"
+    assert versions["base"]["comment"] is None
+
+
+def test_a_comment_can_be_set_changed_and_removed(client, host, disk):
+    url = f"/api/v1/game-disks/{disk['id']}/snapshots/base/comment"
+    r = client.put(url, json={"comment": "first install"})
+    assert r.status_code == 200, r.text
+    assert (r.json()["name"], r.json()["comment"]) == ("base", "first install")
+    assert client.put(url, json={"comment": ""}).json()["comment"] is None
+    assert ["zfs", "inherit", "ggnet:comment", f"{MASTER}@base"] in host.calls
+
+
+def test_a_bad_comment_or_version_is_refused(client, disk):
+    base = f"/api/v1/game-disks/{disk['id']}/snapshots"
+    assert client.put(f"{base}/base/comment", json={"comment": "two\nlines"}).status_code == 422
+    assert client.put(f"{base}/base/comment", json={"comment": "x" * 201}).status_code == 422
+    assert client.put(f"{base}/v9/comment", json={"comment": "nope"}).status_code == 404
+
+
+def test_the_comment_stays_when_the_version_is_merged_into_base(client, host, disk):
+    m = _keeper(client, disk)
+    client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"comment": "v2 notes"})
+    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": False})
+    r = client.post(f"/api/v1/game-disks/{disk['id']}/snapshots/v2/merge-into-base")
+    assert r.status_code == 200, r.text
+    assert _by_name(client, disk)["base"]["comment"] == "v2 notes"

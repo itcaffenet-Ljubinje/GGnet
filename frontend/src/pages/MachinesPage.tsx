@@ -191,7 +191,15 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
       kept +
       `\n\n${m.name} must be powered off.`;
     if (!window.confirm(msg)) return;
-    await run(`apply-${m.id}`, () => api.applyWritebacks(m.id, m.mode === "boot" ? APPLY[what] : undefined));
+    const comment = window.prompt("Comment for the new version (who, what changed). Optional.", "") ?? null;
+    if (comment === null) return;
+    const choice: ApplyChoice = {
+      ...(m.mode === "boot" ? APPLY[what] : {}),
+      ...(comment.trim() ? { comment: comment.trim() } : {}),
+    };
+    await run(`apply-${m.id}`, () =>
+      api.applyWritebacks(m.id, Object.keys(choice).length > 0 ? choice : undefined),
+    );
     await reload();
   }
 

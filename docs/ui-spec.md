@@ -23,24 +23,24 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 
 | Item | Status |
 |---|---|
-| Header: navigation (Machines, Images, Settings, later Server), storage widget (used %, color by threshold) | partial (no storage widget) |
-| Mobile bottom navigation with counts (machines, images) | todo |
-| Shared styles from ggNet2 (`styles.css` tokens, cards, badges, modals, drawers) | todo |
+| Header: navigation (Machines, Images, Settings, later Server), storage widget (used %, color by threshold) | done |
+| Mobile bottom navigation with counts (machines, images) | done |
+| Shared styles from ggNet2 (`styles.css` tokens, cards, badges, modals, drawers) | done |
 
 ## Machines
 
 | Item | Status |
 |---|---|
-| KPI cards: total, online, offline, writebacks / dirty | todo (data exists) |
+| KPI cards: total, online, offline, writebacks / dirty | done |
 | Table: name, MAC, mode (Disk / Boot), OS image + version, game disk + version, status, IP, link speed, uptime, agent version, sent / received | partial |
 | Boot state for Boot Mode PCs: booting (after iPXE), running, off | todo (`ipxe_at`, session state exist) |
 | Live traffic per PC (bps and totals) | backend |
 | Hardware drawer: CPU, GPU, RAM, board, NIC, link, agent, IP, MAC, iSCSI session | partial |
-| Add a PC: name, **MAC (required)**, mode, OS image (Boot Mode), game disk, drive letter. No IQN field | todo (form still has IQN) |
+| Add a PC: name, **MAC (required)**, mode, OS image (Boot Mode), game disk. No IQN field | done |
 | Discovery: PCs that knocked (PXE or agent) — Claim (name, mode, disks) and Ignore | done |
 | Per PC: Wake-on-LAN, Shutdown, Reboot | done |
 | Per PC: Keep Writeback, Discard Writeback, Pin version | done |
-| Per PC: Apply Writebacks with a choice: OS only / game only / both (Boot Mode) | backend (UI always sends both) |
+| Per PC: Apply Writebacks with a choice: OS only / game only / both (Boot Mode) | done |
 | Bulk: power, assign disk, pin, drive letter, stop keeping writebacks, delete | done |
 | Zones (e.g. Main Arena, VIP) for filtering and bulk actions | todo |
 | Fixed IP per PC (as a DHCP reservation hint, not in Windows) | todo |
@@ -50,12 +50,12 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 
 | Item | Status |
 |---|---|
-| Game disks and OS images in separate sections | partial |
+| Game disks and OS images in separate sections; Create asks for the kind | done |
 | Create: name, kind (game / OS), size | done |
 | Import: `.vhdx` / `.vhd` / `.raw` / `.qcow2` from a server folder or a USB disk; new GUIDs, boot-start iSCSI and NDIS NIC driver applied | todo (done by hand for `win11-vip05`) |
 | Upload from the browser with progress | todo |
 | Versions: list with size, date, PCs on each version; Make active, Rollback, Merge into base, Delete (active / pinned / in use protected) | done |
-| Comment on a version (who, when, what changed), asked at Apply Writebacks and Finish Edit | todo |
+| Comment on a version (who, when, what changed): asked at Apply Writebacks, editable per version, kept on the ZFS snapshot (`ggnet:comment`) | done |
 | Edit on a PC (draft game disk) and Finish Edit | done |
 | Writebacks: per PC, size, origin version, session | done |
 | Edit an OS image in the maintenance VM ("Local Drives") | todo |

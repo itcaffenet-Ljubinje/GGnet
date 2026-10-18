@@ -26,6 +26,8 @@ export type DiskKind = "game" | "os";
 export interface ApplyChoice {
   os?: boolean;
   game?: boolean;
+  /** Set on every version Apply Writebacks makes. */
+  comment?: string;
 }
 
 /** One version of a game disk (a ZFS snapshot of its master). */
@@ -37,6 +39,8 @@ export interface Snapshot {
   active: boolean;
   machines: string[];
   pinned: string[];
+  /** Who, when, what changed; null when unset. */
+  comment?: string | null;
 }
 
 /** A PC's writeback (clone) of a game disk. */
@@ -253,8 +257,8 @@ export const api = {
   health: () => request<Health>("GET", "/health"),
 
   listDisks: () => request<GameDisk[]>("GET", "/v1/game-disks"),
-  createDisk: (name: string, size_gb: number) =>
-    request<GameDisk>("POST", "/v1/game-disks", { name, size_gb }),
+  createDisk: (name: string, size_gb: number, kind: DiskKind = "game") =>
+    request<GameDisk>("POST", "/v1/game-disks", { name, size_gb, kind }),
   publishDisk: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/publish`),
   startEdit: (id: number, machine_id: number) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/edit`, { machine_id }),
@@ -265,6 +269,8 @@ export const api = {
     request<GameDisk>("PUT", `/v1/game-disks/${id}/active-snapshot`, { snapshot }),
   deleteSnapshot: (id: number, name: string) =>
     request<void>("DELETE", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}`),
+  setSnapshotComment: (id: number, name: string, comment: string) =>
+    request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),
   listWritebacks: (id: number) => request<Writeback[]>("GET", `/v1/game-disks/${id}/writebacks`),

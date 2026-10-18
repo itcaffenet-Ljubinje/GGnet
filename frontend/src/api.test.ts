@@ -37,7 +37,7 @@ describe("api", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/game-disks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "cs2", size_gb: 10 }),
+      body: JSON.stringify({ name: "cs2", size_gb: 10, kind: "game" }),
     });
   });
 

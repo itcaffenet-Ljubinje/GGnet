@@ -26,6 +26,7 @@ from app.api.v1.schemas import (
     GameDiskCreate,
     GameDiskEdit,
     GameDiskOut,
+    SnapshotComment,
     SnapshotOut,
     WritebackOut,
 )
@@ -224,9 +225,29 @@ def list_snapshots(
             machines=sorted(by_clone[c].name if c in by_clone else c.rsplit("/", 1)[-1]
                             for c in v["clones"]),
             pinned=sorted(m.name for m in disk.machines if m.pinned_snapshot == v["name"]),
+            comment=v.get("comment"),
         )
         for v in _versions(prov, disk)
     ]
+
+
+@router.put("/{disk_id}/snapshots/{name}/comment", response_model=SnapshotOut)
+def set_snapshot_comment(
+    disk_id: int,
+    name: str,
+    body: SnapshotComment,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """Set (or with "" remove) a version's comment: who, when, what changed."""
+    disk = _get(db, disk_id)
+    if not disk.published or name not in {v["name"] for v in _versions(prov, disk)}:
+        not_found("Version", name)
+    try:
+        prov.set_comment(disk.zvol_path, name, body.comment)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    return next(v for v in list_snapshots(disk_id, db, prov) if v.name == name)
 
 
 @router.put("/{disk_id}/active-snapshot", response_model=GameDiskOut)
