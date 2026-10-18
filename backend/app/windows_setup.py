@@ -14,6 +14,8 @@ an extra reboot:
     Services\\Tcpip\\Parameters\\Interfaces\\{...}
                                         a fixed IPv4 address becomes DHCP again
     MountedDevices                      every drive letter but C: is forgotten
+    Enum\\PCI\\<boot NIC>               added when the image knows the PC's network
+                                        chip only in another revision or board
 
 An image made from a PC with a fixed address would give every PC that
 address; the PC that owns it then loses its iSCSI disk whenever another one
@@ -23,6 +25,14 @@ The image also remembers the letters of the PC it was made on (vip-05's
 local D:, E:, F:). On another PC those volumes do not exist, yet Windows
 keeps the letters for them, so the agent could not give the game disk D:
 (Set-Partition 42012). Windows gives present volumes letters again at boot.
+
+Add hardware: Windows boots from iSCSI only if its boot network card is
+installed before Plug and Play runs, so a PC whose card the image has never
+seen stops at 0x7B. The same chip in another revision or on another board
+(Realtek 8168 REV_15 on the PC the image was made on, REV_16 on the next
+board) only has another hardware ID: its Enum entry is copied from the
+known one with the new IDs (iPXE reports them, app.api.v1.boot), so it
+binds the same driver. A chip the image has no driver for is reported.
 
 The Windows partition of the clone is mounted with ntfs-3g and the hive is
 merged with hivexregedit (both ship with Proxmox VE). Only the PC's clone is
@@ -54,6 +64,8 @@ _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _CURRENT_RE = re.compile(r'^"Current"=dword:([0-9a-fA-F]{8})\s*$', re.M)
 _IFACE_RE = re.compile(r"\\Interfaces\\(\{[0-9A-Fa-f-]{36}\})\]$")
 _LETTER_RE = re.compile(r'^"\\\\DosDevices\\\\([A-Za-z]):"=', re.M)
+# A PCI device's hardware ID as Windows names its Enum key.
+NIC_ID_RE = re.compile(r"^VEN_([0-9A-F]{4})&DEV_([0-9A-F]{4})&SUBSYS_([0-9A-F]{8})&REV_([0-9A-F]{2})$")
 
 
 @dataclass(frozen=True)
@@ -62,6 +74,8 @@ class OsSetup:
 
     computer_name: str                        # the machine name, [a-z0-9-], at most 15
     env: Mapping[str, str] = field(default_factory=dict)
+    # The boot network card's hardware ID (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), if known.
+    boot_nic: str | None = None
 
 
 def _reg_string(value: str) -> str:
@@ -104,8 +118,83 @@ def reserved_letters(export: str) -> list[str]:
     return sorted(letters - {"C"})
 
 
+def _reg_blocks(export: str) -> list[tuple[str, list[str]]]:
+    """The keys of a `hivexregedit --export` with their value lines, in order."""
+    text = export.replace("\\\r\n  ", "").replace("\\\n  ", "").replace("\r\n", "\n")
+    blocks: list[tuple[str, list[str]]] = []
+    for line in text.split("\n"):
+        if line.startswith("[") and line.endswith("]"):
+            blocks.append((line[1:-1], []))
+        elif blocks and line.strip():
+            blocks[-1][1].append(line)
+    return blocks
+
+
+def _swap_ids(line: str, swaps: Sequence[tuple[str, str]]) -> str:
+    """A .reg value line with each old ID replaced, in text and in UTF-16 hex data."""
+    name, sep, data = line.partition("=")
+    if not sep:
+        return line
+    m = re.match(r"^(hex(?:\([0-9a-fA-F]+\))?:)([0-9a-fA-F,]*)$", data)
+    if m:
+        raw = bytes(int(x, 16) for x in m.group(2).split(",") if x)
+        for old, new in swaps:
+            raw = raw.replace(old.encode("utf-16-le"), new.encode("utf-16-le"))
+        data = m.group(1) + ",".join(f"{b:02x}" for b in raw)
+    else:
+        for old, new in swaps:
+            data = data.replace(old, new)
+    return f"{name}={data}"
+
+
+def nic_patch(export: str, nic: str) -> tuple[str | None, str | None]:
+    """
+    Add hardware for the boot NIC, from a `hivexregedit --export` of
+    <ControlSet>\\Enum\\PCI: (.reg lines to merge, None) when the image knows
+    the chip under another hardware ID, (None, None) when it knows this one,
+    (None, why) when it has no driver for the chip.
+
+    The entry is copied from the image's entry for the same vendor and device
+    (the same subsystem first, as it is the same board family) that has a
+    driver service; its key and the IDs in its values get the PC's subsystem
+    and revision.
+    """
+    want = NIC_ID_RE.match(nic)
+    if want is None:
+        raise ValueError(f"Invalid PCI hardware ID: {nic!r}")
+    ven, dev, sub, rev = want.groups()
+    blocks = _reg_blocks(export)
+    devices: dict[str, str] = {}            # upper-case device key name -> key path prefix
+    services: set[str] = set()
+    for path, values in blocks:
+        head, marker, rest = path.partition("\\Enum\\PCI\\")
+        if not marker or not rest:
+            continue
+        name = rest.split("\\", 1)[0]
+        devices.setdefault(name.upper(), f"{head}\\Enum\\PCI\\{name}")
+        if any(v.startswith('"Service"=') for v in values):
+            services.add(name.upper())
+    if nic in devices:
+        return None, None
+    siblings = sorted(n for n in services
+                      if (m := NIC_ID_RE.match(n)) and m.group(1) == ven and m.group(2) == dev)
+    if not siblings:
+        return None, f"the image has no driver for the boot network card PCI\\{nic}"
+    source = next((n for n in siblings if NIC_ID_RE.match(n).group(3) == sub), siblings[0])
+    _, _, old_sub, old_rev = NIC_ID_RE.match(source).groups()
+    swaps = [(source, nic), (f"SUBSYS_{old_sub}", f"SUBSYS_{sub}"), (f"REV_{old_rev}", f"REV_{rev}")]
+    prefix = devices[source]
+    lines: list[str] = []
+    for path, values in blocks:
+        if path.upper() != prefix.upper() and not path.upper().startswith(prefix.upper() + "\\"):
+            continue
+        new_path = prefix[: -len(source)] + nic + path[len(prefix):]
+        lines += ["", f"[{new_path}]", *(_swap_ids(v, swaps) for v in values)]
+    return "\n".join(lines).lstrip("\n"), None
+
+
 def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = (),
-                   forget_letters: Sequence[str] = ()) -> str:
+                   forget_letters: Sequence[str] = (), extra: str | None = None) -> str:
     """The .reg text hivexregedit merges into the SYSTEM hive."""
     if not _NAME_RE.match(setup.computer_name):
         raise ValueError(f"Invalid computer name: {setup.computer_name!r}")
@@ -138,6 +227,8 @@ def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[s
             if len(letter) != 1 or not letter.isalpha() or letter.upper() == "C":
                 raise ValueError(f"Invalid drive letter to forget: {letter!r}")
             lines.append(f'"\\\\DosDevices\\\\{letter.upper()}:"=-')
+    if extra:
+        lines += ["", extra]
     return "\n".join(lines) + "\n"
 
 
@@ -188,10 +279,18 @@ class WindowsSetup:
         ok, out, _ = self._run(["hivexregedit", "--export", str(hive), "\\MountedDevices"], quiet=True)
         return reserved_letters(out) if ok else []
 
+    def enum_pci(self, hive: Path, control_set: int) -> str | None:
+        """The hive's PCI device entries as .reg text; None when unreadable."""
+        key = f"\\ControlSet{control_set:03d}\\Enum\\PCI"
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
+        return out if ok else None
+
     def personalize(self, device: str, setup: OsSetup) -> str | None:
         """Write the PC's identity into its OS clone. None when done, else why not."""
         try:
             registry_patch(setup, 1)   # validate before touching the host
+            if setup.boot_nic and not NIC_ID_RE.match(setup.boot_nic):
+                raise ValueError(f"Invalid PCI hardware ID: {setup.boot_nic!r}")
         except ValueError as e:
             return str(e)
         try:
@@ -234,7 +333,14 @@ class WindowsSetup:
         control_set = self.control_set(hive)
         fixed = self.static_interfaces(hive, control_set)
         letters = self.reserved_letters(hive)
-        patch = registry_patch(setup, control_set, fixed, letters)
+        nic_reg, nic_problem = None, None
+        if setup.boot_nic:
+            export = self.enum_pci(hive, control_set)
+            if export is None:
+                nic_problem = "cannot read the image's PCI devices"
+            else:
+                nic_reg, nic_problem = nic_patch(export, setup.boot_nic)
+        patch = registry_patch(setup, control_set, fixed, letters, nic_reg)
         reg = self.run_dir / f"{setup.computer_name}.reg"
         try:
             reg.write_text(patch, encoding="utf-8")
@@ -249,7 +355,11 @@ class WindowsSetup:
                         ", ".join(fixed))
         if letters:
             logger.info("Drive letters forgotten on %s: %s", setup.computer_name, ", ".join(letters))
-        return None
+        if nic_reg:
+            logger.info("Boot network card PCI\\%s added for %s", setup.boot_nic, setup.computer_name)
+        if nic_problem:
+            logger.warning("%s: %s", setup.computer_name, nic_problem)
+        return nic_problem
 
 
 def _find(root: Path, parts: tuple[str, ...]) -> Path | None:

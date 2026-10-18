@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Cpu, HardDrive, Monitor, Network, Save, Settings, X } from "lucide-react";
 
 import { api, type GameDisk, type Machine, type MachineMode } from "../api";
-import { formatBytes, formatLink } from "../format";
+import { formatBytes, formatLink, formatNic } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 import { isOnline } from "./AgentState";
 import { ErrorBanner } from "./ErrorBanner";
@@ -291,6 +291,16 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                 <dd>{hw?.memory_bytes ? formatBytes(hw.memory_bytes) : "—"}</dd>
                 <dt>Network card</dt>
                 <dd>{hw?.nic ?? "—"}</dd>
+                <dt>Boot network card</dt>
+                <dd title={m.boot_nic ? `PCI\\${m.boot_nic}` : undefined}>
+                  {m.boot_nic ? (
+                    <>
+                      {formatNic(m.boot_nic)} <span className="mono muted small">{m.boot_nic}</span>
+                    </>
+                  ) : (
+                    "— (read by iPXE at the next network boot)"
+                  )}
+                </dd>
                 <dt>Windows started</dt>
                 <dd>{m.booted_at ? new Date(m.booted_at).toLocaleString() : "—"}</dd>
                 <dt>Agent</dt>

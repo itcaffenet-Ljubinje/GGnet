@@ -126,6 +126,7 @@ describe("MachineSettings", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Hardware" }));
     expect(screen.getByText("Gigabyte H410M H")).toBeInTheDocument();
     expect(screen.getByText("0.1.11")).toBeInTheDocument();
+    expect(screen.getByText(/read by iPXE at the next network boot/)).toBeInTheDocument();
     expect(screen.queryByText(/iqn\./)).toBeNull();
   });
 

@@ -176,7 +176,7 @@ def on_heartbeat(db: Session, prov: Provisioner, m: Machine, booted_at: datetime
 
 
 def on_ipxe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSettings,
-            now: datetime | None = None) -> bool:
+            now: datetime | None = None, boot_nic: str | None = None) -> bool:
     """
     Boot Mode: iPXE asks for its script, so the PC is booting. Its writebacks
     are discarded before it logs in, unless it keeps them or LIO still shows
@@ -184,13 +184,26 @@ def on_ipxe(db: Session, prov: Provisioner, m: Machine, settings: WritebackSetti
     writeback is the safe choice then). The request time starts the boot
     window in which the watcher leaves the PC alone. False only when a
     discard failed.
+
+    `boot_nic` is the network card iPXE read. A card the server did not know
+    yet (a new PC added by hand, or a new board) needs Add hardware in the
+    OS writeback, which is only written into a fresh one: the writebacks are
+    discarded for it as well, unless the PC keeps them.
     """
+    values: dict = {"ipxe_at": now or _now()}
+    new_nic = bool(boot_nic) and boot_nic != m.boot_nic
+    if new_nic:
+        values["boot_nic"] = boot_nic
+        logger.info("%s boots from network card PCI\\%s", m.name, boot_nic)
     # Observed state, not an edit of the machine: keep updated_at.
     db.execute(update(Machine).where(Machine.id == m.id)
-               .values(ipxe_at=now or _now(), updated_at=Machine.updated_at))
+               .values(**values, updated_at=Machine.updated_at))
     db.commit()
     db.refresh(m)
-    if not (settings.auto_discard and _managed(m) and _needs_discard(m)):
+    if new_nic and m.keep_writeback:
+        logger.warning("%s keeps its writeback: the new network card is added at its next reset", m.name)
+    due = _needs_discard(m) or (new_nic and not m.keep_writeback)
+    if not (settings.auto_discard and _managed(m) and due):
         return True
     if prov.session_active(m.initiator_iqn, m.iscsi_target_iqn) is not False:
         return True

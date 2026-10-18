@@ -381,7 +381,8 @@ def test_ipxe_unknown_pc_waits_for_registration(client, disks):
     assert "Machines -> New PCs" in script
     assert "prompt --timeout 10000 " in script and "&& goto local || goto again" in script
     # It asks again with its own MAC, iPXE filling it in, and boots as soon as it is known.
-    assert "chain --replace --autofree http://testserver/api/v1/boot/ipxe?mac=${net0/mac} || goto wait" in script
+    assert ("chain --replace --autofree http://testserver/api/v1/boot/ipxe?mac=${net0/mac}"
+            "&pci=${ggnet_pci}&cls=${ggnet_cls}&sub=${ggnet_sub}&rev=${ggnet_rev} || goto wait") in script
     assert script.rstrip().endswith("exit")       # a key press boots the local disk
     assert "sanboot" not in script
     # Once registered as a Boot Mode PC, the same request boots it.
@@ -546,3 +547,77 @@ def test_settings_saved_in_the_web_ui_apply_to_the_next_boot(client, disks):
     client.put("/api/v1/settings/boot", json={"gateway": "dhcp", "unregistered": "wait"})
     assert "netX/gateway" not in _ipxe(client)
     assert "prompt" in _ipxe(client, "aa-bb-cc-dd-ee-99")
+
+
+# ── Add hardware: the boot NIC iPXE reads ────────────────────────────
+
+# vip-05's Realtek 8168 as iPXE reads its PCI config space (hexraw, high byte first)
+NIC = {"pci": "816810ec", "cls": "020000", "sub": "e0001458", "rev": "16"}
+NIC_ID = "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16"
+
+
+def _ipxe_nic(client, mac: str = "aa-bb-cc-dd-ee-05", **nic) -> str:
+    r = client.get("/api/v1/boot/ipxe", params={"mac": mac, **(nic or NIC)})
+    assert r.status_code == 200, r.text
+    return r.text
+
+
+@pytest.mark.parametrize("pci, cls, sub, rev, nic_id", [
+    ("816810ec", "020000", "e0001458", "16", NIC_ID),
+    ("81:68:10:ec", "02:00:00", "E0:00:14:58", "16", NIC_ID),   # hex with colons
+    ("15f38086", "020000", "00008086", "03", "VEN_8086&DEV_15F3&SUBSYS_00008086&REV_03"),
+    ("816810ec", "060400", "e0001458", "16", None),       # a PCI bridge, not a network card
+    ("ffffffff", "020000", "ffffffff", "ff", None),       # nothing at that address
+    ("", "", "", "", None),                               # iPXE could not read it
+    ("816810e", "020000", "e0001458", "16", None),
+    ("816810eg", "020000", "e0001458", "16", None),
+])
+def test_boot_nic_id(pci, cls, sub, rev, nic_id):
+    from app.api.v1.boot import boot_nic_id
+    assert boot_nic_id(pci, cls, sub, rev) == nic_id
+
+
+def test_a_waiting_pc_reports_its_nic_and_keeps_it_when_added(client, disks, windows):
+    script = _ipxe_nic(client, "aa-bb-cc-dd-ee-99")
+    # It asks again with what autoexec.ipxe read.
+    assert "&pci=${ggnet_pci}&cls=${ggnet_cls}&sub=${ggnet_sub}&rev=${ggnet_rev} || goto wait" in script
+    [d] = client.get("/api/v1/discovery").json()
+    assert d["boot_nic"] == NIC_ID
+    r = client.post(f"/api/v1/discovery/{d['id']}/claim", json={
+        "name": "pc-99", "mode": "boot", "game_disk_id": disks[1]["id"], "os_disk_id": disks[0]["id"]})
+    assert r.status_code == 201, r.text
+    assert r.json()["boot_nic"] == NIC_ID
+    [(_, setup, _)] = windows.done
+    assert setup.boot_nic == NIC_ID         # Add hardware on its very first boot
+
+
+def test_a_new_nic_gets_a_fresh_os_writeback_before_boot(client, host, disks, auto, windows):
+    m = _boot_machine(client, disks)
+    assert _get(client, m)["boot_nic"] is None
+    windows.done.clear()
+    host.calls.clear()
+    assert "sanboot" in _ipxe_nic(client)
+    assert _get(client, m)["boot_nic"] == NIC_ID
+    assert sorted(_clones_made(host)) == [GAME_CLONE, OS_CLONE]
+    assert [s.boot_nic for _, s, _ in windows.done] == [NIC_ID]
+    # The same NIC next time: nothing to redo on a clean writeback.
+    host.calls.clear()
+    assert "sanboot" in _ipxe_nic(client)
+    assert _clones_made(host) == []
+
+
+def test_a_new_nic_never_touches_a_kept_writeback(client, host, disks, auto):
+    m = _boot_machine(client, disks)
+    assert client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True}).status_code == 200
+    host.calls.clear()
+    assert "sanboot" in _ipxe_nic(client)
+    assert _get(client, m)["boot_nic"] == NIC_ID
+    assert _clones_made(host) == []
+
+
+def test_an_unreadable_nic_changes_nothing(client, host, disks, auto):
+    m = _boot_machine(client, disks)
+    host.calls.clear()
+    assert "sanboot" in _ipxe_nic(client, pci="", cls="", sub="", rev="")
+    assert _get(client, m)["boot_nic"] is None
+    assert _clones_made(host) == []

@@ -178,6 +178,8 @@ export interface Machine {
   reported_mac: string | null;
   link_speed_mbps: number | null;
   hardware: MachineHardware | null;
+  /** Boot Mode: the boot network card's PCI ID as iPXE read it (VEN_10EC&DEV_8168&SUBSYS_…&REV_16). */
+  boot_nic?: string | null;
   status: MachineStatus;
   last_error: string | null;
   clone_zvol: string | null;
@@ -206,6 +208,7 @@ export interface Discovered {
   hostname: string | null;
   ip_address: string | null;
   agent_version: string | null;
+  boot_nic?: string | null;
   seen_count: number;
   ignored: boolean;
   first_seen_at: string;
