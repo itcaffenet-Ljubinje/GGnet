@@ -16,6 +16,8 @@ CONF_DIR="/etc/ggnet"
 CONF_FILE="$CONF_DIR/config.toml"
 UNIT_FILE="/etc/systemd/system/ggnet.service"
 PXE_UNIT_FILE="/etc/systemd/system/ggnet-pxe.service"
+LAN_UNIT_FILE="/etc/systemd/system/ggnet-lan-route.service"
+LAN_SYSCTL_FILE="/etc/sysctl.d/90-ggnet-lan.conf"
 
 PURGE=0
 ASSUME_YES=0
@@ -46,7 +48,10 @@ fi
 echo "==> Stopping ggNet services..."
 systemctl disable --now ggnet >/dev/null 2>&1 || true
 systemctl disable --now ggnet-pxe >/dev/null 2>&1 || true
-rm -f "$UNIT_FILE" "$PXE_UNIT_FILE"
+# The service IP's source rule (only installed when another interface shares
+# its subnet). The ARP settings in its sysctl file stay until the next reboot.
+systemctl disable --now ggnet-lan-route >/dev/null 2>&1 || true
+rm -f "$UNIT_FILE" "$PXE_UNIT_FILE" "$LAN_UNIT_FILE" "$LAN_SYSCTL_FILE"
 systemctl daemon-reload
 
 echo "==> Removing $INSTALL_DIR..."
