@@ -24,11 +24,12 @@ describe("MachinesPage", () => {
     const reload = vi.fn().mockResolvedValue(undefined);
     render(<MachinesPage disks={DISKS} machines={[]} reload={reload} />);
 
+    await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
     expect(screen.queryByLabelText(/IQN/i)).toBeNull();
     await userEvent.type(screen.getByLabelText("Name"), "pc01");
     await userEvent.type(screen.getByLabelText("MAC"), "10:ff:e0:66:be:3a");
     await userEvent.selectOptions(screen.getByLabelText("Game disk"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(actions(fetchMock)).toEqual([
       {
@@ -38,14 +39,16 @@ describe("MachinesPage", () => {
       },
     ]);
     expect(reload).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Add machine" })).toBeNull();
   });
 
   it("does not add a machine without a MAC", async () => {
     const fetchMock = stubFetch(201, machine());
     render(<MachinesPage disks={DISKS} machines={[]} reload={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Name"), "pc01");
     await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
+    await userEvent.type(screen.getByLabelText("Name"), "pc01");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(actions(fetchMock)).toEqual([]);
   });
 
@@ -53,6 +56,7 @@ describe("MachinesPage", () => {
     const fetchMock = stubFetch(201, machine({ mode: "boot" }));
     render(<MachinesPage disks={[...DISKS, OS_IMAGE]} machines={[]} reload={vi.fn()} />);
 
+    await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
     expect(screen.queryByLabelText("OS image")).toBeNull();
     await userEvent.type(screen.getByLabelText("Name"), "pc01");
     await userEvent.type(screen.getByLabelText("MAC"), "18:c0:4d:4f:ab:a8");
@@ -61,7 +65,7 @@ describe("MachinesPage", () => {
     expect(screen.getByLabelText("Game disk")).not.toHaveTextContent("win11");
     await userEvent.selectOptions(screen.getByLabelText("OS image"), "3");
     await userEvent.selectOptions(screen.getByLabelText("Game disk"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(actions(fetchMock)[0].body).toMatchObject({ mode: "boot", os_disk_id: 3, game_disk_id: 1 });
   });
@@ -356,9 +360,8 @@ describe("MachinesPage", () => {
         reload={vi.fn().mockResolvedValue(undefined)}
       />,
     );
-    const buttons = screen.getAllByRole("button", { name: "Turn on" });
-    expect(buttons[1]).toBeDisabled();                            // pc02: no MAC known
-    await userEvent.click(buttons[0]);
+    expect(screen.getByRole("button", { name: "Turn on pc02" })).toBeDisabled();   // no MAC known
+    await userEvent.click(screen.getByRole("button", { name: "Turn on pc01" }));
     expect(confirm).not.toHaveBeenCalled();
     expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1/power", method: "POST", body: { action: "on" } }]);
   });
@@ -369,9 +372,9 @@ describe("MachinesPage", () => {
     const online = machine({ last_seen_at: new Date().toISOString() });
     render(<MachinesPage disks={[]} machines={[online]} reload={vi.fn().mockResolvedValue(undefined)} />);
 
-    expect(screen.queryByRole("button", { name: "Turn on" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Shutdown" }));   // cancelled
-    await userEvent.click(screen.getByRole("button", { name: "Reboot" }));
+    expect(screen.queryByRole("button", { name: "Turn on pc01" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Shut down pc01" }));   // cancelled
+    await userEvent.click(screen.getByRole("button", { name: "Restart pc01" }));
     expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1/power", method: "POST", body: { action: "reboot" } }]);
   });
 
@@ -379,7 +382,57 @@ describe("MachinesPage", () => {
     const m = machine({ last_seen_at: new Date().toISOString(), pending_command: "shutdown" });
     render(<MachinesPage disks={[]} machines={[m]} reload={vi.fn()} />);
     expect(screen.getByText("Shutting down…")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reboot" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Restart pc01" })).toBeDisabled();
+  });
+
+  it("finds machines by name, IP, MAC or disk", async () => {
+    const machines = [
+      machine({ id: 1, name: "pc01", mac: "aa:bb:cc:dd:ee:01", game_disk_id: 1, status: "provisioned" }),
+      machine({ id: 2, name: "vip05", mac: "10:ff:e0:66:be:3a", reported_ip: "192.168.0.25" }),
+    ];
+    render(<MachinesPage disks={DISKS} machines={machines} reload={vi.fn()} />);
+    const search = screen.getByLabelText("Search machines");
+
+    await userEvent.type(search, "be:3a");
+    expect(screen.queryByText("pc01")).toBeNull();
+    expect(screen.getByText("vip05")).toBeInTheDocument();
+    await userEvent.clear(search);
+    await userEvent.type(search, "cs2");
+    expect(screen.getByText("pc01")).toBeInTheDocument();
+    expect(screen.queryByText("vip05")).toBeNull();
+    await userEvent.clear(search);
+    await userEvent.type(search, "nothing");
+    expect(screen.getByText("No machines match the filter.")).toBeInTheDocument();
+  });
+
+  it("filters online, offline and writeback PCs, with counts", async () => {
+    const machines = [
+      machine({ id: 1, name: "pc01", last_seen_at: new Date().toISOString() }),
+      machine({ id: 2, name: "pc02", game_disk_id: 1, status: "provisioned", keep_writeback: true }),
+    ];
+    render(<MachinesPage disks={DISKS} machines={machines} reload={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Online (1)" }));
+    expect(screen.getByText("pc01")).toBeInTheDocument();
+    expect(screen.queryByText("pc02")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Writeback (1)" }));
+    expect(screen.queryByText("pc01")).toBeNull();
+    expect(screen.getByText("pc02")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All (2)" }));
+    expect(screen.getByText("pc01")).toBeInTheDocument();
+  });
+
+  it("opens the settings from the PC's name and deletes from its icon", async () => {
+    const fetchMock = stubFetch(204);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<MachinesPage disks={DISKS} machines={[machine()]} reload={vi.fn().mockResolvedValue(undefined)} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "pc01" }));
+    expect(screen.getByRole("dialog", { name: "Settings of pc01" })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Delete pc01" }));
+    expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1", method: "DELETE", body: undefined }]);
   });
 
   describe("bulk", () => {
@@ -393,7 +446,7 @@ describe("MachinesPage", () => {
       render(<MachinesPage disks={DISKS} machines={three} reload={vi.fn()} />);
       expect(screen.queryByLabelText("Bulk actions")).toBeNull();
       await userEvent.click(screen.getByLabelText("Select all machines"));
-      expect(screen.getByLabelText("Bulk actions")).toHaveTextContent("3 selected");
+      expect(screen.getByLabelText("Bulk actions")).toHaveTextContent("3 of 3 selected");
       // Different game disks: no shared version to pin.
       expect(screen.queryByLabelText("Version for selected")).toBeNull();
       await userEvent.click(screen.getByLabelText("Clear selection"));

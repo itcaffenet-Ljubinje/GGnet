@@ -2083,3 +2083,174 @@ tr.selected td {
   font-weight: 600;
   color: var(--muted-light);
 }
+
+/* Machines page (ggNet2 layout) */
+.station {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.station .status-dot {
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.station-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.btn-text {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s ease;
+}
+
+button.btn-text:hover {
+  background: transparent;
+  text-decoration-color: #38bdf8;
+}
+
+.station-name .mode-pill {
+  font-size: 9.5px;
+  padding: 1px 5px;
+}
+
+.disk-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.disk-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.disk-line select {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+select.letter-select {
+  width: auto;
+}
+
+select.disk-select.assigned {
+  background: rgba(2, 132, 199, 0.1);
+  border-color: rgba(2, 132, 199, 0.3);
+  color: #38bdf8;
+}
+
+.drive-os {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.drive-game {
+  color: #c084fc;
+  font-weight: 600;
+}
+
+.disk-line .code-badge {
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.writeback-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-line select {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.writeback-cell label.check {
+  margin: 0;
+}
+
+th.th-actions {
+  text-align: right;
+}
+
+button.icon-btn-danger {
+  color: #f87171;
+}
+
+button.icon-btn-ok {
+  color: #34d399;
+}
+
+.rate-down {
+  color: #38bdf8;
+}
+
+.rate-up {
+  color: #34d399;
+}
+
+.empty .empty-icon {
+  display: block;
+  margin: 0 auto 12px;
+  color: var(--muted);
+}
+
+.empty p {
+  margin: 0;
+}
+
+.bulk-toolbar {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bulk-actions-group {
+  flex-wrap: wrap;
+}
+
+.bulk-disk-assign select {
+  font-size: 12px;
+  padding: 4px 8px;
+  width: auto;
+}
+
+/* Room for the bulk dock under the last row. */
+section.has-bulk-dock {
+  padding-bottom: 140px;
+}
+
+@media (max-width: 768px) {
+  .bulk-toolbar {
+    bottom: 70px;
+    width: calc(100vw - 32px);
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  section.has-bulk-dock {
+    padding-bottom: 260px;
+  }
+}
