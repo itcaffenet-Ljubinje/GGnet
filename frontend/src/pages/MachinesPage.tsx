@@ -16,7 +16,6 @@ import { AgentState, isOnline } from "../components/AgentState";
 import { DiscoveredPanel } from "../components/DiscoveredPanel";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ImageStatus } from "../components/ImageStatus";
-import { MachineDetails } from "../components/MachineDetails";
 import { MachineSettings } from "../components/MachineSettings";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatBytes, formatRate } from "../format";
@@ -47,8 +46,6 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   // Boot Mode: which kept writebacks Apply Writebacks turns into versions, per machine.
   const [applyWhat, setApplyWhat] = useState<Record<number, ApplyKey>>({});
   const [allLetter, setAllLetter] = useState("D");
-  // The machine whose hardware and network are shown.
-  const [open, setOpen] = useState<number | null>(null);
   // The machine whose settings dialog is open.
   const [editing, setEditing] = useState<number | null>(null);
   // Bulk operations: the selected machines and the last result.
@@ -457,14 +454,6 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                     >
                       Settings
                     </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      aria-expanded={open === m.id}
-                      onClick={() => setOpen(open === m.id ? null : m.id)}
-                    >
-                      {open === m.id ? "Hide details" : "Details"}
-                    </button>
                     {isOnline(m) ? (
                       <>
                         <button
@@ -528,13 +517,6 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                     </button>
                   </td>
                 </tr>
-                {open === m.id && (
-                  <tr>
-                    <td colSpan={9}>
-                      <MachineDetails machine={m} />
-                    </td>
-                  </tr>
-                )}
               </Fragment>
             ))}
           </tbody>
