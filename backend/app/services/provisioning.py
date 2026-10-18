@@ -337,6 +337,44 @@ class Provisioner:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
         return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path, problem)
 
+    def rename(
+        self, old_name: str, new_name: str, initiator_iqn: str, clone_zvol: str,
+        os_clone_zvol: str | None = None,
+    ) -> tuple[str, str | None]:
+        """
+        Give a provisioned machine a new name on the host: its writebacks are
+        renamed (zfs rename, nothing is copied) and mapped again under the new
+        backstore names; the ACL is the initiator's, so it is the same. The
+        client must be powered off. On failure everything goes back to the
+        old name. Returns the new clone paths (game, OS).
+        """
+        new_clone = self.client_path(new_name)
+        new_os = self.os_client_path(new_name) if os_clone_zvol is not None else None
+        pairs = [(clone_zvol, new_clone)] + ([(os_clone_zvol, new_os)] if os_clone_zvol else [])
+        with self.lock:
+            self._clear()
+            for _, new in pairs:
+                if self.zfs.dataset_exists(new):
+                    raise ProvisioningError(f"{new} already exists on the host")
+            self._detach(old_name, initiator_iqn)
+            done: list[tuple[str, str]] = []
+            err: ProvisioningError | None = None
+            for old, new in pairs:
+                if not self.zfs.rename_dataset(old, new):
+                    err = self._fail(f"Renaming {old} to {new} failed")
+                    break
+                done.append((old, new))
+            if err is None:
+                if self.iscsi.attach(new_name, initiator_iqn, self._disks(new_clone, new_os)) is not None:
+                    return new_clone, new_os
+                err = self._fail("Exposing the renamed disks over iSCSI failed", self.iscsi.runner)
+            for old, new in reversed(done):
+                if not self.zfs.rename_dataset(new, old):
+                    logger.error("Rollback: %s left as %s", old, new)
+            if self.iscsi.attach(old_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol)) is None:
+                logger.error("Rollback: the disks of %s could not be mapped again", old_name)
+            raise err
+
     def deprovision(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str | None,
         os_clone_zvol: str | None = None,

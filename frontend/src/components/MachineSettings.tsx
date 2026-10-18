@@ -21,7 +21,8 @@ const LETTERS = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 /**
  * Everything about one PC in one place (ggRock's machine settings). Save
- * sends only what changed: name, mode, MAC and drive letter; the disks (which
+ * sends only what changed: name (a PC with disks is renamed on the server
+ * too, so it asks first), mode, MAC and drive letter; the disks (which
  * re-clones the writebacks, so it asks first); Keep Writeback; the pinned version.
  */
 export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
@@ -63,6 +64,12 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
     if (mode !== m.mode) patch.mode = mode;
     if ((mac.trim() || null) !== m.mac) patch.mac = mac.trim() || null;
     if (mode === "disk" && letter !== m.drive_letter) patch.drive_letter = letter;
+    if (patch.name && hasDisk) {
+      const msg =
+        `Rename ${m.name} to ${patch.name}? Its writebacks are renamed on the server (nothing is lost) and ` +
+        "Windows gets the new name at its next boot.\n\nThe PC must be powered off.";
+      if (!window.confirm(msg)) return;
+    }
     if (disksChanged && m.game_disk_id !== null) {
       const msg =
         `Change the disks of ${m.name}? Its writebacks are cloned again from the new disks, ` +
@@ -155,8 +162,7 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                     onChange={(e) => setName(e.target.value)}
                     maxLength={15}
                     required
-                    disabled={hasDisk}
-                    title={hasDisk ? "Remove its disks first: the name is part of its writebacks" : undefined}
+                    title={hasDisk ? "The PC must be powered off: its writebacks are renamed too" : undefined}
                   />
                 </label>
                 <label className="check">

@@ -330,12 +330,15 @@ def update_machine(
         changes["initiator_iqn"] = default_iqn(prov, changes.get("name", machine.name),
                                                changes.get("mac", machine.mac))
 
-    # The name is in the clone path and target name, the IQN in the ACL;
-    # they cannot change on the host while the machine has a disk.
-    host_bound = {k for k in ("name", "initiator_iqn", "mode") if k in changes
+    # The IQN is in the ACL and the mode decides the disks; they cannot change
+    # on the host while the machine has a disk. The name is in the writeback
+    # paths and backstore names: a powered-off PC is renamed on the host too.
+    host_bound = {k for k in ("initiator_iqn", "mode") if k in changes
                   and changes[k] != getattr(machine, k)}
     if host_bound and (_has_host_state(machine) or machine.game_disk_id is not None):
         conflict(f"{', '.join(sorted(host_bound))} can only change while the machine has no disk")
+    if "name" in changes and changes["name"] != machine.name and _has_host_state(machine):
+        _rename_on_host(db, prov, machine, changes["name"])
 
     if changes.get("mode", machine.mode) is MachineMode.BOOT:
         if changes.get("drive_letter", "D") != "D":
@@ -353,6 +356,24 @@ def update_machine(
         discovery.forget(db, changes["mac"])
         db.commit()
     return machine
+
+
+def _rename_on_host(db: Session, prov: Provisioner, machine: Machine, new_name: str) -> None:
+    """Rename a provisioned machine's writebacks; the caller saves the new name."""
+    if machine.status is not MachineStatus.PROVISIONED or machine.clone_zvol is None:
+        conflict(f"'{machine.name}' can only be renamed while it is provisioned or has no disk")
+    if db.scalar(select(Machine).where(Machine.name == new_name, Machine.id != machine.id)):
+        conflict(DUPLICATE)
+    session = prov.session_active(machine.initiator_iqn, machine.iscsi_target_iqn)
+    if session is None:
+        host_failed(f"Cannot read the iSCSI session state of '{machine.name}'")
+    if session:
+        conflict(f"'{machine.name}' is still connected; shut it down first")
+    try:
+        machine.clone_zvol, machine.os_clone_zvol = prov.rename(
+            machine.name, new_name, machine.initiator_iqn, machine.clone_zvol, machine.os_clone_zvol)
+    except ProvisioningError as e:
+        host_failed(str(e), machine_id=machine.id)
 
 
 @router.post("/{machine_id}/assign", response_model=MachineOut)

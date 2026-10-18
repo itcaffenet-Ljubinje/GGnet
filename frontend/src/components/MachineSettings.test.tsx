@@ -41,9 +41,30 @@ describe("MachineSettings", () => {
     expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
-  it("does not let the name or mode change while the PC has disks", () => {
+  it("renames a PC with disks after a confirmation; the mode stays locked", async () => {
+    const fetchMock = stubFetch(200, machine());
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     open(machine({ game_disk_id: 1, status: "provisioned" }));
-    expect(screen.getByLabelText("Name")).toBeDisabled();
+
+    const name = screen.getByLabelText("Name");
+    expect(name).toBeEnabled();
+    await userEvent.clear(name);
+    await userEvent.type(name, "pc-13");
+    await userEvent.click(screen.getByRole("tab", { name: "Disks" }));
+    expect(screen.getByLabelText("Mode")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(confirm.mock.calls[0][0]).toContain("must be powered off");
+    expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1", method: "PATCH", body: { name: "pc-13" } }]);
+  });
+
+  it("does not rename when the confirmation is cancelled", async () => {
+    const fetchMock = stubFetch(200, machine());
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    open(machine({ game_disk_id: 1, status: "provisioned" }));
+    await userEvent.type(screen.getByLabelText("Name"), "x");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(actions(fetchMock)).toEqual([]);
   });
 
   it("asks before changing a Boot Mode PC's disks and sends the OS image too", async () => {
