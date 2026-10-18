@@ -17,6 +17,7 @@ import { DiscoveredPanel } from "../components/DiscoveredPanel";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ImageStatus } from "../components/ImageStatus";
 import { MachineDetails } from "../components/MachineDetails";
+import { MachineSettings } from "../components/MachineSettings";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatBytes, formatRate } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
@@ -48,6 +49,8 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
   const [allLetter, setAllLetter] = useState("D");
   // The machine whose hardware and network are shown.
   const [open, setOpen] = useState<number | null>(null);
+  // The machine whose settings dialog is open.
+  const [editing, setEditing] = useState<number | null>(null);
   // Bulk operations: the selected machines and the last result.
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkReport, setBulkReport] = useState<{ label: string; results: BulkResult[] } | null>(null);
@@ -214,6 +217,15 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
       <MachineKpis machines={machines} discovered={discovered.length} />
+
+      {editing !== null && machines.some((x) => x.id === editing) && (
+        <MachineSettings
+          machine={machines.find((x) => x.id === editing)!}
+          disks={disks}
+          onClose={() => setEditing(null)}
+          reload={reload}
+        />
+      )}
 
       <DiscoveredPanel discovered={discovered} disks={disks} busy={busy !== null} run={run} reload={reload} />
 
@@ -438,6 +450,13 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                     />
                   </td>
                   <td className="actions">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(m.id)}
+                      aria-label={`Settings of ${m.name}`}
+                    >
+                      Settings
+                    </button>
                     <button
                       type="button"
                       className="secondary"

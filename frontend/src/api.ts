@@ -289,8 +289,13 @@ export const api = {
   createMachine: (body: MachineCreate) => request<Machine>("POST", "/v1/machines", body),
   updateMachine: (id: number, body: Partial<MachineCreate>) =>
     request<Machine>("PATCH", `/v1/machines/${id}`, body),
-  assignDisk: (id: number, game_disk_id: number | null) =>
-    request<Machine>("POST", `/v1/machines/${id}/assign`, { game_disk_id }),
+  /** Game disk, and in Boot Mode the OS image (not sent keeps the current one). */
+  assignDisk: (id: number, game_disk_id: number | null, os_disk_id?: number | null) =>
+    request<Machine>(
+      "POST",
+      `/v1/machines/${id}/assign`,
+      os_disk_id === undefined ? { game_disk_id } : { game_disk_id, os_disk_id },
+    ),
   setDriveLetterAll: (drive_letter: string) =>
     request<Machine[]>("PUT", "/v1/machines/drive-letter", { drive_letter }),
   setKeepWriteback: (id: number, enabled: boolean) =>
