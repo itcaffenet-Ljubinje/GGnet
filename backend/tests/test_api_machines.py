@@ -124,13 +124,59 @@ def test_create_machine_duplicates(client):
 def test_update_host_bound_fields_only_while_idle(client):
     d = _disk(client)
     m = _machine(client, game_disk_id=d["id"])
-    for body in ({"name": "pc99"}, {"initiator_iqn": "iqn.1991-05.com.microsoft:pc99"},
-                 {"mode": "boot"}):
+    for body in ({"initiator_iqn": "iqn.1991-05.com.microsoft:pc99"}, {"mode": "boot"}):
         assert client.patch(f"/api/v1/machines/{m['id']}", json=body).status_code == 409
     r = client.patch(f"/api/v1/machines/{m['id']}", json={"mac": "aa:bb:cc:dd:ee:ff"})
     assert r.status_code == 200 and r.json()["mac"] == "aa:bb:cc:dd:ee:ff"
     r = client.patch(f"/api/v1/machines/{m['id']}", json={"mac": None})
     assert r.json()["mac"] is None
+
+
+def test_rename_a_provisioned_machine_moves_its_writeback(client, host):
+    d = _disk(client)
+    m = _machine(client, game_disk_id=d["id"])
+    old = m["clone_zvol"]
+    r = client.patch(f"/api/v1/machines/{m['id']}", json={"name": "pc99"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["name"] == "pc99" and out["clone_zvol"] == "tank/ggnet/writebacks/pc99"
+    assert not host.exists(old) and host.exists("tank/ggnet/writebacks/pc99")
+    # The data stays: same origin, nothing cloned again.
+    assert host.datasets["tank/ggnet/writebacks/pc99"]["origin"].endswith("@base")
+    assert not any(c[:2] == ["zfs", "clone"] for c in host.calls[-12:])
+    # Mapped again for the same initiator, under the new name.
+    assert host.visible(m["initiator_iqn"]) == ["/dev/zvol/tank/ggnet/writebacks/pc99"]
+    assert "pc99-game" in host.backstores and not any(b.startswith("pc01") for b in host.backstores)
+
+
+def test_rename_refused_while_the_pc_is_connected(client, host):
+    d = _disk(client)
+    m = _machine(client, game_disk_id=d["id"])
+    host.sessions.add(m["initiator_iqn"])
+    r = client.patch(f"/api/v1/machines/{m['id']}", json={"name": "pc99"})
+    assert r.status_code == 409 and "shut it down" in r.text
+    assert host.exists(m["clone_zvol"])
+
+
+def test_rename_refused_to_a_taken_name(client, host):
+    d = _disk(client)
+    m = _machine(client, game_disk_id=d["id"])
+    client.post("/api/v1/machines", json={"name": "pc02"})
+    r = client.patch(f"/api/v1/machines/{m['id']}", json={"name": "pc02"})
+    assert r.status_code == 409
+    assert host.exists(m["clone_zvol"])
+
+
+def test_rename_rolls_back_when_the_host_fails(client, host):
+    d = _disk(client)
+    m = _machine(client, game_disk_id=d["id"])
+    host.fail_on[("targetcli", "/backstores/block", "create", "name=pc99-game")] = "no space"
+    r = client.patch(f"/api/v1/machines/{m['id']}", json={"name": "pc99"})
+    assert r.status_code == 502
+    after = client.get(f"/api/v1/machines/{m['id']}").json()
+    assert (after["name"], after["clone_zvol"]) == ("pc01", m["clone_zvol"])
+    assert host.exists(m["clone_zvol"]) and not host.exists("tank/ggnet/writebacks/pc99")
+    assert host.visible(m["initiator_iqn"]) == [f"/dev/zvol/{m['clone_zvol']}"]
 
 
 def test_update_idle_machine(client):

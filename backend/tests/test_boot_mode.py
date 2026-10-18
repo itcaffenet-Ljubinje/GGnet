@@ -183,6 +183,19 @@ def test_keep_writeback_keeps_both(client, host, disks):
     assert synced == {OS_CLONE, GAME_CLONE}
 
 
+def test_rename_a_boot_pc_moves_both_writebacks(client, host, disks):
+    m = _boot_machine(client, disks)
+    r = client.patch(f"/api/v1/machines/{m['id']}", json={"name": "vip-15"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert (out["clone_zvol"], out["os_clone_zvol"]) == (
+        "tank/ggnet/writebacks/vip-15", "tank/ggnet/writebacks/vip-15-os")
+    assert not host.exists(OS_CLONE) and not host.exists(GAME_CLONE)
+    assert host.visible(IQN) == ["/dev/zvol/tank/ggnet/writebacks/vip-15-os",
+                                 "/dev/zvol/tank/ggnet/writebacks/vip-15"]
+    assert "booting vip-15" in _ipxe(client)
+
+
 # ── Apply Writebacks ──────────────────────────────────────────────────
 
 def _boot_keeper(client, disks) -> dict:

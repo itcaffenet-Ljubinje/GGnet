@@ -36,6 +36,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Boot state for Boot Mode PCs: booting (after iPXE), running, off | todo (`ipxe_at`, session state exist) |
 | Live traffic per PC (bps and totals) | backend |
 | Hardware drawer: CPU, GPU, RAM, board, NIC, link, agent, IP, MAC, iSCSI session | partial |
+| Settings per PC (dialog, tabs General / Disks / Network / Hardware): name and mode (while it has no disk), MAC, OS image, game disk, drive letter, version pin, Keep Writeback | done |
 | Add a PC: name, **MAC (required)**, mode, OS image (Boot Mode), game disk. No IQN field | done |
 | Discovery: PCs that knocked (PXE or agent) — Claim (name, mode, disks) and Ignore | done |
 | Per PC: Wake-on-LAN, Shutdown, Reboot | done |
