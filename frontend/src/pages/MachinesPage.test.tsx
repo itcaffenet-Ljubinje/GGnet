@@ -10,6 +10,7 @@ import { MachinesPage } from "./MachinesPage";
 const actions = (mock: ReturnType<typeof vi.fn>) => calls(mock).filter((c) => c.method !== "GET");
 
 const DISKS = [disk(), disk({ id: 2, name: "draft", published: false, snapshot: null })];
+const OS_IMAGE = disk({ id: 3, name: "win11", kind: "os" });
 
 describe("MachinesPage", () => {
   it("offers only published disks", () => {
@@ -18,12 +19,14 @@ describe("MachinesPage", () => {
     expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["None", "cs2"]);
   });
 
-  it("creates a machine with a disk; empty fields are sent as null", async () => {
+  it("creates a machine by MAC with a disk; there is no IQN field", async () => {
     const fetchMock = stubFetch(201, machine());
     const reload = vi.fn().mockResolvedValue(undefined);
     render(<MachinesPage disks={DISKS} machines={[]} reload={reload} />);
 
+    expect(screen.queryByLabelText(/IQN/i)).toBeNull();
     await userEvent.type(screen.getByLabelText("Name"), "pc01");
+    await userEvent.type(screen.getByLabelText("MAC"), "10:ff:e0:66:be:3a");
     await userEvent.selectOptions(screen.getByLabelText("Game disk"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
 
@@ -31,23 +34,36 @@ describe("MachinesPage", () => {
       {
         url: "/api/v1/machines",
         method: "POST",
-        body: { name: "pc01", mode: "disk", mac: null, initiator_iqn: null, game_disk_id: 1 },
+        body: { name: "pc01", mode: "disk", mac: "10:ff:e0:66:be:3a", game_disk_id: 1, os_disk_id: null },
       },
     ]);
     expect(reload).toHaveBeenCalled();
   });
 
-  it("boot mode machines get no disk", async () => {
-    const fetchMock = stubFetch(201, machine({ mode: "boot" }));
+  it("does not add a machine without a MAC", async () => {
+    const fetchMock = stubFetch(201, machine());
     render(<MachinesPage disks={DISKS} machines={[]} reload={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Name"), "pc01");
-    await userEvent.selectOptions(screen.getByLabelText("Game disk"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
+    expect(actions(fetchMock)).toEqual([]);
+  });
+
+  it("a boot mode machine gets an OS image and a game disk", async () => {
+    const fetchMock = stubFetch(201, machine({ mode: "boot" }));
+    render(<MachinesPage disks={[...DISKS, OS_IMAGE]} machines={[]} reload={vi.fn()} />);
+
+    expect(screen.queryByLabelText("OS image")).toBeNull();
+    await userEvent.type(screen.getByLabelText("Name"), "pc01");
+    await userEvent.type(screen.getByLabelText("MAC"), "18:c0:4d:4f:ab:a8");
     await userEvent.selectOptions(screen.getByLabelText("Mode"), "boot");
-    expect(screen.getByLabelText("Game disk")).toBeDisabled();
+    // OS images are offered for the OS, not as game disks.
+    expect(screen.getByLabelText("Game disk")).not.toHaveTextContent("win11");
+    await userEvent.selectOptions(screen.getByLabelText("OS image"), "3");
+    await userEvent.selectOptions(screen.getByLabelText("Game disk"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Add machine" }));
 
-    expect(actions(fetchMock)[0].body).toMatchObject({ mode: "boot", game_disk_id: null });
+    expect(actions(fetchMock)[0].body).toMatchObject({ mode: "boot", os_disk_id: 3, game_disk_id: 1 });
   });
 
   it("assigns a disk to an idle machine without asking", async () => {
@@ -114,6 +130,60 @@ describe("MachinesPage", () => {
     expect(actions(fetchMock)).toEqual([
       { url: "/api/v1/machines/1/apply-writebacks", method: "POST", body: undefined },
     ]);
+  });
+
+  it("a boot mode PC can apply only its OS writeback", async () => {
+    const fetchMock = stubFetch(200, machine());
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const m = machine({
+      mode: "boot",
+      game_disk_id: 1,
+      os_disk_id: 3,
+      status: "provisioned",
+      keep_writeback: true,
+    });
+    render(<MachinesPage disks={[...DISKS, OS_IMAGE]} machines={[m]} reload={vi.fn()} />);
+
+    await userEvent.selectOptions(screen.getByLabelText("What to apply from pc01"), "os");
+    await userEvent.click(screen.getByRole("button", { name: "Apply writebacks" }));
+    expect(confirm.mock.calls[0][0]).toContain('the OS image "win11"');
+    expect(confirm.mock.calls[0][0]).toContain("The game writeback is not applied");
+    expect(actions(fetchMock)).toEqual([
+      { url: "/api/v1/machines/1/apply-writebacks", method: "POST", body: { os: true, game: false } },
+    ]);
+  });
+
+  it("shows the boot mode PC's OS image and game disk with their versions", () => {
+    const m = machine({
+      mode: "boot",
+      game_disk_id: 1,
+      os_disk_id: 3,
+      status: "provisioned",
+      clone_snapshot: "tank/ggnet/images/cs2@v2",
+      os_clone_snapshot: "tank/ggnet/images/win11@base",
+    });
+    render(<MachinesPage disks={[...DISKS, OS_IMAGE]} machines={[m]} reload={vi.fn()} />);
+    expect(screen.getByText("@base")).toBeInTheDocument();
+    expect(screen.getByText("@v2")).toBeInTheDocument();
+  });
+
+  it("summarises the machines in cards and never shows an IQN", () => {
+    const now = new Date().toISOString();
+    const machines = [
+      machine({ id: 1, name: "pc01", last_seen_at: now, keep_writeback: true }),
+      machine({ id: 2, name: "pc02", mode: "boot" }),
+    ];
+    render(<MachinesPage disks={DISKS} machines={machines} reload={vi.fn()} />);
+    const card = (title: string) =>
+      screen
+        .getAllByText(title)
+        .find((el) => el.classList.contains("kpi-title"))!
+        .closest(".kpi-card") as HTMLElement;
+    expect(within(card("Machines")).getByText("2")).toBeInTheDocument();
+    expect(within(card("Machines")).getByText("1 Boot Mode · 1 Disk Mode")).toBeInTheDocument();
+    expect(within(card("Online")).getByText("1")).toBeInTheDocument();
+    expect(within(card("Writebacks")).getByText("1")).toBeInTheDocument();
+    expect(screen.queryByText(/^iqn\./)).toBeNull();
   });
 
   it("cannot apply while the PC is connected", () => {

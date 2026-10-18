@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Clock, Layers, Monitor, RefreshCw, Server, Settings as SettingsIcon } from "lucide-react";
 
 import {
   api,
@@ -9,6 +10,7 @@ import {
   type MachineTraffic,
   type Storage,
 } from "./api";
+import { isOnline } from "./components/AgentState";
 import { GameDisksPage } from "./pages/GameDisksPage";
 import { MachinesPage } from "./pages/MachinesPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -27,15 +29,21 @@ export function App() {
   const [traffic, setTraffic] = useState<Record<number, MachineTraffic>>({});
   const [discovered, setDiscovered] = useState<Discovered[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const reload = useCallback(async () => {
+    setRefreshing(true);
     try {
       const [d, m] = await Promise.all([api.listDisks(), api.listMachines()]);
       setDisks(d);
       setMachines(m);
+      setLastUpdated(new Date());
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefreshing(false);
     }
     // The pool can be unreadable while the rest works; it only drives a warning.
     api.getStorage().then(setStorage).catch(() => setStorage(null));
@@ -53,35 +61,82 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [reload]);
 
+  const online = machines.filter((m) => isOnline(m)).length;
+  const tabs: { id: Tab; label: string; icon: typeof Monitor; count?: number }[] = [
+    { id: "machines", label: "Machines", icon: Monitor, count: machines.length },
+    { id: "disks", label: "Images", icon: Layers, count: disks.length },
+    { id: "settings", label: "Settings", icon: SettingsIcon },
+  ];
+
   return (
     <div className="app">
-      <header>
-        <h1>ggNet</h1>
-        <nav>
-          <button
-            type="button"
-            className={tab === "machines" ? "tab active" : "tab"}
-            onClick={() => setTab("machines")}
-          >
-            Machines ({machines.length})
-          </button>
-          <button
-            type="button"
-            className={tab === "disks" ? "tab active" : "tab"}
-            onClick={() => setTab("disks")}
-          >
-            Game disks ({disks.length})
-          </button>
-          <button
-            type="button"
-            className={tab === "settings" ? "tab active" : "tab"}
-            onClick={() => setTab("settings")}
-          >
-            Settings
-          </button>
+      <header className="app-header">
+        <div className="brand-section">
+          <div className="brand-logo">
+            <div className="brand-icon">
+              <Server size={18} />
+            </div>
+            <span>ggNet</span>
+          </div>
+        </div>
+
+        <nav className="desktop-nav">
+          {tabs.map(({ id, label, icon: Icon, count }) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? "tab active" : "tab"}
+              onClick={() => setTab(id)}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
+              {count !== undefined && <span className="tab-badge">{count}</span>}
+            </button>
+          ))}
         </nav>
-        <div className="muted small">
-          {health ? `v${health.version} · pool ${health.pool} · ${health.server_ip}` : "API offline"}
+
+        <div className="header-status">
+          {storage && (
+            <div className="storage-mini" title={`Pool ${storage.pool}: ${storage.used_percent} % used`}>
+              <div className="storage-mini-header">
+                <span>Storage</span>
+                <span>{storage.used_percent}%</span>
+              </div>
+              <div className="storage-mini-bar">
+                <div
+                  className="storage-mini-fill"
+                  style={{
+                    width: `${Math.min(storage.used_percent, 100)}%`,
+                    backgroundColor: storage.warning ? "var(--warn)" : "var(--accent)",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="status-chip" title={health ? `ggNet ${health.version} · pool ${health.pool}` : undefined}>
+            <span className={`status-dot ${health ? "online" : "offline"}`} />
+            <span>{health ? `${health.server_ip} · ${online}/${machines.length} online` : "API offline"}</span>
+          </div>
+
+          <div className="header-refresh-wrap">
+            {lastUpdated && (
+              <span className="last-updated" title={lastUpdated.toLocaleString()}>
+                <Clock size={12} className="last-updated-icon" />
+                <span className="last-updated-time">{lastUpdated.toLocaleTimeString()}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={reload}
+              disabled={refreshing}
+              title="Refresh"
+              aria-label="Refresh"
+            >
+              <RefreshCw size={14} className={refreshing ? "spin-animation" : ""} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -111,6 +166,23 @@ export function App() {
           <SettingsPage storage={storage} reload={reload} />
         )}
       </main>
+
+      <nav className="mobile-bottom-bar" aria-label="Navigation">
+        {tabs.map(({ id, label, icon: Icon, count }) => (
+          <button
+            key={id}
+            type="button"
+            className={`mobile-tab ${tab === id ? "active" : ""}`}
+            onClick={() => setTab(id)}
+          >
+            <div className="mobile-tab-icon-wrap">
+              <Icon size={18} />
+              {count !== undefined && <span className="mobile-tab-badge">{count}</span>}
+            </div>
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

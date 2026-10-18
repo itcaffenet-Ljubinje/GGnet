@@ -16,6 +16,16 @@ export interface GameDisk {
   published: boolean;
   editor_id: number | null;
   created_at: string;
+  /** "os": a Boot Mode Windows image; "game": a game disk. Older servers send none (game). */
+  kind?: DiskKind;
+}
+
+export type DiskKind = "game" | "os";
+
+/** Which kept writebacks Apply Writebacks turns into versions (Boot Mode has two). */
+export interface ApplyChoice {
+  os?: boolean;
+  game?: boolean;
 }
 
 /** One version of a game disk (a ZFS snapshot of its master). */
@@ -132,6 +142,7 @@ export interface Machine {
   mac: string | null;
   game_disk_id: number | null;
   os_disk_id?: number | null;      // Boot Mode: the OS image
+  os_clone_snapshot?: string | null; // Boot Mode: the OS image version the PC runs
   editing_disk_id: number | null;
   drive_letter: string;
   reported_drive_letter: string | null;
@@ -184,9 +195,10 @@ export interface DiscoveryClaim {
 export interface MachineCreate {
   name: string;
   mode?: MachineMode;
-  initiator_iqn?: string | null;
+  /** Identifies the PC; the server derives the initiator IQN from it. */
   mac?: string | null;
   game_disk_id?: number | null;
+  os_disk_id?: number | null;     // Boot Mode: the OS image
   drive_letter?: string;
 }
 
@@ -276,7 +288,8 @@ export const api = {
     request<Machine[]>("PUT", "/v1/machines/drive-letter", { drive_letter }),
   setKeepWriteback: (id: number, enabled: boolean) =>
     request<Machine>("PUT", `/v1/machines/${id}/keep-writeback`, { enabled }),
-  applyWritebacks: (id: number) => request<Machine>("POST", `/v1/machines/${id}/apply-writebacks`),
+  applyWritebacks: (id: number, choice?: ApplyChoice) =>
+    request<Machine>("POST", `/v1/machines/${id}/apply-writebacks`, choice),
   pinSnapshot: (id: number, snapshot: string | null) =>
     request<Machine>("PUT", `/v1/machines/${id}/pin`, { snapshot }),
   bulk: (
