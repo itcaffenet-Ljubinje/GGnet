@@ -49,7 +49,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Fixed IP per PC (as a DHCP reservation hint, not in Windows) | todo |
 | Add hardware: iPXE reads the boot NIC's PCI IDs; the same chip in another revision or board is added to each fresh OS writeback automatically; shown in New PCs and Settings → Hardware | done |
 | Add hardware for a chip the image has no driver for (driver library, inject into the image) | todo |
-| The server's agent copied into every fresh OS writeback (service registered, Fast Startup off; `[boot] inject_agent`) | done |
+| Prepare image (once per OS version, also on Apply Writebacks of an OS image): the server's agent and its service, Fast Startup off, fixed IPs to DHCP, stale letters forgotten; each PC's writeback then only gets its name, variables and NIC (`[boot] inject_agent`) | done |
 
 ## Images
 

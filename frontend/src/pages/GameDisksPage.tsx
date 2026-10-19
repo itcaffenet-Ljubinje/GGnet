@@ -65,6 +65,17 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
+  async function prepare(disk: GameDisk) {
+    const msg =
+      `Prepare "${disk.name}" for all PCs?\n\n` +
+      "A new version is made from the newest one, with the server's agent (Settings → Client app) and " +
+      "its service, Fast Startup off, fixed IP addresses switched to DHCP and old drive letters forgotten. " +
+      "PCs move to it at their next reboot. Apply Writebacks of an OS image does this already.";
+    if (!window.confirm(msg)) return;
+    await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id));
+    await reload();
+  }
+
   async function remove(disk: GameDisk) {
     const what = disk.kind === "os" ? "OS image" : "game disk";
     if (!window.confirm(`Delete ${what} "${disk.name}" and its zvol on the host?`)) return;
@@ -118,6 +129,16 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                           onClick={() => setOpen(open === d.id ? null : d.id)}
                         >
                           {open === d.id ? "Hide details" : "Details"}
+                        </button>
+                      )}
+                      {d.published && d.kind === "os" && (
+                        <button
+                          type="button"
+                          onClick={() => prepare(d)}
+                          disabled={busy !== null}
+                          title="New version with the server's agent and the settings every PC needs"
+                        >
+                          {busy === `prepare-${d.id}` ? "Preparing…" : "Prepare image"}
                         </button>
                       )}
                       {!d.published && d.editor_id === null && (

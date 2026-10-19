@@ -32,6 +32,8 @@ from app.api.v1.schemas import (
 )
 from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
+from app.services.agent_package import default_package
+from app.services.os_setup import image_prep
 from app.services.provisioning import Provisioner, ProvisioningError
 
 logger = logging.getLogger("ggnet.api.game_disks")
@@ -299,6 +301,42 @@ def delete_snapshot(
     except ProvisioningError as e:
         host_failed(str(e))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{disk_id}/prepare", response_model=GameDiskOut)
+def prepare_image(
+    disk_id: int,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """
+    OS images: a new active version with what every PC needs made part of
+    the image (the server's agent and its service, Fast Startup off, DHCP,
+    stale letters forgotten; app.windows_setup.prepare_image). PCs move to it
+    at their next reboot. Apply Writebacks of an OS image does this already.
+    """
+    disk = _get(db, disk_id)
+    _published(disk)
+    if disk.kind is not DiskKind.OS:
+        conflict(f"'{disk.name}' is a game disk; only OS images are prepared")
+    names = [v["name"] for v in _versions(prov, disk)]
+    if names and names[-1] != disk.snapshot:
+        conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
+                 f"make @{names[-1]} active first (a new version always follows the newest)")
+    prep = image_prep()
+    try:
+        new = prov.prepare_image(disk.zvol_path, prep)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    disk.snapshot = new
+    db.commit()
+    version = default_package().info()
+    agent = f", agent {version.version}" if prep.agent and version and version.version else ""
+    try:
+        prov.set_comment(disk.zvol_path, new, f"ggNet: prepared for all PCs{agent}")
+    except ProvisioningError as e:   # the version exists; only its comment is missing
+        logger.warning("%s", e)
+    return disk
 
 
 @router.post("/{disk_id}/snapshots/{name}/merge-into-base", response_model=GameDiskOut)

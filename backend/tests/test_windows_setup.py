@@ -388,7 +388,7 @@ def test_personalize_refuses_a_bad_nic_id(windows, runner):
     assert runner.calls == []
 
 
-# ── The server's agent in every fresh writeback ──────────────────────
+# ── Prepared once per OS version: agent, Fast Startup, DHCP, letters ─
 
 def _agent(tmp_path, data: bytes = b"MZ agent 0.1.13") -> "AgentInstall":
     import hashlib
@@ -401,6 +401,12 @@ def _agent(tmp_path, data: bytes = b"MZ agent 0.1.13") -> "AgentInstall":
     return AgentInstall(exe=exe, sha256=hashlib.sha256(data).hexdigest(), server_url="http://192.168.0.40:8088/")
 
 
+def _prep(tmp_path, **kw):
+    from app.windows_setup import ImagePrep
+
+    return ImagePrep(agent=_agent(tmp_path, **kw))
+
+
 def _merged(runner) -> dict:
     merged = {}
 
@@ -411,10 +417,15 @@ def _merged(runner) -> dict:
     return merged
 
 
-def test_registry_patch_registers_the_agent_service():
-    from app.windows_setup import agent_service_patch
+def _image(windows) -> Path:
+    """An image's Windows as prepare_image mounts it."""
+    return _windows_on(windows, "prepare-win11").parents[3]
 
-    patch = registry_patch(SETUP, 2, agent_service=True)
+
+def test_image_patch_registers_the_agent_service():
+    from app.windows_setup import agent_service_patch, image_patch
+
+    patch = image_patch(2, agent_service=True)
     assert "[\\ControlSet002\\Services\\ggnet-agent]" in patch
     assert '"Start"=dword:00000002' in patch and '"ObjectName"="LocalSystem"' in patch
     image_path = '"C:\\Program Files\\ggnet-agent\\ggnet-agent.exe"\0'.encode("utf-16-le")
@@ -424,22 +435,28 @@ def test_registry_patch_registers_the_agent_service():
     assert "[\\ControlSet002\\Control\\Session Manager\\Power]" in patch
     assert '"HiberbootEnabled"=dword:00000000' in patch
     assert agent_service_patch(1)[1] == "[\\ControlSet001\\Services\\ggnet-agent]"
+    assert "ggnet-agent" not in image_patch(2)
+    # The PC's own patch never carries image-wide things.
     assert "ggnet-agent" not in registry_patch(SETUP, 2)
 
 
-def test_personalize_puts_the_agent_into_the_writeback(windows, runner, tmp_path):
-    import dataclasses
+def test_prepare_image_puts_the_agent_in_and_cleans_up(windows, runner, tmp_path):
     import json as _json
 
-    hive = _windows_on(windows, "pc-05")
-    program_files = hive.parents[3] / "program files"            # any case, as on NTFS
+    root = _image(windows)
+    program_files = root / "program files"            # any case, as on NTFS
     program_files.mkdir()
+    select = runner.responses[("hivexregedit", "--export")]
+
+    def export(cmd):
+        if cmd[-1].endswith("\\Interfaces"):
+            return True, INTERFACES, ""
+        return (True, MOUNTED, "") if cmd[-1] == "\\MountedDevices" else select
+    runner.responses[("hivexregedit", "--export")] = export
     merged = _merged(runner)
-    setup = dataclasses.replace(SETUP, computer_name="pc-05", agent=_agent(tmp_path))
     seen = {}
 
     def snapshot(cmd):
-        # What is in the mount while it is mounted (personalize removes it afterwards).
         exe = program_files / "ggnet-agent" / "ggnet-agent.exe"
         seen["exe"] = exe.read_bytes() if exe.exists() else None
         settings = exe.with_name("appsettings.json")
@@ -447,56 +464,54 @@ def test_personalize_puts_the_agent_into_the_writeback(windows, runner, tmp_path
         return True, "", ""
     runner.responses[("umount",)] = snapshot
 
-    assert windows.personalize(DEVICE, setup) is None
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
     assert seen["exe"] == b"MZ agent 0.1.13"
     assert seen["settings"]["Agent"]["ServerUrl"] == "http://192.168.0.40:8088"
     assert seen["settings"]["Agent"]["DriveLetter"] == "D"
-    assert "[\\ControlSet002\\Services\\ggnet-agent]" in merged["reg"]
+    from app.windows_setup import image_patch
+    assert merged["reg"] == image_patch(2, [FIXED], ["D", "E", "F"], agent_service=True)
+    assert "ComputerName" not in merged["reg"]            # no PC's identity in the image
 
 
 def test_the_same_agent_is_not_copied_again_and_own_settings_stay(windows, runner, tmp_path):
-    import dataclasses
-
-    hive = _windows_on(windows, "pc-05")
-    folder = hive.parents[3] / "Program Files" / "ggnet-agent"
+    folder = _image(windows) / "Program Files" / "ggnet-agent"
     folder.mkdir(parents=True)
     exe = folder / "ggnet-agent.exe"
     exe.write_bytes(b"MZ agent 0.1.13")
     (folder / "appsettings.json").write_text('{"Agent": {"ServerUrl": "http://10.0.0.1:8088", "HideLocalDisks": false}}')
     stamp = exe.stat().st_mtime_ns
     _merged(runner)
-    setup = dataclasses.replace(SETUP, computer_name="pc-05", agent=_agent(tmp_path))
     seen = {}
     runner.responses[("umount",)] = lambda cmd: (seen.update(
         mtime=exe.stat().st_mtime_ns, settings=(folder / "appsettings.json").read_text()), (True, "", ""))[1]
-    assert windows.personalize(DEVICE, setup) is None
-    assert seen["mtime"] == stamp                                 # not written: no space in the clone
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
+    assert seen["mtime"] == stamp                                 # not written again
     assert "10.0.0.1" in seen["settings"]                         # the image's own settings stay
 
 
 def test_a_new_agent_replaces_the_old_one(windows, runner, tmp_path):
-    import dataclasses
-
-    hive = _windows_on(windows, "pc-05")
-    folder = hive.parents[3] / "Program Files" / "ggnet-agent"
+    folder = _image(windows) / "Program Files" / "ggnet-agent"
     folder.mkdir(parents=True)
     (folder / "ggnet-agent.exe").write_bytes(b"MZ agent 0.1.11 (older and longer)")
     _merged(runner)
     seen = {}
     runner.responses[("umount",)] = lambda cmd: (seen.update(
         exe=(folder / "ggnet-agent.exe").read_bytes(), left=sorted(p.name for p in folder.iterdir())), (True, "", ""))[1]
-    setup = dataclasses.replace(SETUP, computer_name="pc-05", agent=_agent(tmp_path))
-    assert windows.personalize(DEVICE, setup) is None
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
     assert seen["exe"] == b"MZ agent 0.1.13"
     assert seen["left"] == ["appsettings.json", "ggnet-agent.exe"]   # no .new left behind
 
 
 def test_an_image_without_program_files_gets_no_agent_service(windows, runner, tmp_path):
-    import dataclasses
-
-    _windows_on(windows, "pc-05")
+    _image(windows)
     merged = _merged(runner)
-    setup = dataclasses.replace(SETUP, computer_name="pc-05", agent=_agent(tmp_path))
-    assert windows.personalize(DEVICE, setup) == "no Program Files folder in the image"
-    assert "ggnet-agent" not in merged["reg"]                     # the rest is still set up
-    assert "ComputerName" in merged["reg"]
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") == "no Program Files folder in the image"
+    assert "ggnet-agent" not in merged["reg"]
+    assert "HiberbootEnabled" not in merged["reg"]
+
+
+def test_a_pcs_writeback_gets_only_its_identity(windows, runner):
+    _windows_on(windows)
+    merged = _merged(runner)
+    assert windows.personalize(DEVICE, SETUP) is None
+    assert "ggnet-agent" not in merged["reg"] and "HiberbootEnabled" not in merged["reg"]
