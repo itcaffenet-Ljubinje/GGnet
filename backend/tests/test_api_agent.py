@@ -34,6 +34,7 @@ def test_heartbeat_returns_target_and_portal(client, host):
         "game_disk": "cs2",
         "drive_letter": "D",
         "command": None,
+        "secure_boot": None,
     }
     assert host.calls == []   # a heartbeat never touches the host
 

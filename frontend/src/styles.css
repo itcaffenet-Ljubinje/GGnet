@@ -2312,3 +2312,9 @@ a.button-link:hover {
   color: var(--muted);
   cursor: help;
 }
+
+.secure-boot-pending {
+  display: inline-flex;
+  color: var(--warn);
+  cursor: help;
+}

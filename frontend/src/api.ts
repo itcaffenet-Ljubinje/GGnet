@@ -91,6 +91,10 @@ export interface BootSettings {
   /** "none" (0.0.0.0), "dhcp" (the router's) or an IPv4 address. */
   gateway: string;
   unregistered: "wait" | "local";
+  /** Boot Mode agents ask shim to enroll the ggNet Secure Boot key (confirmed in MokManager). */
+  mok_enroll: boolean;
+  /** Typed in MokManager to confirm: a-z and 0-9, 4 to 16 characters. */
+  mok_password: string;
 }
 
 export interface BootSettingsOut extends BootSettings {
@@ -193,6 +197,8 @@ export interface Machine {
   hardware: MachineHardware | null;
   /** Boot Mode: the boot network card's PCI ID as iPXE read it (VEN_10EC&DEV_8168&SUBSYS_…&REV_16). */
   boot_nic?: string | null;
+  /** The ggNet Secure Boot key on this PC, as its agent reports it. */
+  mok_state?: "enrolled" | "requested" | "failed" | null;
   status: MachineStatus;
   last_error: string | null;
   clone_zvol: string | null;

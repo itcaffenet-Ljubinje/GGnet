@@ -17,7 +17,8 @@ public sealed class AgentWorker(
     Func<TimeSpan>? uptime = null,
     IInventory? inventory = null,
     IPowerControl? power = null,
-    ILocalDisks? localDisks = null) : BackgroundService
+    ILocalDisks? localDisks = null,
+    IUefiVariables? uefi = null) : BackgroundService
 {
     internal static readonly string Version =
         typeof(AgentWorker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -45,6 +46,9 @@ public sealed class AgentWorker(
     private string? _portalIp;
     // Boot Mode: local disks are taken offline once per service start.
     private bool _disksHidden;
+    // Boot Mode: the Secure Boot key is checked (and asked for) once per service start.
+    private string? _mok;
+    private bool _mokChecked;
 
         /// <summary>The ggNet target this agent connected (sessions are not persistent across reboots).</summary>
     internal string? ConnectedTarget { get; private set; }
@@ -110,7 +114,7 @@ public sealed class AgentWorker(
             {
                 config = await server.HeartbeatAsync(
                     new Heartbeat(_machineName, Version, initiator, ConnectedTarget is not null, _bootedAt,
-                        DriveLetter, _inventory), ct);
+                        DriveLetter, _inventory, Mok: _mok), ct);
                 _portalIp = config.PortalIp;
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
@@ -119,6 +123,7 @@ public sealed class AgentWorker(
             }
 
             await HideLocalDisksAsync(config, ct);
+            EnrollSecureBootKey(config);
 
             var actions = Planner.Plan(config, new LocalState(initiator, ConnectedTarget, RequestedLetter),
                 _options.ManageInitiatorName, _options.DriveLetter);
@@ -154,6 +159,30 @@ public sealed class AgentWorker(
         {
             // Retried on the next heartbeat.
             logger.LogWarning("Taking the local disks offline failed: {Error}", e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Boot Mode, when the server asks for it: make sure this PC trusts the
+    /// ggNet Secure Boot key, else ask for it (MokManager at the next boot).
+    /// Reported from the next heartbeat on.
+    /// </summary>
+    private void EnrollSecureBootKey(AgentConfig? config)
+    {
+        if (_mokChecked || uefi is null || config?.Mode != "boot" || config.SecureBoot is not { } key) return;
+        _mokChecked = true;
+        try
+        {
+            _mok = new MokEnrollment(uefi).Ensure(Convert.FromBase64String(key.Certificate), key.Password);
+            if (_mok == MokState.Requested)
+            {
+                logger.LogInformation("Secure Boot: ggNet key requested; confirm Enroll MOK in MokManager at the next boot");
+            }
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _mok = MokState.Failed;
+            logger.LogWarning("Secure Boot: asking for the ggNet key failed: {Error}", e.Message);
         }
     }
 

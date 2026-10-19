@@ -6,9 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ggnet-agent</AssemblyName>
     <RootNamespace>GgnetAgent</RootNamespace>
-    <Version>0.1.12</Version>
+    <Version>0.1.13</Version>
     <InvariantGlobalization>true</InvariantGlobalization>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- LibraryImport (UEFI variables for Secure Boot key enrollment) generates unsafe marshalling code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!-- dotnet publish -r win-x64: one self-contained ggnet-agent.exe, no .NET install on clients. -->

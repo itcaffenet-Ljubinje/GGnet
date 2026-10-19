@@ -53,6 +53,9 @@ class BootSettings:
     gateway: str = "none"
     # A PC whose MAC is not registered: "wait" on screen, or boot its "local" disk.
     unregistered: str = "wait"
+    # Agents ask shim to enroll the ggNet Secure Boot key (MokManager password).
+    mok_enroll: bool = False
+    mok_password: str = "ggnet"
 
 
 def _defaults(cfg: dict[str, Any]) -> BootSettings:
@@ -60,6 +63,8 @@ def _defaults(cfg: dict[str, Any]) -> BootSettings:
     return BootSettings(
         gateway=str(boot.get("gateway") or "none").strip() or "none",
         unregistered=str(boot.get("unregistered") or "wait"),
+        mok_enroll=bool(boot.get("mok_enroll", False)),
+        mok_password=str(boot.get("mok_password") or "ggnet"),
     )
 
 

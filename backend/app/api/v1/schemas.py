@@ -290,6 +290,7 @@ class MachineOut(BaseModel):
     link_speed_mbps: int | None
     hardware: MachineHardware | None = Field(validation_alias="hardware_info")
     boot_nic: str | None
+    mok_state: str | None
     status: MachineStatus
     last_error: str | None
     clone_zvol: str | None
@@ -327,6 +328,8 @@ class AgentHeartbeat(BaseModel):
     # a bad inventory never fails the heartbeat itself.
     inventory: dict[str, Any] | None = None
     stopping: bool = False              # last beat: the agent's service is stopping
+    # The ggNet Secure Boot key on this PC (agent 0.1.13+, Boot Mode, once asked for).
+    mok: Literal["enrolled", "requested", "failed"] | None = None
 
     @field_validator("drive_letter")
     @classmethod
@@ -405,6 +408,15 @@ class AgentConfig(BaseModel):
     game_disk: str | None
     drive_letter: str                   # the letter the game disk should get
     command: str | None = None          # "shutdown" | "reboot", handed out once
+    # Boot Mode, while Settings -> Network boot asks the PCs to enroll the key.
+    secure_boot: "AgentSecureBoot | None" = None
+
+
+class AgentSecureBoot(BaseModel):
+    """The ggNet Secure Boot key a Boot Mode PC's agent asks shim to enroll."""
+
+    certificate: str                    # DER, base64
+    password: str                       # typed in MokManager to confirm
 
 
 # ── Settings: retention and storage ───────────────────────────────────
@@ -557,6 +569,12 @@ class BootSettingsIn(BaseModel):
     # "none" (0.0.0.0 in the iBFT), "dhcp" (the router's gateway) or an IPv4 address.
     gateway: str = "none"
     unregistered: Literal["wait", "local"] = "wait"
+    # Agents of Boot Mode PCs ask shim to enroll the ggNet Secure Boot key; at
+    # the next boot MokManager asks to confirm it with this password. Off by
+    # default: until it is confirmed, every boot shows MokManager for 10 s.
+    mok_enroll: bool = False
+    # MokManager's keyboard is US: lower-case letters and digits only.
+    mok_password: str = Field("ggnet", pattern=r"^[a-z0-9]{4,16}$")
 
     @field_validator("gateway")
     @classmethod

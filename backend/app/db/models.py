@@ -203,6 +203,9 @@ class Machine(Base):
     # Boot Mode: the boot network card's PCI hardware ID as iPXE read it
     # (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), for Add hardware.
     boot_nic: Mapped[str | None] = mapped_column(String(64), default=None)
+    # Boot Mode: the ggNet Secure Boot key on this PC as its agent reports it:
+    # "enrolled", "requested" (confirm in MokManager at the next boot), "failed".
+    mok_state: Mapped[str | None] = mapped_column(String(16), default=None)
 
     # Reported by ggnet-agent in its heartbeat; never used for provisioning.
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)

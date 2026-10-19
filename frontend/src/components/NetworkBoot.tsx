@@ -21,6 +21,8 @@ export function NetworkBoot() {
   const [choice, setChoice] = useState<GatewayChoice>("none");
   const [ip, setIp] = useState("");
   const [unregistered, setUnregistered] = useState<BootSettings["unregistered"]>("wait");
+  const [mokEnroll, setMokEnroll] = useState(false);
+  const [mokPassword, setMokPassword] = useState("ggnet");
   const [done, setDone] = useState(false);
 
   function show(s: BootSettingsOut) {
@@ -28,6 +30,8 @@ export function NetworkBoot() {
     setChoice(choiceOf(s.gateway));
     setIp(choiceOf(s.gateway) === "ip" ? s.gateway : "");
     setUnregistered(s.unregistered);
+    setMokEnroll(s.mok_enroll);
+    setMokPassword(s.mok_password);
   }
 
   useEffect(() => {
@@ -53,7 +57,8 @@ export function NetworkBoot() {
     e.preventDefault();
     setDone(false);
     const gateway = choice === "ip" ? ip.trim() : choice;
-    const ok = await run("save", async () => show(await api.saveBootSettings({ gateway, unregistered })));
+    const body = { gateway, unregistered, mok_enroll: mokEnroll, mok_password: mokPassword };
+    const ok = await run("save", async () => show(await api.saveBootSettings(body)));
     if (ok) setDone(true);
   }
 
@@ -143,6 +148,32 @@ export function NetworkBoot() {
               </select>
               <span className="muted small">A waiting PC boots as soon as it is added in Machines → New PCs.</span>
             </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={mokEnroll}
+                onChange={(e) => setMokEnroll(e.target.checked)}
+                disabled={!status?.secure_boot}
+              />
+              Prepare the Secure Boot key on PCs (no USB)
+            </label>
+            {mokEnroll && (
+              <label>
+                MokManager password
+                <input
+                  value={mokPassword}
+                  onChange={(e) => setMokPassword(e.target.value)}
+                  pattern="[a-z0-9]{4,16}"
+                  title="4 to 16 lower-case letters or digits (MokManager's keyboard is US)"
+                  required
+                />
+                <span className="muted small">
+                  The agent of each Boot Mode PC without the key asks for it. At its next boot the blue MokManager
+                  screen opens: Enroll MOK → Continue → Yes, type this password, Reboot. Until then MokManager waits
+                  10 s on every boot, so turn this off when the PCs are done.
+                </span>
+              </label>
+            )}
           </div>
           <div className="actions-row">
             <button type="submit" disabled={busy !== null}>

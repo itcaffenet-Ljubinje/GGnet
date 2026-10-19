@@ -444,11 +444,13 @@ describe("MachinesPage", () => {
           machine({ id: 1, name: "pc01", hardware: { ...hw, secure_boot: true } }),
           machine({ id: 2, name: "pc02", hardware: { ...hw, secure_boot: false } }),
           machine({ id: 3, name: "pc03" }),
+          machine({ id: 4, name: "pc04", mok_state: "requested", hardware: { ...hw, secure_boot: false } }),
         ]}
         reload={vi.fn()}
       />,
     );
     const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(within(row("pc04")).getByLabelText("Secure Boot key: confirm at next boot")).toBeInTheDocument();
     expect(within(row("pc01")).getByLabelText("Secure Boot on")).toBeInTheDocument();
     expect(within(row("pc02")).getByLabelText("Secure Boot off")).toBeInTheDocument();
     expect(within(row("pc03")).queryByLabelText(/Secure Boot/)).toBeNull();

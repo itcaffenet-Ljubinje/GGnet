@@ -52,7 +52,8 @@ function stubHost(retention: Retention = DEFAULTS) {
     if (url.endsWith("/preview")) body = PLAN;
     if (url.endsWith("/run")) body = { at: "2026-10-09T13:00:00Z", dry_run: false, actions: [] };
     // Settings → Network boot, tested in NetworkBoot.test.tsx.
-    if (url.endsWith("/settings/boot")) body = { gateway: "none", unregistered: "wait", saved: false };
+    if (url.endsWith("/settings/boot"))
+      body = { gateway: "none", unregistered: "wait", mok_enroll: false, mok_password: "ggnet", saved: false };
     if (url.endsWith("/pxe")) body = PXE;
     return new Response(JSON.stringify(body), { status: 200 });
   });
