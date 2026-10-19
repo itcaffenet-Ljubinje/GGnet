@@ -435,6 +435,25 @@ describe("MachinesPage", () => {
     expect(actions(fetchMock)).toEqual([{ url: "/api/v1/machines/1", method: "DELETE", body: undefined }]);
   });
 
+  it("shows whether a PC booted with Secure Boot", () => {
+    const hw = { nic: null, cpu: null, gpus: [], motherboard: null, memory_bytes: null };
+    render(
+      <MachinesPage
+        disks={DISKS}
+        machines={[
+          machine({ id: 1, name: "pc01", hardware: { ...hw, secure_boot: true } }),
+          machine({ id: 2, name: "pc02", hardware: { ...hw, secure_boot: false } }),
+          machine({ id: 3, name: "pc03" }),
+        ]}
+        reload={vi.fn()}
+      />,
+    );
+    const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(within(row("pc01")).getByLabelText("Secure Boot on")).toBeInTheDocument();
+    expect(within(row("pc02")).getByLabelText("Secure Boot off")).toBeInTheDocument();
+    expect(within(row("pc03")).queryByLabelText(/Secure Boot/)).toBeNull();
+  });
+
   describe("bulk", () => {
     const three = [
       machine({ id: 1, name: "pc01", game_disk_id: 1 }),

@@ -4,7 +4,8 @@ namespace GgnetAgent;
 
 /// <summary>
 /// What the PC reports about itself: the network it reaches the server on
-/// (ggRock's IP and Link Speed columns) and its hardware (the Hardware tab).
+/// (ggRock's IP and Link Speed columns), its hardware (the Hardware tab) and
+/// whether Windows booted with UEFI Secure Boot on (anti-cheats need it).
 /// </summary>
 public sealed record Inventory(
     string? IpAddress,
@@ -14,7 +15,8 @@ public sealed record Inventory(
     string? Cpu,
     IReadOnlyList<string>? Gpus,
     string? Motherboard,
-    long? MemoryBytes);
+    long? MemoryBytes,
+    bool? SecureBoot = null);
 
 public interface IInventory
 {
@@ -38,6 +40,8 @@ public sealed class WindowsInventory(IScriptRunner runner) : IInventory
             $addr = {{route}}
             $nic = if ($addr) { Get-NetAdapter -InterfaceIndex $addr.InterfaceIndex -ErrorAction SilentlyContinue } else { $null }
             $board = Get-CimInstance Win32_BaseBoard | Select-Object -First 1
+            # Set by Windows at boot; missing on a BIOS (non-UEFI) boot.
+            $sb = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\State' -ErrorAction SilentlyContinue
             [pscustomobject]@{
                 ip_address = if ($addr) { [string]$addr.IPAddress } else { $null }
                 mac_address = if ($nic) { [string]$nic.MacAddress } else { $null }
@@ -47,6 +51,7 @@ public sealed class WindowsInventory(IScriptRunner runner) : IInventory
                 gpus = @(Get-CimInstance Win32_VideoController | ForEach-Object { [string]$_.Name })
                 motherboard = "$($board.Manufacturer) $($board.Product)"
                 memory_bytes = [int64](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+                secure_boot = if ($sb -and $null -ne $sb.UEFISecureBootEnabled) { $sb.UEFISecureBootEnabled -eq 1 } else { $null }
             } | ConvertTo-Json -Compress
             """;
     }

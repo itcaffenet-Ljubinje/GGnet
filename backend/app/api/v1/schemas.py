@@ -368,6 +368,8 @@ class AgentInventory(BaseModel):
     gpus: list[Annotated[str, Field(max_length=128)]] = Field(default_factory=list, max_length=8)
     motherboard: str | None = Field(None, max_length=128)
     memory_bytes: int | None = Field(None, ge=0)
+    # Windows booted with UEFI Secure Boot on (null: not UEFI, or an older agent).
+    secure_boot: bool | None = None
 
     @field_validator("ip_address")
     @classmethod
@@ -386,6 +388,7 @@ class MachineHardware(BaseModel):
     gpus: list[str] = []
     motherboard: str | None = None
     memory_bytes: int | None = None
+    secure_boot: bool | None = None
 
 
 class AgentConfig(BaseModel):
@@ -572,6 +575,13 @@ class BootSettingsOut(BootSettingsIn):
     saved: bool
 
 
+class SecureBootKeyOut(BaseModel):
+    subject: str
+    fingerprint: str
+    expires: datetime | None
+    ipxe_signed: bool | None
+
+
 class PxeStatusOut(BaseModel):
     unit: str
     installed: bool
@@ -580,3 +590,5 @@ class PxeStatusOut(BaseModel):
     since: datetime | None
     tftp_root: str
     files: dict[str, bool]
+    # None: no Secure Boot key on this server yet (scripts/install_ggnet.sh makes it).
+    secure_boot: SecureBootKeyOut | None = None

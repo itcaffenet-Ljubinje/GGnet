@@ -291,6 +291,8 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                 <dd>{hw?.memory_bytes ? formatBytes(hw.memory_bytes) : "—"}</dd>
                 <dt>Network card</dt>
                 <dd>{hw?.nic ?? "—"}</dd>
+                <dt>Secure Boot</dt>
+                <dd>{hw?.secure_boot === true ? "On" : hw?.secure_boot === false ? "Off" : "—"}</dd>
                 <dt>Boot network card</dt>
                 <dd title={m.boot_nic ? `PCI\\${m.boot_nic}` : undefined}>
                   {m.boot_nic ? (

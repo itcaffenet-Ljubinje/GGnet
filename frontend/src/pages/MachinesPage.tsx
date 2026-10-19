@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
   HardDrive,
+  Lock,
+  LockOpen,
   Monitor,
   Plus,
   Power,
@@ -377,6 +379,7 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                             >
                               {m.name}
                             </button>
+                            <SecureBootIcon machine={m} />
                             <span
                               className={`mode-pill ${m.mode === "boot" ? "mode-pill-boot" : "mode-pill-disk"}`}
                               title={m.mode === "boot" ? "Boot Mode: diskless" : "Disk Mode: local Windows"}
@@ -934,6 +937,21 @@ const APPLY: Record<ApplyKey, ApplyChoice> = {
   os: { os: true, game: false },
   game: { os: false, game: true },
 };
+
+/** ggNet2's lock: whether Windows booted with Secure Boot on (anti-cheats need it), as the agent reports. */
+function SecureBootIcon({ machine: m }: { machine: Machine }) {
+  const on = m.hardware?.secure_boot;
+  if (on === undefined || on === null) return null;
+  return on ? (
+    <span className="secure-boot-on" title="Secure Boot on" aria-label="Secure Boot on">
+      <Lock size={12} />
+    </span>
+  ) : (
+    <span className="secure-boot-off" title="Secure Boot off" aria-label="Secure Boot off">
+      <LockOpen size={12} />
+    </span>
+  );
+}
 
 /** Boot Mode: the OS image (C:) and game disk (D:) a PC runs, with their versions. */
 function BootDisks({ machine: m, diskName }: { machine: Machine; diskName: (id: number | null) => string }) {

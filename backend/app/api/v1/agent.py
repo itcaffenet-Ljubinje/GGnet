@@ -89,7 +89,7 @@ def heartbeat(
 
     inventory: dict = {}
     if inv is not None:
-        hw = inv.model_dump(include={"nic", "cpu", "gpus", "motherboard", "memory_bytes"})
+        hw = inv.model_dump(include={"nic", "cpu", "gpus", "motherboard", "memory_bytes", "secure_boot"})
         inventory = {
             "reported_ip": inv.ip_address,
             "reported_mac": inv.mac_address,

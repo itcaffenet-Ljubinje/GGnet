@@ -97,6 +97,15 @@ export interface BootSettingsOut extends BootSettings {
   saved: boolean;
 }
 
+export interface SecureBootKey {
+  subject: string;
+  /** SHA-256, as MokManager shows it. */
+  fingerprint: string;
+  expires: string | null;
+  /** Whether sb/grubx64.efi is signed with this key; null: not there. */
+  ipxe_signed: boolean | null;
+}
+
 /** The PXE service (proxyDHCP + TFTP) as systemd sees it. */
 export interface PxeStatus {
   unit: string;
@@ -106,6 +115,8 @@ export interface PxeStatus {
   since: string | null;
   tftp_root: string;
   files: Record<string, boolean>;
+  /** The ggNet Secure Boot key the PCs enroll; null until the installer made it. */
+  secure_boot?: SecureBootKey | null;
 }
 
 export interface Storage {
@@ -126,6 +137,8 @@ export interface MachineHardware {
   gpus: string[];
   motherboard: string | null;
   memory_bytes: number | null;
+  /** Windows booted with Secure Boot on; null or missing: unknown (not UEFI, or an older agent). */
+  secure_boot?: boolean | null;
 }
 
 /** iSCSI traffic of a mapped machine since its writeback was last cloned. */
