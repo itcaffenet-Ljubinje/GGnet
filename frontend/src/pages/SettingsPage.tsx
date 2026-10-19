@@ -6,16 +6,22 @@ import {
   type RetentionAction,
   type RetentionSettings,
   type Storage,
+  type User,
 } from "../api";
 import { ClientApp } from "../components/ClientApp";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { NetworkBoot } from "../components/NetworkBoot";
+import { AccountCard, ActivityCard, UsersCard } from "../components/Users";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 
 interface Props {
   storage: Storage | null;
   reload: () => Promise<void>;
+  /** The signed-in user; staff only see their account and the client app. */
+  user?: User;
+  /** Called after one's own password changed: the session ended. */
+  onPasswordChanged?: () => void;
 }
 
 const NUMBERS: { key: keyof RetentionSettings; label: string; min: number; max: number; hint: string }[] = [
@@ -61,7 +67,19 @@ function settingsOf(r: Retention): RetentionSettings {
   return s;
 }
 
-export function SettingsPage({ storage, reload }: Props) {
+export function SettingsPage({ storage, reload, user, onPasswordChanged = () => undefined }: Props) {
+  if (user && user.role !== "admin") {
+    return (
+      <section>
+        <AccountCard me={user} onPasswordChanged={onPasswordChanged} />
+        <ClientApp />
+      </section>
+    );
+  }
+  return <AdminSettings storage={storage} reload={reload} user={user} onPasswordChanged={onPasswordChanged} />;
+}
+
+function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { onPasswordChanged: () => void }) {
   const { busy, error, setError, run } = useAsyncAction();
   const [retention, setRetention] = useState<Retention | null>(null);
   const [form, setForm] = useState<RetentionSettings | null>(null);
@@ -208,6 +226,10 @@ export function SettingsPage({ storage, reload }: Props) {
       <NetworkBoot />
 
       <ClientApp />
+
+      {user && <UsersCard me={user} />}
+      {user && <AccountCard me={user} onPasswordChanged={onPasswordChanged} />}
+      {user && <ActivityCard />}
 
       {preview && (
         <div className="card" aria-label="Preview">

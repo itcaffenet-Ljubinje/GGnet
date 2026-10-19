@@ -75,7 +75,8 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Secure Boot: shim (signed by Microsoft) + iPXE signed with the ggNet key (made and re-signed by the installer), certificate download with fingerprint and MokManager how-to, per-PC Secure Boot state from the agent (lock in Machines) | done |
 | Secure Boot: key enrollment prepared by the agent (MokNew/MokAuth, no USB), switched on in Network boot with a MokManager password; per-PC key state (enrolled / confirm at next boot) | done |
 | Secure Boot: BIOS how-to per vendor | todo |
-| Login and HTTPS | todo |
+| Sign-in: users with roles (admin: everything; staff: view + power), first admin with a one-time setup code (`ggnet-admin setup-code`), sessions in an HttpOnly cookie or Bearer token, scrypt passwords, wrong-password lockout; Settings → Users and Account | done |
+| HTTPS | todo |
 
 ## Server (new page)
 
@@ -84,7 +85,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Pool: size, used, free, health, last scrub, next scheduled scrub | todo |
 | ARC size and hit ratio, IOPS and throughput per zvol, network per interface | todo |
 | iSCSI sessions live (initiator, IP, since when) | todo |
-| Activity log (who did what, when) | todo |
+| Activity log (who did what, when, result; failed sign-ins too) in Settings → Activity | done |
 | Schedule: power PCs on / off at set times | todo |
 | Image backup / restore (`zfs send` to a USB disk or another server) | todo |
 

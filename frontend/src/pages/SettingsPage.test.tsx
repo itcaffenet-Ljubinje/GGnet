@@ -136,4 +136,16 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Run now" }));
     expect(actions(mock).map((c) => c.url)).toEqual(["/api/v1/settings/retention/run"]);
   });
+
+  it("staff only see their account and the client app", () => {
+    stubHost();
+    const staff = {
+      id: 2, username: "ana", role: "staff" as const, disabled: false,
+      created_at: "2026-10-19T10:00:00Z", last_login_at: null,
+    };
+    render(<SettingsPage storage={STORAGE} reload={vi.fn()} user={staff} />);
+    expect(screen.getByLabelText("Account")).toHaveTextContent("ana (staff)");
+    expect(screen.queryByLabelText("Retention")).toBeNull();
+    expect(screen.queryByLabelText("Users")).toBeNull();
+  });
 });

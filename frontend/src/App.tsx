@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Clock, Layers, Monitor, RefreshCw, Server, Settings as SettingsIcon } from "lucide-react";
+import { Clock, Layers, LogOut, Monitor, RefreshCw, Server, Settings as SettingsIcon, UserRound } from "lucide-react";
 
 import {
   api,
@@ -9,8 +9,11 @@ import {
   type Machine,
   type MachineTraffic,
   type Storage,
+  type User,
+  SIGNED_OUT,
 } from "./api";
 import { isOnline } from "./components/AgentState";
+import { SignIn } from "./components/SignIn";
 import { GameDisksPage } from "./pages/GameDisksPage";
 import { MachinesPage } from "./pages/MachinesPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -20,7 +23,55 @@ type Tab = "machines" | "disks" | "settings";
 // Machine status changes on the host (reset, errors) are picked up by polling.
 const REFRESH_MS = 10_000;
 
+/**
+ * Sign-in first: the first admin (with the setup code) right after installing,
+ * then everyone signs in. A session that ends on the server (expired, password
+ * changed) brings the sign-in back.
+ */
 export function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [setup, setSetup] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  const check = useCallback(() => {
+    api
+      .authState()
+      .then((s) => {
+        setSetup(s.setup_required);
+        setUser(s.user);
+      })
+      .catch(() => setUser(null))
+      .finally(() => setChecked(true));
+  }, []);
+
+  useEffect(() => {
+    check();
+    const signedOut = () => setUser(null);
+    window.addEventListener(SIGNED_OUT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT, signedOut);
+  }, [check]);
+
+  async function signOut() {
+    await api.logout().catch(() => undefined);
+    setUser(null);
+  }
+
+  if (!checked) return null;
+  if (!user) {
+    return (
+      <SignIn
+        setup={setup}
+        onSignedIn={(u) => {
+          setSetup(false);
+          setUser(u);
+        }}
+      />
+    );
+  }
+  return <Console user={user} onSignOut={signOut} />;
+}
+
+function Console({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("machines");
   const [health, setHealth] = useState<Health | null>(null);
   const [disks, setDisks] = useState<GameDisk[]>([]);
@@ -119,6 +170,15 @@ export function App() {
             <span>{health ? `${health.server_ip} · ${online}/${machines.length} online` : "API offline"}</span>
           </div>
 
+          <div className="user-chip" title={`Signed in as ${user.username} (${user.role})`}>
+            <UserRound size={14} />
+            <span>{user.username}</span>
+            {user.role !== "admin" && <span className="badge">{user.role}</span>}
+            <button type="button" className="icon-btn" onClick={onSignOut} aria-label="Sign out" title="Sign out">
+              <LogOut size={14} />
+            </button>
+          </div>
+
           <div className="header-refresh-wrap">
             {lastUpdated && (
               <span className="last-updated" title={lastUpdated.toLocaleString()}>
@@ -163,7 +223,7 @@ export function App() {
         ) : tab === "disks" ? (
           <GameDisksPage disks={disks} machines={machines} reload={reload} />
         ) : (
-          <SettingsPage storage={storage} reload={reload} />
+          <SettingsPage storage={storage} reload={reload} user={user} onPasswordChanged={onSignOut} />
         )}
       </main>
 

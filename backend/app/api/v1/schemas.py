@@ -9,7 +9,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.db.models import DiscoverySource, DiskKind, MachineMode, MachineStatus
+from app.db.models import DiscoverySource, DiskKind, MachineMode, MachineStatus, UserRole
+from app.services.auth import PASSWORD_MIN, USERNAME_RE
 from app.zfs_manager import COMMENT_MAX, valid_comment
 
 # The disk name becomes part of a ZFS path, so only [a-z0-9-].
@@ -610,3 +611,104 @@ class PxeStatusOut(BaseModel):
     files: dict[str, bool]
     # None: no Secure Boot key on this server yet (scripts/install_ggnet.sh makes it).
     secure_boot: SecureBootKeyOut | None = None
+
+
+# ── Sign-in, users, activity log ──────────────────────────────────────
+
+def _username(v: str) -> str:
+    v = v.strip().lower()
+    if not USERNAME_RE.match(v):
+        raise ValueError("username: 2-32 of a-z, 0-9, '.', '_', '-', starting with a letter or digit")
+    return v
+
+
+def _password(v: str) -> str:
+    if len(v) < PASSWORD_MIN or len(v) > 128:
+        raise ValueError(f"password: {PASSWORD_MIN} to 128 characters")
+    return v
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: UserRole
+    disabled: bool
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+class AuthState(BaseModel):
+    setup_required: bool                # no user yet: create the first admin with the setup code
+    user: UserOut | None
+    token: str | None = None            # for scripts (Authorization: Bearer); browsers use the cookie
+
+
+class LoginIn(BaseModel):
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=128)
+
+
+class SetupIn(BaseModel):
+    setup_code: str = Field(max_length=32)
+    username: str
+    password: str
+
+    @field_validator("username")
+    @classmethod
+    def check_username(cls, v: str) -> str:
+        return _username(v)
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _password(v)
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: UserRole = UserRole.STAFF
+
+    @field_validator("username")
+    @classmethod
+    def check_username(cls, v: str) -> str:
+        return _username(v)
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _password(v)
+
+
+class UserUpdate(BaseModel):
+    role: UserRole | None = None
+    password: str | None = None
+    disabled: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str | None) -> str | None:
+        return _password(v) if v is not None else v
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=128)
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return _password(v)
+
+
+class ActivityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    at: datetime
+    username: str | None
+    action: str
+    status_code: int
+    ip_address: str | None

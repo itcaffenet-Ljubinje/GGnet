@@ -294,12 +294,61 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     // Non-JSON body (e.g. a proxy error page).
   }
+  if (res.status === 401 && !path.startsWith("/v1/auth/")) {
+    // The session ended (expired, password changed, signed out elsewhere): show the sign-in.
+    window.dispatchEvent(new Event(SIGNED_OUT));
+  }
   if (!res.ok) throw new ApiError(res.status, errorMessage(res.status, data));
   return data as T;
 }
 
+/** Fired when the server no longer knows this browser's session. */
+export const SIGNED_OUT = "ggnet:signed-out";
+
+export type UserRole = "admin" | "staff";
+
+export interface User {
+  id: number;
+  username: string;
+  role: UserRole;
+  disabled: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface AuthState {
+  /** No user yet: create the first admin with the setup code from the server. */
+  setup_required: boolean;
+  user: User | null;
+}
+
+export interface Activity {
+  id: number;
+  at: string;
+  username: string | null;
+  action: string;
+  status_code: number;
+  ip_address: string | null;
+}
+
 export const api = {
   health: () => request<Health>("GET", "/health"),
+
+  authState: () => request<AuthState>("GET", "/v1/auth/state"),
+  setup: (setup_code: string, username: string, password: string) =>
+    request<AuthState>("POST", "/v1/auth/setup", { setup_code, username, password }),
+  login: (username: string, password: string) =>
+    request<AuthState>("POST", "/v1/auth/login", { username, password }),
+  logout: () => request<void>("POST", "/v1/auth/logout"),
+  changePassword: (current_password: string, new_password: string) =>
+    request<void>("POST", "/v1/auth/password", { current_password, new_password }),
+  listUsers: () => request<User[]>("GET", "/v1/users"),
+  createUser: (username: string, password: string, role: UserRole) =>
+    request<User>("POST", "/v1/users", { username, password, role }),
+  updateUser: (id: number, body: { role?: UserRole; password?: string; disabled?: boolean }) =>
+    request<User>("PATCH", `/v1/users/${id}`, body),
+  deleteUser: (id: number) => request<void>("DELETE", `/v1/users/${id}`),
+  listActivity: (limit = 200) => request<Activity[]>("GET", `/v1/activity?limit=${limit}`),
 
   listDisks: () => request<GameDisk[]>("GET", "/v1/game-disks"),
   createDisk: (name: string, size_gb: number, kind: DiskKind = "game") =>

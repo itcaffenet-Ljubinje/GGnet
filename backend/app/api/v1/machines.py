@@ -29,7 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner, get_traffic_monitor, get_wol_sender
+from app.api.deps import get_provisioner, get_traffic_monitor, get_wol_sender, require_user
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     BOOT_MODE_LETTER,
@@ -47,7 +47,7 @@ from app.api.v1.schemas import (
     MachineUpdate,
     WINDOWS_IQN_PREFIX,
 )
-from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
+from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus, User, UserRole
 from app.db.session import get_db
 from app.services import discovery
 from app.services.os_setup import os_setup_for
@@ -221,12 +221,16 @@ def bulk(
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
     wol=Depends(get_wol_sender),
+    user: User = Depends(require_user),
 ):
     """
     Run one action on several machines, each exactly like its single-machine
     route (same checks, same messages). One machine failing does not stop the
-    others; the answer says per machine what happened.
+    others; the answer says per machine what happened. Staff may only turn
+    PCs on, shut them down and restart them.
     """
+    if user.role is not UserRole.ADMIN and body.action not in ("on", "shutdown", "reboot"):
+        raise HTTPException(403, detail={"error": f"Your role ({user.role.value}) cannot do this"})
     def run(machine_id: int) -> None:
         if body.action in ("on", "shutdown", "reboot"):
             power(machine_id, PowerAction(action=body.action), db, wol)
