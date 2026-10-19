@@ -5,6 +5,7 @@ The API lives under /api; the React build (frontend/dist) is served from the sam
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,6 +17,32 @@ from app.api.v1 import agent, auth, boot, discovery, game_disks, machines, setti
 from app.config import get_config
 
 VERSION_FILE = Path(__file__).resolve().parents[2] / "VERSION"
+
+
+class QuietAccessLog(logging.Filter):
+    """
+    Keep the journal readable: the web UI polls every 10 s and each agent beats
+    every 30 s, which uvicorn would log line by line. Successful reads and
+    heartbeats are dropped; changes, errors and the PCs' iPXE requests (useful
+    when a PC does not boot) stay. Who changed what is also in the activity log.
+    """
+
+    KEEP_PATHS = ("/api/v1/boot/",)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            _client, method, path, _version, status = record.args  # uvicorn.access's format
+            status = int(status)
+        except (TypeError, ValueError):
+            return True
+        if status >= 400 or str(path).startswith(self.KEEP_PATHS):
+            return True
+        if method in ("GET", "HEAD"):
+            return False
+        return not str(path).startswith("/api/v1/agent/heartbeat")
+
+
+logging.getLogger("uvicorn.access").addFilter(QuietAccessLog())
 
 
 def read_version() -> str:
