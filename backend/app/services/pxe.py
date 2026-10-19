@@ -10,12 +10,19 @@ change applies to the next PC that boots, with no restart.
 The PXE service is ggNet's own dnsmasq (`ggnet-pxe`, scripts/install_ggnet.sh;
 `[boot] pxe_service` names another unit, e.g. on the dev instance). The web
 UI shows its state and can restart it; it never changes its configuration.
+
+Secure Boot: the PCs load shim (signed by Microsoft) from `sb/` in the TFTP
+root, and shim loads iPXE signed with the ggNet key, which each PC accepts
+once (MOK). The installer makes the key in `[boot] secureboot_dir` (default:
+`secureboot/` next to config.toml); the web UI offers its certificate
+(ggnet-sb.cer) for that, and shows whether the iPXE in `sb/` is signed with it.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,7 +30,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.config import get_config
+from app.config import DEFAULT_CONFIG_PATH, get_config
 from app.db.models import AppSetting
 from app.runner import CommandRunner
 
@@ -33,7 +40,11 @@ SETTINGS_KEY = "boot"
 DEFAULT_UNIT = "ggnet-pxe"
 # What the PCs fetch over TFTP: iPXE (snponly.efi uses the board's own network
 # driver, ipxe.efi its built-in ones) and the script that sends iPXE to ggNet.
-TFTP_FILES = ("snponly.efi", "ipxe.efi", "autoexec.ipxe")
+TFTP_FILES = ("snponly.efi", "ipxe.efi", "autoexec.ipxe",
+              # Secure Boot: shim, its MOK manager, iPXE signed with the ggNet key.
+              "sb/shimx64.efi", "sb/mmx64.efi", "sb/grubx64.efi")
+SB_CERT = "ggnet-sb.cer"      # DER, what a PC enrolls
+SB_CERT_PEM = "ggnet-sb.crt"  # the same certificate, for checking signatures
 
 
 @dataclass
@@ -92,20 +103,45 @@ class PxeStatus:
     tftp_root: str
     # Which of TFTP_FILES are in the TFTP root.
     files: dict[str, bool]
+    secure_boot: "SecureBootKey | None" = None
+
+
+@dataclass
+class SecureBootKey:
+    """The ggNet Secure Boot certificate the PCs enroll."""
+
+    subject: str
+    fingerprint: str          # SHA-256, as MokManager shows it
+    expires: datetime | None
+    # Whether sb/grubx64.efi is signed with this key (None: not there or not checked).
+    ipxe_signed: bool | None
 
 
 class PxeService:
-    def __init__(self, unit: str, tftp_root: Path, runner: CommandRunner | None = None):
+    def __init__(self, unit: str, tftp_root: Path, runner: CommandRunner | None = None,
+                 secureboot_dir: Path | None = None):
         self.unit = unit
         self.tftp_root = tftp_root
         self.runner = runner or CommandRunner(timeout=30)
+        self.secureboot_dir = secureboot_dir
+
+    @property
+    def certificate(self) -> Path | None:
+        """The DER certificate a PC enrolls, if the installer made the key."""
+        if self.secureboot_dir is None:
+            return None
+        path = self.secureboot_dir / SB_CERT
+        return path if path.is_file() else None
 
     @classmethod
     def from_config(cls, cfg: dict[str, Any] | None = None) -> "PxeService":
         cfg = cfg if cfg is not None else get_config()
         root = (cfg.get("services") or {}).get("tftp_root") or Path(cfg["paths"]["data_dir"]) / "tftp"
-        unit = str((cfg.get("boot") or {}).get("pxe_service") or DEFAULT_UNIT)
-        return cls(unit, Path(root))
+        boot = cfg.get("boot") or {}
+        unit = str(boot.get("pxe_service") or DEFAULT_UNIT)
+        sb_dir = boot.get("secureboot_dir") or (
+            Path(os.environ.get("GGNET_CONFIG", DEFAULT_CONFIG_PATH)).parent / "secureboot")
+        return cls(unit, Path(root), secureboot_dir=Path(sb_dir))
 
     def status(self) -> PxeStatus | None:
         """The service's state, or None when systemctl cannot be asked."""
@@ -124,6 +160,30 @@ class PxeService:
             since=_unix_time(props.get("ActiveEnterTimestamp", "")),
             tftp_root=str(self.tftp_root),
             files={f: (self.tftp_root / f).is_file() for f in TFTP_FILES},
+            secure_boot=self.secure_boot_key(),
+        )
+
+    def secure_boot_key(self) -> SecureBootKey | None:
+        """The certificate's details; None without a key or when openssl cannot read it."""
+        cert = self.certificate
+        if cert is None:
+            return None
+        ok, out, _ = self.runner.run(
+            ["openssl", "x509", "-inform", "DER", "-in", str(cert), "-noout",
+             "-subject", "-enddate", "-fingerprint", "-sha256", "-nameopt", "oneline"], quiet=True)
+        if not ok:
+            return None
+        props = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+        ipxe = self.tftp_root / "sb" / "grubx64.efi"
+        pem = cert.with_name(SB_CERT_PEM)
+        signed = None
+        if ipxe.is_file() and pem.is_file():
+            signed = self.runner.run(["sbverify", "--cert", str(pem), str(ipxe)], quiet=True)[0]
+        return SecureBootKey(
+            subject=props.get("subject", "").strip(),
+            fingerprint=next((v for k, v in props.items() if k.lower().endswith("fingerprint")), "").strip(),
+            expires=_openssl_time(props.get("notAfter", "")),
+            ipxe_signed=signed,
         )
 
     def restart(self) -> bool:
@@ -133,6 +193,14 @@ class PxeService:
         else:
             logger.error("Restarting the PXE service %s failed: %s", self.unit, err)
         return ok
+
+
+def _openssl_time(value: str) -> datetime | None:
+    """openssl's `Oct 16 00:33:03 2036 GMT`."""
+    try:
+        return datetime.strptime(value.strip(), "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 def _unix_time(value: str) -> datetime | None:

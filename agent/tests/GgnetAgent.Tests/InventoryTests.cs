@@ -13,15 +13,25 @@ public class InventoryTests
             {"ip_address":"192.168.0.21","mac_address":"AA-BB-CC-DD-EE-01","link_speed_mbps":1000,
              "nic":"Intel(R) Ethernet I219-V","cpu":"  AMD Ryzen 5 5600X 6-Core Processor  ",
              "gpus":["NVIDIA GeForce RTX 3060",""],"motherboard":" ASUSTeK TUF GAMING B550-PLUS ",
-             "memory_bytes":17179869184}
+             "memory_bytes":17179869184,"secure_boot":true}
             """;
         var inv = WindowsInventory.Parse(json)!;
+        Assert.True(inv.SecureBoot);
         Assert.Equal("192.168.0.21", inv.IpAddress);
         Assert.Equal(1000, inv.LinkSpeedMbps);
         Assert.Equal("AMD Ryzen 5 5600X 6-Core Processor", inv.Cpu);
         Assert.Equal(["NVIDIA GeForce RTX 3060"], inv.Gpus);
         Assert.Equal("ASUSTeK TUF GAMING B550-PLUS", inv.Motherboard);
         Assert.Equal(16L << 30, inv.MemoryBytes);
+    }
+
+    [Fact]
+    public void Secure_boot_is_unknown_when_not_reported()
+    {
+        var inv = WindowsInventory.Parse("""{"cpu":"x","secure_boot":null}""")!;
+        Assert.Null(inv.SecureBoot);
+        Assert.False(WindowsInventory.Parse("""{"secure_boot":false}""")!.SecureBoot);
+        Assert.Contains(@"Control\SecureBoot\State", WindowsInventory.Script(null));
     }
 
     [Theory]

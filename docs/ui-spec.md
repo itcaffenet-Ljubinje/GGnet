@@ -72,7 +72,8 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Retention: reserved space, warning threshold, unused version age, newest versions kept, dry-run preview, run now | done |
 | Network boot: PXE service state and restart, TFTP files (`snponly.efi`, `ipxe.efi`, `autoexec.ipxe`), iBFT gateway, unregistered PCs wait / boot locally (saved values override `[boot]` in config.toml) | done |
 | Restart services: ZFS, iSCSI target (PXE: done, in Network boot) | todo |
-| Secure Boot: signed iPXE (shim + MOK), certificate download, auto-enrollment, BIOS how-to per vendor | todo |
+| Secure Boot: shim (signed by Microsoft) + iPXE signed with the ggNet key (made and re-signed by the installer), certificate download with fingerprint and MokManager how-to, per-PC Secure Boot state from the agent (lock in Machines) | done |
+| Secure Boot: MOK enrollment prepared by the agent (no USB), BIOS how-to per vendor | todo |
 | Login and HTTPS | todo |
 
 ## Server (new page)

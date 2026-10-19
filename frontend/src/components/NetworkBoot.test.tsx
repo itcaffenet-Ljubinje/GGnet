@@ -76,4 +76,39 @@ describe("NetworkBoot", () => {
     expect(await screen.findByLabelText("Gateway address")).toHaveValue("10.0.0.1");
     expect(screen.queryByText(/values from config.toml/)).toBeNull();
   });
+
+  it("says when there is no Secure Boot key yet", async () => {
+    stubHost();
+    render(<NetworkBoot />);
+    expect(await screen.findByText(/No Secure Boot key on this server yet/)).toBeInTheDocument();
+  });
+
+  it("shows the Secure Boot key and offers its certificate", async () => {
+    stubHost(undefined, {
+      ...PXE,
+      secure_boot: {
+        subject: "CN = ggNet Secure Boot (pve)",
+        fingerprint: "FA:23:CA:52",
+        expires: "2036-10-16T00:33:03Z",
+        ipxe_signed: true,
+      },
+    });
+    render(<NetworkBoot />);
+    expect(await screen.findByText("CN = ggNet Secure Boot (pve)")).toBeInTheDocument();
+    expect(screen.getByText("FA:23:CA:52")).toBeInTheDocument();
+    expect(screen.getByText("Signed with this key")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Download certificate/ })).toHaveAttribute(
+      "href",
+      "/api/v1/boot/secureboot.cer",
+    );
+  });
+
+  it("warns when iPXE is not signed with the key", async () => {
+    stubHost(undefined, {
+      ...PXE,
+      secure_boot: { subject: "CN = x", fingerprint: "AA", expires: null, ipxe_signed: false },
+    });
+    render(<NetworkBoot />);
+    expect(await screen.findByText(/Not signed with this key/)).toBeInTheDocument();
+  });
 });

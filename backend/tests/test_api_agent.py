@@ -144,7 +144,7 @@ def test_boot_mode_game_disk_is_always_d(client):
 INVENTORY = {
     "ip_address": "192.168.0.21", "mac_address": "AA-BB-CC-DD-EE-01", "link_speed_mbps": 1000,
     "nic": "Intel(R) Ethernet I219-V", "cpu": "AMD Ryzen 5 5600X", "gpus": ["NVIDIA GeForce RTX 3060"],
-    "motherboard": "ASUSTeK TUF GAMING B550-PLUS", "memory_bytes": 17179869184,
+    "motherboard": "ASUSTeK TUF GAMING B550-PLUS", "memory_bytes": 17179869184, "secure_boot": True,
 }
 
 
@@ -159,6 +159,7 @@ def test_heartbeat_stores_the_inventory(client):
     assert got["hardware"] == {
         "nic": "Intel(R) Ethernet I219-V", "cpu": "AMD Ryzen 5 5600X", "gpus": ["NVIDIA GeForce RTX 3060"],
         "motherboard": "ASUSTeK TUF GAMING B550-PLUS", "memory_bytes": 17179869184,
+        "secure_boot": True,
     }
 
     # An agent without inventory (older version) keeps the last one.

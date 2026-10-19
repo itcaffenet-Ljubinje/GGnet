@@ -34,17 +34,19 @@ import ipaddress
 import logging
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner, get_writeback_settings
+from app.api.deps import get_provisioner, get_pxe_service, get_writeback_settings
+from app.api.v1.errors import not_found
 from app.config import get_config
 from app.api.v1.schemas import _mac
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services import discovery, pxe
 from app.services.provisioning import Provisioner
+from app.services.pxe import PxeService
 from app.services.writebacks import WritebackSettings, on_ipxe
 
 logger = logging.getLogger("ggnet.api.boot")
@@ -218,3 +220,15 @@ def ipxe_script(
     logger.info("iPXE: %s boots %s + %s", m.name, m.os_clone_snapshot, m.clone_snapshot)
     return sanboot_script(m, prov.iscsi.portal_ip, prov.iscsi.portal_port, m.iscsi_target_iqn,
                           boot_gateway(cfg))
+
+
+@router.get("/secureboot.cer")
+def secure_boot_certificate(service: PxeService = Depends(get_pxe_service)):
+    """
+    The ggNet Secure Boot certificate (DER), public: each PC enrolls it once in
+    MokManager (Enroll key from disk) so shim starts ggNet's signed iPXE.
+    """
+    cert = service.certificate
+    if cert is None:
+        not_found("Secure Boot certificate in", str(service.secureboot_dir))
+    return FileResponse(cert, media_type="application/pkix-cert", filename="ggnet-sb.cer")

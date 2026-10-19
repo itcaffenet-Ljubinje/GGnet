@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import Session
@@ -17,13 +18,18 @@ from .conftest import FakeRunner
 SHOW = "LoadState=loaded\nActiveState=active\nSubState=running\nActiveEnterTimestamp=@1792297503"
 
 
+CERT = ("subject=CN = ggNet Secure Boot, O = IT Caffe Net\nnotAfter=Oct 16 00:33:03 2036 GMT\n"
+        "sha256 Fingerprint=FA:23:CA:52:6C:3E")
+
+
 @pytest.fixture
 def pxe(client, tmp_path):
     runner = FakeRunner()
     runner.on("systemctl", "show", result=(True, SHOW, ""))
+    runner.on("openssl", "x509", result=(True, CERT, ""))
     (tmp_path / "snponly.efi").write_bytes(b"x")
     (tmp_path / "autoexec.ipxe").write_text("#!ipxe\n")
-    service = PxeService("ggnet-pxe", tmp_path, runner)
+    service = PxeService("ggnet-pxe", tmp_path, runner, secureboot_dir=tmp_path / "secureboot")
     app.dependency_overrides[get_pxe_service] = lambda: service
     return runner
 
@@ -72,7 +78,9 @@ def test_pxe_status(client, pxe, tmp_path):
     assert (body["state"], body["sub_state"]) == ("active", "running")
     assert datetime.fromisoformat(body["since"]) == datetime.fromtimestamp(1792297503, tz=timezone.utc)
     assert body["tftp_root"] == str(tmp_path)
-    assert body["files"] == {"snponly.efi": True, "ipxe.efi": False, "autoexec.ipxe": True}
+    assert body["files"] == {"snponly.efi": True, "ipxe.efi": False, "autoexec.ipxe": True,
+                             "sb/shimx64.efi": False, "sb/mmx64.efi": False, "sb/grubx64.efi": False}
+    assert body["secure_boot"] is None          # no key made yet
     assert pxe.calls[0][:3] == ["systemctl", "show", "ggnet-pxe"]
 
 
@@ -102,3 +110,53 @@ def test_pxe_service_from_config():
     assert (s.unit, str(s.tftp_root)) == ("ggnet-dev-dnsmasq", "/var/lib/ggnet/tftp")
     s = PxeService.from_config({"paths": {"data_dir": "/x"}, "services": {"tftp_root": "/srv/tftp"}})
     assert (s.unit, str(s.tftp_root)) == ("ggnet-pxe", "/srv/tftp")
+
+
+def _secure_boot(tmp_path, ipxe: bool = True) -> None:
+    """What the installer leaves: the key's certificate and the signed iPXE for shim."""
+    sb = tmp_path / "secureboot"
+    sb.mkdir()
+    (sb / "ggnet-sb.cer").write_bytes(b"0\x82DER")
+    (sb / "ggnet-sb.crt").write_text("-----BEGIN CERTIFICATE-----\n")
+    (tmp_path / "sb").mkdir()
+    for name in ("shimx64.efi", "mmx64.efi") + (("grubx64.efi",) if ipxe else ()):
+        (tmp_path / "sb" / name).write_bytes(b"MZ")
+
+
+def test_pxe_status_shows_the_secure_boot_key(client, pxe, tmp_path):
+    _secure_boot(tmp_path)
+    body = client.get("/api/v1/pxe").json()
+    assert body["files"]["sb/shimx64.efi"] and body["files"]["sb/grubx64.efi"]
+    assert body["secure_boot"] == {
+        "subject": "CN = ggNet Secure Boot, O = IT Caffe Net",
+        "fingerprint": "FA:23:CA:52:6C:3E",
+        "expires": "2036-10-16T00:33:03Z",
+        "ipxe_signed": True,
+    }
+    assert ["sbverify", "--cert", str(tmp_path / "secureboot" / "ggnet-sb.crt"),
+            str(tmp_path / "sb" / "grubx64.efi")] in pxe.calls
+
+
+def test_an_unsigned_or_missing_ipxe_is_shown(client, pxe, tmp_path):
+    _secure_boot(tmp_path)
+    pxe.on("sbverify", result=(False, "", "Signature verification failed"))
+    assert client.get("/api/v1/pxe").json()["secure_boot"]["ipxe_signed"] is False
+    (tmp_path / "sb" / "grubx64.efi").unlink()
+    assert client.get("/api/v1/pxe").json()["secure_boot"]["ipxe_signed"] is None
+
+
+def test_the_certificate_is_downloaded_without_login(client, pxe, tmp_path):
+    assert client.get("/api/v1/boot/secureboot.cer").status_code == 404
+    _secure_boot(tmp_path)
+    r = client.get("/api/v1/boot/secureboot.cer")
+    assert r.status_code == 200
+    assert r.content == b"0\x82DER"
+    assert r.headers["content-type"] == "application/pkix-cert"
+    assert "ggnet-sb.cer" in r.headers["content-disposition"]
+
+
+def test_secureboot_dir_defaults_next_to_config_toml(monkeypatch):
+    monkeypatch.setenv("GGNET_CONFIG", "/var/lib/ggnet-dev/config.toml")
+    assert PxeService.from_config({"paths": {"data_dir": "/x"}}).secureboot_dir == Path("/var/lib/ggnet-dev/secureboot")
+    s = PxeService.from_config({"paths": {"data_dir": "/x"}, "boot": {"secureboot_dir": "/srv/sb"}})
+    assert s.secureboot_dir == Path("/srv/sb")

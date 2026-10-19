@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { RefreshCw, RotateCw, Save } from "lucide-react";
+import { Download, Lock, RefreshCw, RotateCw, Save } from "lucide-react";
 
 import { api, type BootSettings, type BootSettingsOut, type PxeStatus } from "../api";
 import { useAsyncAction } from "../useAsyncAction";
@@ -107,6 +107,8 @@ export function NetworkBoot() {
         </p>
       )}
 
+      {status && <SecureBoot status={status} />}
+
       {saved && (
         <form onSubmit={save}>
           {!saved.saved && (
@@ -151,6 +153,61 @@ export function NetworkBoot() {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/**
+ * Secure Boot: shim (signed by Microsoft) starts iPXE signed with the ggNet
+ * key. Each PC with Secure Boot on accepts that key once in MokManager.
+ */
+function SecureBoot({ status }: { status: PxeStatus }) {
+  const key = status.secure_boot;
+  if (!key) {
+    return (
+      <div className="secure-boot" aria-label="Secure Boot">
+        <h4 className="section-title">
+          <Lock size={14} /> Secure Boot
+        </h4>
+        <p className="muted small">
+          No Secure Boot key on this server yet: run the installer again to make it and sign iPXE.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="secure-boot" aria-label="Secure Boot">
+      <h4 className="section-title">
+        <Lock size={14} /> Secure Boot
+      </h4>
+      <dl className="details">
+        <dt>Key</dt>
+        <dd>{key.subject}</dd>
+        <dt>Fingerprint (SHA-256)</dt>
+        <dd className="mono small">{key.fingerprint}</dd>
+        <dt>Expires</dt>
+        <dd>{key.expires ? new Date(key.expires).toLocaleDateString() : "—"}</dd>
+        <dt>iPXE for shim</dt>
+        <dd>
+          {key.ipxe_signed === true ? (
+            <span className="badge badge-provisioned">Signed with this key</span>
+          ) : key.ipxe_signed === false ? (
+            <span className="badge badge-error">Not signed with this key: run the installer again</span>
+          ) : (
+            <span className="badge badge-warn">Missing</span>
+          )}
+        </dd>
+      </dl>
+      <p className="small">
+        <a className="button-link" href="/api/v1/boot/secureboot.cer" download="ggnet-sb.cer">
+          <Download size={14} /> Download certificate (ggnet-sb.cer)
+        </a>
+      </p>
+      <p className="muted small">
+        Once per PC: copy the certificate to a FAT32 USB stick, turn Secure Boot on in the BIOS and boot
+        from the network. In the blue MokManager screen choose Enroll key from disk, pick ggnet-sb.cer,
+        check that the fingerprint matches, confirm and reboot.
+      </p>
     </div>
   );
 }

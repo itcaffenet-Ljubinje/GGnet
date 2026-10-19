@@ -18,6 +18,8 @@ UNIT_FILE="/etc/systemd/system/ggnet.service"
 PXE_UNIT_FILE="/etc/systemd/system/ggnet-pxe.service"
 LAN_UNIT_FILE="/etc/systemd/system/ggnet-lan-route.service"
 LAN_SYSCTL_FILE="/etc/sysctl.d/90-ggnet-lan.conf"
+SB_SIGN="/usr/local/sbin/ggnet-sign-ipxe"
+SB_APT_HOOK="/etc/apt/apt.conf.d/90ggnet-secureboot"
 
 PURGE=0
 ASSUME_YES=0
@@ -52,6 +54,9 @@ systemctl disable --now ggnet-pxe >/dev/null 2>&1 || true
 # its subnet). The ARP settings in its sysctl file stay until the next reboot.
 systemctl disable --now ggnet-lan-route >/dev/null 2>&1 || true
 rm -f "$UNIT_FILE" "$PXE_UNIT_FILE" "$LAN_UNIT_FILE" "$LAN_SYSCTL_FILE"
+# The Secure Boot signer and its apt hook; the key stays in $CONF_DIR/secureboot
+# (deleted with --purge), so a reinstall keeps the key the PCs enrolled.
+rm -f "$SB_SIGN" "$SB_APT_HOOK"
 systemctl daemon-reload
 
 echo "==> Removing $INSTALL_DIR..."
