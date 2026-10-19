@@ -363,6 +363,9 @@ unregistered = "wait"
 pxe_service = "ggnet-pxe"
 # The Secure Boot key (made by the installer; never leaves this server).
 secureboot_dir = "$SB_DIR"
+# Copy the server's agent (Settings -> Client app) into every fresh OS
+# writeback, so PCs always run it without updating the image.
+inject_agent = true
 
 [writebacks]
 # Discard each client's writeback after it disconnects (shutdown/restart),

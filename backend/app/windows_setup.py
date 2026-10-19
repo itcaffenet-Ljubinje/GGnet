@@ -14,6 +14,8 @@ an extra reboot:
     Services\\Tcpip\\Parameters\\Interfaces\\{...}
                                         a fixed IPv4 address becomes DHCP again
     MountedDevices                      every drive letter but C: is forgotten
+    Services\\ggnet-agent               the agent's Windows service (with its files,
+                                        below), and Fast Startup off
     Enum\\PCI\\<boot NIC>               added when the image knows the PC's network
                                         chip only in another revision or board
 
@@ -34,6 +36,13 @@ board) only has another hardware ID: its Enum entry is copied from the
 known one with the new IDs (iPXE reports them, app.api.v1.boot), so it
 binds the same driver. A chip the image has no driver for is reported.
 
+The agent: the PC's agent comes from the server, not from the image. The
+server's ggnet-agent.exe is copied to C:\\Program Files\\ggnet-agent (where
+install.ps1 puts it; skipped when the image has the same file, so a clone
+costs no space for it) with an appsettings.json naming this server unless the
+image has one, and the service is registered as install.ps1 does. A new
+agent reaches every PC at its next fresh writeback, with no Apply.
+
 The Windows partition of the clone is mounted with ntfs-3g and the hive is
 merged with hivexregedit (both ship with Proxmox VE). Only the PC's clone is
 touched; the image and its snapshots are never mounted.
@@ -46,9 +55,12 @@ for the caller to log.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
@@ -68,6 +80,26 @@ _LETTER_RE = re.compile(r'^"\\\\DosDevices\\\\([A-Za-z]):"=', re.M)
 NIC_ID_RE = re.compile(r"^VEN_([0-9A-F]{4})&DEV_([0-9A-F]{4})&SUBSYS_([0-9A-F]{8})&REV_([0-9A-F]{2})$")
 
 
+AGENT_DIR = ("Program Files", "ggnet-agent")
+AGENT_EXE = "ggnet-agent.exe"
+AGENT_SERVICE = "ggnet-agent"
+AGENT_IMAGE_PATH = '"C:\\Program Files\\ggnet-agent\\ggnet-agent.exe"'
+# sc failure: restart after 5 s, 5 s, then 30 s; reset the count after a day
+# (SERVICE_FAILURE_ACTIONS as Windows stores it).
+AGENT_FAILURE_ACTIONS = bytes.fromhex(
+    "80510100" "00000000" "00000000" "03000000" "14000000"
+    "01000000" "88130000" "01000000" "88130000" "01000000" "30750000")
+
+
+@dataclass(frozen=True)
+class AgentInstall:
+    """The server's agent, copied into each fresh OS writeback."""
+
+    exe: Path
+    sha256: str
+    server_url: str
+
+
 @dataclass(frozen=True)
 class OsSetup:
     """What a Boot Mode PC's Windows is told about itself."""
@@ -76,6 +108,8 @@ class OsSetup:
     env: Mapping[str, str] = field(default_factory=dict)
     # The boot network card's hardware ID (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), if known.
     boot_nic: str | None = None
+    # The agent to put into the writeback, if the server has one.
+    agent: AgentInstall | None = None
 
 
 def _reg_string(value: str) -> str:
@@ -193,8 +227,32 @@ def nic_patch(export: str, nic: str) -> tuple[str | None, str | None]:
     return "\n".join(lines).lstrip("\n"), None
 
 
+def _hex(kind: str, data: bytes) -> str:
+    return f"{kind}:" + ",".join(f"{b:02x}" for b in data)
+
+
+def agent_service_patch(control_set: int) -> list[str]:
+    """The agent's service as install.ps1 creates it, and Fast Startup off."""
+    cs = f"\\ControlSet{control_set:03d}"
+    return [
+        "", f"[{cs}\\Services\\{AGENT_SERVICE}]",
+        '"Type"=dword:00000010',            # own process
+        '"Start"=dword:00000002',           # automatic
+        '"ErrorControl"=dword:00000001',
+        f'"ImagePath"={_hex("hex(2)", (AGENT_IMAGE_PATH + chr(0)).encode("utf-16-le"))}',
+        '"ObjectName"="LocalSystem"',
+        '"DisplayName"="ggNet agent"',
+        '"Description"="Connects the ggNet game disk over iSCSI and reports to the ggNet server."',
+        f'"FailureActions"={_hex("hex", AGENT_FAILURE_ACTIONS)}',
+        # "Shut down" with Fast Startup is a hibernation: the server would not see a new boot.
+        "", f"[{cs}\\Control\\Session Manager\\Power]",
+        '"HiberbootEnabled"=dword:00000000',
+    ]
+
+
 def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = (),
-                   forget_letters: Sequence[str] = (), extra: str | None = None) -> str:
+                   forget_letters: Sequence[str] = (), extra: str | None = None,
+                   agent_service: bool = False) -> str:
     """The .reg text hivexregedit merges into the SYSTEM hive."""
     if not _NAME_RE.match(setup.computer_name):
         raise ValueError(f"Invalid computer name: {setup.computer_name!r}")
@@ -227,6 +285,8 @@ def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[s
             if len(letter) != 1 or not letter.isalpha() or letter.upper() == "C":
                 raise ValueError(f"Invalid drive letter to forget: {letter!r}")
             lines.append(f'"\\\\DosDevices\\\\{letter.upper()}:"=-')
+    if agent_service:
+        lines += agent_service_patch(control_set)
     if extra:
         lines += ["", extra]
     return "\n".join(lines) + "\n"
@@ -319,7 +379,9 @@ class WindowsSetup:
                 if hive is None:
                     reasons.append(f"{part}: no Windows on it")
                     continue
-                return self._merge(hive, setup)
+                agent_ok, agent_problem = self._install_agent(mount, setup)
+                problem = self._merge(hive, setup, agent_service=agent_ok)
+                return "; ".join(p for p in (problem, agent_problem) if p) or None
             finally:
                 if not self._run(["umount", str(mount)])[0]:
                     logger.error("Could not unmount %s", mount)
@@ -329,7 +391,34 @@ class WindowsSetup:
                     pass
         return "; ".join(reasons)
 
-    def _merge(self, hive: Path, setup: OsSetup) -> str | None:
+    def _install_agent(self, root: Path, setup: OsSetup) -> tuple[bool, str | None]:
+        """
+        The server's agent into the mounted Windows: (whether the service can
+        be registered, why not). The file is written only when it differs.
+        """
+        agent = setup.agent
+        if agent is None:
+            return False, None
+        program_files = _find_dir(root, AGENT_DIR[:1])
+        if program_files is None:
+            return False, "no Program Files folder in the image"
+        folder = _find_dir(program_files, AGENT_DIR[1:]) or program_files / AGENT_DIR[1]
+        exe = folder / AGENT_EXE
+        try:
+            folder.mkdir(exist_ok=True)
+            if not _same_file(exe, agent.exe, agent.sha256):
+                tmp = folder / f"{AGENT_EXE}.new"
+                shutil.copyfile(agent.exe, tmp)
+                os.replace(tmp, exe)
+                logger.info("Agent copied into the writeback of %s", setup.computer_name)
+            settings = folder / "appsettings.json"
+            if not settings.exists():
+                settings.write_text(json.dumps(agent_settings(agent.server_url), indent=2), encoding="utf-8")
+        except OSError as e:
+            return exe.is_file(), f"copying the agent failed: {e}"
+        return True, None
+
+    def _merge(self, hive: Path, setup: OsSetup, agent_service: bool = False) -> str | None:
         control_set = self.control_set(hive)
         fixed = self.static_interfaces(hive, control_set)
         letters = self.reserved_letters(hive)
@@ -340,7 +429,7 @@ class WindowsSetup:
                 nic_problem = "cannot read the image's PCI devices"
             else:
                 nic_reg, nic_problem = nic_patch(export, setup.boot_nic)
-        patch = registry_patch(setup, control_set, fixed, letters, nic_reg)
+        patch = registry_patch(setup, control_set, fixed, letters, nic_reg, agent_service)
         reg = self.run_dir / f"{setup.computer_name}.reg"
         try:
             reg.write_text(patch, encoding="utf-8")
@@ -360,6 +449,53 @@ class WindowsSetup:
         if nic_problem:
             logger.warning("%s: %s", setup.computer_name, nic_problem)
         return nic_problem
+
+
+def agent_settings(server_url: str) -> dict:
+    """appsettings.json as install.ps1 writes it (Boot Mode: the game disk is D:)."""
+    return {
+        "Agent": {
+            "ServerUrl": server_url.rstrip("/"),
+            "DriveLetter": "D",
+            "HeartbeatSeconds": 30,
+            "ManageInitiatorName": True,
+            "HideLocalDisks": True,
+        },
+        "Logging": {"EventLog": {"LogLevel": {
+            "Default": "Information", "Microsoft": "Warning", "System.Net.Http.HttpClient": "Warning"}}},
+    }
+
+
+def _same_file(path: Path, source: Path, sha256: str) -> bool:
+    """Whether `path` already holds the source (size first, then the checksum)."""
+    try:
+        if not path.is_file() or path.stat().st_size != source.stat().st_size:
+            return False
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest() == sha256
+    except OSError:
+        return False
+
+
+def _find_dir(root: Path, parts: tuple[str, ...]) -> Path | None:
+    """root/parts as directories, without regard to case (as Windows does)."""
+    path = root
+    for name in parts:
+        exact = path / name
+        if exact.is_dir():
+            path = exact
+            continue
+        try:
+            match = next((p for p in path.iterdir() if p.name.lower() == name.lower() and p.is_dir()), None)
+        except OSError:
+            return None
+        if match is None:
+            return None
+        path = match
+    return path
 
 
 def _find(root: Path, parts: tuple[str, ...]) -> Path | None:
