@@ -69,7 +69,7 @@ else
     echo "==> $CONF_DIR and $DATA_DIR were kept (a reinstall will reuse them)."
 fi
 
-rm -f /usr/local/sbin/ggnet-uninstall
+rm -f /usr/local/sbin/ggnet-uninstall /usr/local/sbin/ggnet-admin
 
 echo
 echo "ggNet has been removed."

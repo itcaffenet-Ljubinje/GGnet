@@ -8,10 +8,11 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import agent, boot, discovery, game_disks, machines, settings
+from app.api.deps import require_user
+from app.api.v1 import agent, auth, boot, discovery, game_disks, machines, settings
 from app.config import get_config
 
 VERSION_FILE = Path(__file__).resolve().parents[2] / "VERSION"
@@ -54,12 +55,18 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="ggNet", version=read_version(), lifespan=lifespan)
-app.include_router(game_disks.router, prefix="/api/v1")
-app.include_router(machines.router, prefix="/api/v1")
+# The web UI's API needs a signed-in user (app.services.auth); what the PCs
+# use (agent, boot) and signing in itself do not.
+signed_in = [Depends(require_user)]
+app.include_router(game_disks.router, prefix="/api/v1", dependencies=signed_in)
+app.include_router(machines.router, prefix="/api/v1", dependencies=signed_in)
+app.include_router(settings.router, prefix="/api/v1", dependencies=signed_in)
+app.include_router(discovery.router, prefix="/api/v1", dependencies=signed_in)
+app.include_router(auth.users, prefix="/api/v1")
+app.include_router(auth.activity, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
-app.include_router(settings.router, prefix="/api/v1")
 app.include_router(boot.router, prefix="/api/v1")
-app.include_router(discovery.router, prefix="/api/v1")
 
 
 @app.get("/api/health")

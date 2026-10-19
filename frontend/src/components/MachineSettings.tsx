@@ -293,6 +293,16 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                 <dd>{hw?.nic ?? "—"}</dd>
                 <dt>Secure Boot</dt>
                 <dd>{hw?.secure_boot === true ? "On" : hw?.secure_boot === false ? "Off" : "—"}</dd>
+                <dt>ggNet Secure Boot key</dt>
+                <dd>
+                  {m.mok_state === "enrolled"
+                    ? "Enrolled"
+                    : m.mok_state === "requested"
+                      ? "Asked for: confirm Enroll MOK in MokManager at the next boot"
+                      : m.mok_state === "failed"
+                        ? "The agent could not ask for it (see its log)"
+                        : "—"}
+                </dd>
                 <dt>Boot network card</dt>
                 <dd title={m.boot_nic ? `PCI\\${m.boot_nic}` : undefined}>
                   {m.boot_nic ? (

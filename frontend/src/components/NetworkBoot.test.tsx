@@ -16,7 +16,10 @@ const PXE: PxeStatus = {
   files: { "snponly.efi": true, "ipxe.efi": true, "autoexec.ipxe": false },
 };
 
-function stubHost(boot = { gateway: "none", unregistered: "wait", saved: false }, pxe: PxeStatus = PXE) {
+const BOOT = { gateway: "none", unregistered: "wait", mok_enroll: false, mok_password: "ggnet", saved: false };
+const KEY = { subject: "CN = ggNet Secure Boot (pve)", fingerprint: "FA:23:CA:52", expires: null, ipxe_signed: true };
+
+function stubHost(boot: Record<string, unknown> = BOOT, pxe: PxeStatus = PXE) {
   const mock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     let body: unknown = url.endsWith("/pxe") || url.endsWith("/restart") ? pxe : boot;
@@ -65,13 +68,17 @@ describe("NetworkBoot", () => {
     await userEvent.selectOptions(screen.getByLabelText(/Unregistered PCs/), "local");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(actions(mock)).toEqual([
-      { url: "/api/v1/settings/boot", method: "PUT", body: { gateway: "192.168.0.40", unregistered: "local" } },
+      {
+        url: "/api/v1/settings/boot",
+        method: "PUT",
+        body: { gateway: "192.168.0.40", unregistered: "local", mok_enroll: false, mok_password: "ggnet" },
+      },
     ]);
     expect(await screen.findByText(/applies to the next PC that boots/)).toBeInTheDocument();
   });
 
   it("shows a saved address as Another address", async () => {
-    stubHost({ gateway: "10.0.0.1", unregistered: "wait", saved: true });
+    stubHost({ ...BOOT, gateway: "10.0.0.1", saved: true });
     render(<NetworkBoot />);
     expect(await screen.findByLabelText("Gateway address")).toHaveValue("10.0.0.1");
     expect(screen.queryByText(/values from config.toml/)).toBeNull();
@@ -110,5 +117,28 @@ describe("NetworkBoot", () => {
     });
     render(<NetworkBoot />);
     expect(await screen.findByText(/Not signed with this key/)).toBeInTheDocument();
+  });
+
+  it("turns on key enrollment by the agents with a MokManager password", async () => {
+    const mock = stubHost(BOOT, { ...PXE, secure_boot: KEY });
+    render(<NetworkBoot />);
+    await userEvent.click(await screen.findByLabelText(/Prepare the Secure Boot key on PCs/));
+    const password = screen.getByLabelText(/MokManager password/);
+    await userEvent.clear(password);
+    await userEvent.type(password, "cafe2026");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(actions(mock)).toEqual([
+      {
+        url: "/api/v1/settings/boot",
+        method: "PUT",
+        body: { gateway: "none", unregistered: "wait", mok_enroll: true, mok_password: "cafe2026" },
+      },
+    ]);
+  });
+
+  it("cannot prepare the key before the server has one", async () => {
+    stubHost();
+    render(<NetworkBoot />);
+    expect(await screen.findByLabelText(/Prepare the Secure Boot key on PCs/)).toBeDisabled();
   });
 });

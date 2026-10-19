@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
   HardDrive,
+  KeyRound,
   Lock,
   LockOpen,
   Monitor,
@@ -941,6 +942,17 @@ const APPLY: Record<ApplyKey, ApplyChoice> = {
 /** ggNet2's lock: whether Windows booted with Secure Boot on (anti-cheats need it), as the agent reports. */
 function SecureBootIcon({ machine: m }: { machine: Machine }) {
   const on = m.hardware?.secure_boot;
+  if (m.mok_state === "requested" && !on) {
+    return (
+      <span
+        className="secure-boot-pending"
+        title="ggNet Secure Boot key asked for: confirm Enroll MOK in MokManager at the next boot"
+        aria-label="Secure Boot key: confirm at next boot"
+      >
+        <KeyRound size={12} />
+      </span>
+    );
+  }
   if (on === undefined || on === null) return null;
   return on ? (
     <span className="secure-boot-on" title="Secure Boot on" aria-label="Secure Boot on">

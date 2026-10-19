@@ -52,7 +52,8 @@ function stubHost(retention: Retention = DEFAULTS) {
     if (url.endsWith("/preview")) body = PLAN;
     if (url.endsWith("/run")) body = { at: "2026-10-09T13:00:00Z", dry_run: false, actions: [] };
     // Settings → Network boot, tested in NetworkBoot.test.tsx.
-    if (url.endsWith("/settings/boot")) body = { gateway: "none", unregistered: "wait", saved: false };
+    if (url.endsWith("/settings/boot"))
+      body = { gateway: "none", unregistered: "wait", mok_enroll: false, mok_password: "ggnet", saved: false };
     if (url.endsWith("/pxe")) body = PXE;
     return new Response(JSON.stringify(body), { status: 200 });
   });
@@ -134,5 +135,17 @@ describe("SettingsPage", () => {
     expect(within(last).getByText("Deleted")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Run now" }));
     expect(actions(mock).map((c) => c.url)).toEqual(["/api/v1/settings/retention/run"]);
+  });
+
+  it("staff only see their account and the client app", () => {
+    stubHost();
+    const staff = {
+      id: 2, username: "ana", role: "staff" as const, disabled: false,
+      created_at: "2026-10-19T10:00:00Z", last_login_at: null,
+    };
+    render(<SettingsPage storage={STORAGE} reload={vi.fn()} user={staff} />);
+    expect(screen.getByLabelText("Account")).toHaveTextContent("ana (staff)");
+    expect(screen.queryByLabelText("Retention")).toBeNull();
+    expect(screen.queryByLabelText("Users")).toBeNull();
   });
 });

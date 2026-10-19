@@ -145,12 +145,12 @@ def db_url(tmp_path) -> str:
     return url
 
 
-@pytest.fixture
-def client(db_url: str, prov: Provisioner):
+def _client(db_url: str, prov: Provisioner, signed_in: bool):
     from fastapi.testclient import TestClient
     from sqlalchemy.orm import sessionmaker
 
-    from app.api.deps import get_provisioner
+    from app.api.deps import get_provisioner, require_user
+    from app.db.models import User, UserRole
     from app.db.session import get_db, make_engine
     from app.main import app
 
@@ -166,7 +166,23 @@ def client(db_url: str, prov: Provisioner):
 
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_provisioner] = lambda: prov
+    if signed_in:
+        # Most tests are about the API, not about signing in (tests/test_auth.py).
+        app.dependency_overrides[require_user] = lambda: User(
+            id=0, username="test-admin", role=UserRole.ADMIN, disabled=False)
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
     engine.dispose()
+
+
+@pytest.fixture
+def client(db_url: str, prov: Provisioner):
+    """A test client signed in as an admin."""
+    yield from _client(db_url, prov, signed_in=True)
+
+
+@pytest.fixture
+def anon_client(db_url: str, prov: Provisioner):
+    """A test client that has to sign in like a browser."""
+    yield from _client(db_url, prov, signed_in=False)

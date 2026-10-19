@@ -203,6 +203,9 @@ class Machine(Base):
     # Boot Mode: the boot network card's PCI hardware ID as iPXE read it
     # (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), for Add hardware.
     boot_nic: Mapped[str | None] = mapped_column(String(64), default=None)
+    # Boot Mode: the ggNet Secure Boot key on this PC as its agent reports it:
+    # "enrolled", "requested" (confirm in MokManager at the next boot), "failed".
+    mok_state: Mapped[str | None] = mapped_column(String(16), default=None)
 
     # Reported by ggnet-agent in its heartbeat; never used for provisioning.
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
@@ -304,3 +307,51 @@ class DiscoveredMachine(Base):
     ignored: Mapped[bool] = mapped_column(Boolean, default=False)
     first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+
+
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"    # everything, including users and settings
+    STAFF = "staff"    # sees everything; may only turn PCs on, off and restart them
+
+
+class User(Base):
+    """Someone who signs in to the web UI (cafe owner or staff)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(32), unique=True)
+    # scrypt, as app.services.auth.hash_password writes it; never the password itself.
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[UserRole] = mapped_column(_str_enum(UserRole), default=UserRole.STAFF)
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
+
+
+class AuthSession(Base):
+    """A signed-in browser or script. Only a hash of its token is stored."""
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), default=None)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+    user: Mapped[User] = relationship()
+
+
+class Activity(Base):
+    """Activity log: every change made through the web UI or API, by whom."""
+
+    __tablename__ = "activity"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, index=True)
+    username: Mapped[str | None] = mapped_column(String(32), default=None)
+    action: Mapped[str] = mapped_column(String(200))     # "POST /api/v1/machines/3/power"
+    status_code: Mapped[int] = mapped_column(Integer)
+    ip_address: Mapped[str | None] = mapped_column(String(45), default=None)

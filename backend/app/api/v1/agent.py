@@ -14,6 +14,7 @@ discard after a reboot (app.services.writebacks), before the agent logs in.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from datetime import datetime, timezone
@@ -24,7 +25,13 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_agent_package, get_provisioner, get_server_url, get_writeback_settings
+from app.api.deps import (
+    get_agent_package,
+    get_provisioner,
+    get_pxe_service,
+    get_server_url,
+    get_writeback_settings,
+)
 from app.api.v1.errors import not_found
 from app.api.v1.schemas import (
     AgentConfig,
@@ -32,12 +39,14 @@ from app.api.v1.schemas import (
     AgentInventory,
     AgentPackageFileOut,
     AgentPackageOut,
+    AgentSecureBoot,
 )
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
-from app.services import discovery
+from app.services import discovery, pxe
 from app.services.agent_package import AgentPackage, bootstrap_script
 from app.services.power import take_command
+from app.services.pxe import PxeService
 from app.services.provisioning import Provisioner
 from app.services.writebacks import WritebackSettings, on_heartbeat
 
@@ -71,6 +80,7 @@ def heartbeat(
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
     settings: WritebackSettings = Depends(get_writeback_settings),
+    pxe_service: PxeService = Depends(get_pxe_service),
 ):
     inv = None
     if body.inventory is not None:
@@ -110,6 +120,7 @@ def heartbeat(
             agent_stopped=body.stopping,
             reported_drive_letter=body.drive_letter if body.iscsi_connected else None,
             **inventory,   # an old agent sends none: the last inventory stays
+            **({"mok_state": body.mok} if body.mok else {}),
             updated_at=Machine.updated_at,
         )
     )
@@ -136,7 +147,17 @@ def heartbeat(
         game_disk=disk.name if disk else None,
         drive_letter=machine.drive_letter if machine.mode is MachineMode.DISK else "D",
         command=command,
+        secure_boot=_secure_boot_key(db, pxe_service) if machine.mode is MachineMode.BOOT else None,
     )
+
+
+def _secure_boot_key(db: Session, service: PxeService) -> AgentSecureBoot | None:
+    """The key to enroll, while Settings -> Network boot asks for it and the key exists."""
+    s, _ = pxe.load_settings(db)
+    cert = service.certificate
+    if not s.mok_enroll or cert is None:
+        return None
+    return AgentSecureBoot(certificate=base64.b64encode(cert.read_bytes()).decode(), password=s.mok_password)
 
 
 # ── Client app download (Settings → Client app) ──────────────────────

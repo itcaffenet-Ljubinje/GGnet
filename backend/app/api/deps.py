@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from functools import lru_cache
 
+from fastapi import Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+
 from app.config import get_config, server_url
+from app.db.models import User
+from app.db.session import get_db
 from app.iscsi_manager import ISCSIManager
 from app.services.provisioning import Provisioner
 from app.services.traffic import TrafficMonitor
@@ -58,3 +64,44 @@ def get_pxe_service():
     from app.services.pxe import PxeService
 
     return PxeService.from_config()
+
+
+def _token(request) -> str | None:
+    """The session token: the browser's cookie, or `Authorization: Bearer` from a script."""
+    from app.services.auth import COOKIE
+
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("bearer "):
+        return header[7:].strip() or None
+    return request.cookies.get(COOKIE)
+
+
+def require_user(request: Request, db: Session = Depends(get_db)) -> Iterator[User]:
+    """
+    Router dependency: the request must come from a signed-in user whose role
+    allows it (app.services.auth.allowed). Every change (anything but GET) is
+    written to the activity log with its outcome.
+    """
+    from app.services import auth
+
+    user = auth.user_for(db, _token(request))
+    if user is None:
+        raise HTTPException(401, detail={"error": "Sign in first"})
+    method, path = request.method, request.url.path
+    if not auth.allowed(user, method, path):
+        raise HTTPException(403, detail={"error": f"Your role ({user.role.value}) cannot do this"})
+    if method in ("GET", "HEAD"):
+        yield user
+        return
+    ip = request.client.host if request.client else None
+    status = 500
+    try:
+        yield user
+        status = 200
+    except HTTPException as e:
+        status = e.status_code
+        raise
+    finally:
+        # Never commit what a failed request left behind; write only the log entry.
+        db.rollback()
+        auth.record(db, user, method, path, status, ip)

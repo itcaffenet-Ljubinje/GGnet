@@ -17,7 +17,8 @@ public sealed record Heartbeat(
     DateTimeOffset? BootedAt = null,
     string? DriveLetter = null,    // the letter the game disk got, while connected
     Inventory? Inventory = null,   // network and hardware, refreshed every few minutes
-    bool Stopping = false);        // last beat as the service stops (Windows shutting down)
+    bool Stopping = false,         // last beat as the service stops (Windows shutting down)
+    string? Mok = null);           // the ggNet Secure Boot key: MokState, once asked for
 
 /// <summary>The server's answer: what this PC should connect.</summary>
 public sealed record AgentConfig(
@@ -31,7 +32,11 @@ public sealed record AgentConfig(
     int PortalPort,
     string? GameDisk,
     string? DriveLetter = null,    // the letter the game disk should get (set per machine in the UI)
-    string? Command = null);       // "shutdown" | "reboot", sent once
+    string? Command = null,        // "shutdown" | "reboot", sent once
+    SecureBootKey? SecureBoot = null);   // set while the server asks PCs to enroll its key
+
+/// <summary>The ggNet Secure Boot key to enroll (DER, base64) and the MokManager password.</summary>
+public sealed record SecureBootKey(string Certificate, string Password);
 
 internal static class Protocol
 {

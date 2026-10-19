@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,13 +38,15 @@ def pxe(client, tmp_path):
 def test_boot_settings_default_to_config_toml(client):
     r = client.get("/api/v1/settings/boot")
     assert r.status_code == 200
-    assert r.json() == {"gateway": "none", "unregistered": "wait", "saved": False}
+    assert r.json() == {"gateway": "none", "unregistered": "wait", "mok_enroll": False,
+                        "mok_password": "ggnet", "saved": False}
 
 
 def test_boot_settings_are_saved(client):
     r = client.put("/api/v1/settings/boot", json={"gateway": " 192.168.0.1 ", "unregistered": "local"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"gateway": "192.168.0.1", "unregistered": "local", "saved": True}
+    assert r.json() == {"gateway": "192.168.0.1", "unregistered": "local", "mok_enroll": False,
+                        "mok_password": "ggnet", "saved": True}
     assert client.get("/api/v1/settings/boot").json()["saved"] is True
 
 
@@ -51,6 +54,8 @@ def test_boot_settings_are_saved(client):
     {"gateway": "router", "unregistered": "wait"},
     {"gateway": "192.168.0.300", "unregistered": "wait"},
     {"gateway": "none", "unregistered": "never"},
+    {"gateway": "none", "mok_password": "abc"},          # too short
+    {"gateway": "none", "mok_password": "GGnet!"},       # MokManager's keyboard is US: a-z, 0-9
 ])
 def test_invalid_boot_settings_are_refused(client, body):
     assert client.put("/api/v1/settings/boot", json=body).status_code == 422
@@ -66,7 +71,8 @@ def test_effective_config_keeps_config_toml_until_saved(client, db_url):
         assert (s.gateway, s.unregistered, saved) == ("dhcp", "wait", False)
         client.put("/api/v1/settings/boot", json={"gateway": "none", "unregistered": "local"})
         merged = effective_config(db, cfg)
-        assert merged["boot"] == {"gateway": "none", "unregistered": "local", "pxe_service": "x"}
+        assert merged["boot"] == {"gateway": "none", "unregistered": "local", "pxe_service": "x",
+                                  "mok_enroll": False, "mok_password": "ggnet"}
     engine.dispose()
 
 
@@ -160,3 +166,41 @@ def test_secureboot_dir_defaults_next_to_config_toml(monkeypatch):
     assert PxeService.from_config({"paths": {"data_dir": "/x"}}).secureboot_dir == Path("/var/lib/ggnet-dev/secureboot")
     s = PxeService.from_config({"paths": {"data_dir": "/x"}, "boot": {"secureboot_dir": "/srv/sb"}})
     assert s.secureboot_dir == Path("/srv/sb")
+
+
+# ── Secure Boot key enrollment by the agent ──────────────────────────
+
+def _beat(client, name: str, **extra) -> dict:
+    r = client.post("/api/v1/agent/heartbeat", json={"name": name, "agent_version": "0.1.13", **extra})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_boot_mode_agents_get_the_key_only_while_enrollment_is_on(client, pxe, tmp_path):
+    _secure_boot(tmp_path)
+    client.post("/api/v1/machines", json={"name": "pc01", "mode": "boot", "mac": "aa:bb:cc:dd:ee:01"})
+    client.post("/api/v1/machines", json={"name": "pc02", "mac": "aa:bb:cc:dd:ee:02"})   # Disk Mode
+    assert _beat(client, "pc01")["secure_boot"] is None          # off by default
+    r = client.put("/api/v1/settings/boot", json={"mok_enroll": True, "mok_password": "cafe2026"})
+    assert r.status_code == 200, r.text
+    assert _beat(client, "pc01")["secure_boot"] == {
+        "certificate": base64.b64encode(b"0\x82DER").decode(), "password": "cafe2026"}
+    assert _beat(client, "pc02")["secure_boot"] is None          # boots its own Windows
+
+
+def test_no_key_on_the_server_means_nothing_to_enroll(client, pxe):
+    client.post("/api/v1/machines", json={"name": "pc01", "mode": "boot", "mac": "aa:bb:cc:dd:ee:01"})
+    client.put("/api/v1/settings/boot", json={"mok_enroll": True})
+    assert _beat(client, "pc01")["secure_boot"] is None
+
+
+def test_the_agent_reports_the_key_state(client):
+    m = client.post("/api/v1/machines", json={"name": "pc01", "mode": "boot"}).json()
+    _beat(client, "pc01", mok="requested")
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["mok_state"] == "requested"
+    _beat(client, "pc01")                                        # nothing new: kept
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["mok_state"] == "requested"
+    _beat(client, "pc01", mok="enrolled")
+    assert client.get(f"/api/v1/machines/{m['id']}").json()["mok_state"] == "enrolled"
+    r = client.post("/api/v1/agent/heartbeat", json={"name": "pc01", "agent_version": "0.1.13", "mok": "x"})
+    assert r.status_code == 422

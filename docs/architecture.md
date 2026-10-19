@@ -512,4 +512,5 @@ network throughput of the iSCSI interface.
 | Boot Mode: import `.vhdx` into an OS image (new GUIDs, boot-start iSCSI, NDIS NIC driver), Add hardware, Secure Boot (shim + MOK) | planned |
 | ZFS property defaults from section 1, Server monitor page | next |
 | Boot Mode: OS images, proxyDHCP, iPXE build, per-MAC script, Add Machines wizard | after Disk Mode |
-| JWT auth + TLS | last |
+| Sign-in (users, roles, sessions, activity log) | done |
+| TLS | last |
