@@ -150,4 +150,24 @@ describe("GameDisksPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(calls(fetchMock).filter((c) => c.method === "POST")[0].body).toMatchObject({ kind: "os" });
   });
+
+  it("prepares an OS image after confirmation; game disks have no such button", async () => {
+    const fetchMock = stubFetch(200, disk({ id: 3, name: "win11", kind: "os", snapshot: "v2" }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const reload = vi.fn().mockResolvedValue(undefined);
+    render(
+      <GameDisksPage
+        disks={[disk(), disk({ id: 3, name: "win11", kind: "os" })]}
+        machines={[]}
+        reload={reload}
+      />,
+    );
+    const buttons = screen.getAllByRole("button", { name: "Prepare image" });
+    expect(buttons).toHaveLength(1);
+    await userEvent.click(buttons[0]);
+    expect(calls(fetchMock).filter((c) => c.method !== "GET")).toEqual([
+      { url: "/api/v1/game-disks/3/prepare", method: "POST", body: undefined },
+    ]);
+    expect(reload).toHaveBeenCalled();
+  });
 });

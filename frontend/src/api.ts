@@ -365,6 +365,7 @@ export const api = {
     request<void>("DELETE", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}`),
   setSnapshotComment: (id: number, name: string, comment: string) =>
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
+  prepareImage: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),
   listWritebacks: (id: number) => request<Writeback[]>("GET", `/v1/game-disks/${id}/writebacks`),

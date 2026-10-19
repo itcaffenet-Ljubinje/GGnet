@@ -15,7 +15,7 @@ import threading
 from dataclasses import dataclass
 
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
-from app.windows_setup import OsSetup, WindowsSetup
+from app.windows_setup import ImagePrep, OsSetup, WindowsSetup
 from app.zfs_manager import ZFSManager
 
 logger = logging.getLogger("ggnet.provisioning")
@@ -375,6 +375,36 @@ class Provisioner:
                 logger.error("Rollback: the disks of %s could not be mapped again", old_name)
             raise err
 
+    def prepare_image(self, master: str, prep: ImagePrep) -> str:
+        """
+        A new version of an OS image that is ready for every PC: its newest
+        version is cloned, prepared (app.windows_setup.prepare_image) and
+        made the next version, as Apply Writebacks does with a PC's writeback.
+        Returns the new snapshot name. Nothing changes on failure.
+        """
+        if self.windows is None:
+            raise ProvisioningError("Windows setup is not available on this server")
+        tmp = f"{self.zfs.layout.writebacks}/{master.rsplit('/', 1)[-1]}_ggnet_prep"   # '_': never a PC
+        with self.lock:
+            self._clear()
+            snaps = self.zfs.list_snapshots(master)
+            if not snaps:
+                raise self._fail(f"Listing versions of {master} failed")
+            base, new = snaps[-1], next_version(snaps)
+            if self.zfs.dataset_exists(tmp) and not self.zfs.destroy(tmp):
+                raise self._fail(f"{tmp} is left over from an earlier prepare and cannot be removed")
+            if not self.zfs.clone(f"{master}@{base}", tmp):
+                raise self._fail(f"Cloning {master}@{base} failed")
+            problem = self.windows.prepare_image(self.zfs.zvol_device_path(tmp), prep,
+                                                 label=master.rsplit("/", 1)[-1])
+            if problem is None and self.zfs.apply_clone(tmp, master, base, new):
+                return new
+            err = ProvisioningError(f"Preparing {master} failed: {problem}") if problem \
+                else self._fail(f"Making {tmp} the next version of {master} failed")
+            if not self.zfs.destroy(tmp):
+                logger.error("Could not remove %s after a failed prepare", tmp)
+            raise err
+
     def deprovision(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str | None,
         os_clone_zvol: str | None = None,
@@ -416,7 +446,7 @@ class Provisioner:
 
     def apply_writebacks(
         self, machine_name: str, initiator_iqn: str, applies: list[WritebackApply],
-        clone_zvol: str, os_clone_zvol: str | None = None,
+        clone_zvol: str, os_clone_zvol: str | None = None, os_prep: ImagePrep | None = None,
     ) -> list[str]:
         """
         Make each clone's content the next version of its master (ggRock
@@ -427,6 +457,8 @@ class Provisioner:
         unmapped first; the caller re-clones the machine from the new
         versions. When the first apply fails, the disks are mapped again;
         when a later one fails, PartialApplyError says what was applied.
+        With `os_prep`, the OS writeback is prepared for every PC first
+        (app.windows_setup.prepare_image), so the new version is ready as it is.
         """
         with self.lock:
             self._clear()
@@ -439,6 +471,11 @@ class Provisioner:
             self._detach(machine_name, initiator_iqn)
             applied: dict[str, str] = {}
             for a, new in zip(applies, news):
+                if os_prep is not None and a.clone_zvol == os_clone_zvol and self.windows is not None:
+                    problem = self.windows.prepare_image(self.zfs.zvol_device_path(a.clone_zvol), os_prep,
+                                                         label=machine_name)
+                    if problem:
+                        logger.warning("The OS version from %s is not fully prepared: %s", machine_name, problem)
                 if self.zfs.apply_clone(a.clone_zvol, a.master, a.base_snap, new):
                     applied[a.master] = new
                     continue

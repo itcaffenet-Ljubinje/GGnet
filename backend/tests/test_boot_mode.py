@@ -470,6 +470,14 @@ class FakeWindows:
         self.done.append((device, setup, mapped))
         return self.problem
 
+    prep_problem: str | None = None
+
+    def prepare_image(self, device, prep, label="image"):
+        # Whether the clone was already made a version when it was prepared.
+        promoted = any(c[:2] == ["zfs", "promote"] for c in self.host.calls)
+        self.prepared = getattr(self, "prepared", []) + [(device, prep, promoted)]
+        return self.prep_problem
+
 
 @pytest.fixture
 def windows(prov, host):
@@ -621,3 +629,53 @@ def test_an_unreadable_nic_changes_nothing(client, host, disks, auto):
     assert "sanboot" in _ipxe_nic(client, pci="", cls="", sub="", rev="")
     assert _get(client, m)["boot_nic"] is None
     assert _clones_made(host) == []
+
+
+
+# ── Image-wide setup, once per OS version ────────────────────────────
+
+def test_applying_the_os_writeback_prepares_it_first(client, host, disks, windows, db_url):
+    m = _boot_machine(client, disks)
+    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True})
+    host.calls.clear()
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"os": True, "game": False})
+    assert r.status_code == 200, r.text
+    [(device, prep, promoted)] = windows.prepared
+    assert device == f"/dev/zvol/{OS_CLONE}"
+    assert promoted is False                   # prepared before it became the version
+
+
+def test_applying_only_the_game_writeback_prepares_nothing(client, host, disks, windows):
+    m = _boot_machine(client, disks)
+    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True})
+    r = client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={"os": False, "game": True})
+    assert r.status_code == 200, r.text
+    assert getattr(windows, "prepared", []) == []
+
+
+def test_prepare_image_makes_a_new_active_version(client, host, disks, windows):
+    os_disk, game = disks
+    host.calls.clear()
+    r = client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare")
+    assert r.status_code == 200, r.text
+    assert r.json()["snapshot"] == "v2"
+    tmp = "tank/ggnet/writebacks/win11_ggnet_prep"
+    assert any(c[:2] == ["zfs", "clone"] and c[-2:] == ["tank/ggnet/images/win11@base", tmp]
+               for c in host.calls)
+    [(device, prep, promoted)] = windows.prepared
+    assert device == f"/dev/zvol/{tmp}" and promoted is False
+    versions = client.get(f"/api/v1/game-disks/{os_disk['id']}/snapshots").json()
+    assert [v["name"] for v in versions] == ["base", "v2"]
+    assert versions[-1]["comment"].startswith("ggNet: prepared for all PCs")
+    # Game disks are not Windows images.
+    assert client.post(f"/api/v1/game-disks/{game['id']}/prepare").status_code == 409
+
+
+def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
+    os_disk, _ = disks
+    windows.prep_problem = "no Program Files folder in the image"
+    r = client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare")
+    assert r.status_code == 502
+    assert "no Program Files folder" in r.text
+    assert client.get(f"/api/v1/game-disks/{os_disk['id']}").json()["snapshot"] == "base"
+    assert ["zfs", "destroy", "tank/ggnet/writebacks/win11_ggnet_prep"] in [c[:3] for c in host.calls]

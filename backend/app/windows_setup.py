@@ -1,5 +1,7 @@
 """
-WindowsSetup: makes a Boot Mode PC's OS writeback its own before it boots.
+WindowsSetup: makes a Boot Mode OS image ready for every PC (prepare_image,
+once per image version) and each PC's OS writeback its own (personalize,
+before it boots).
 
 Every Boot Mode PC boots the same Windows image, so on its own every PC would
 have the image's computer name. Like ggRock (its Rename.PC and
@@ -16,6 +18,10 @@ an extra reboot:
     MountedDevices                      every drive letter but C: is forgotten
     Enum\\PCI\\<boot NIC>               added when the image knows the PC's network
                                         chip only in another revision or board
+
+The fixed address and the letters are the image's, so prepare_image() clears
+them once; a writeback only does it when the image still has them (an image
+from before prepare_image).
 
 An image made from a PC with a fixed address would give every PC that
 address; the PC that owns it then loses its iSCSI disk whenever another one
@@ -34,24 +40,35 @@ board) only has another hardware ID: its Enum entry is copied from the
 known one with the new IDs (iPXE reports them, app.api.v1.boot), so it
 binds the same driver. A chip the image has no driver for is reported.
 
-The Windows partition of the clone is mounted with ntfs-3g and the hive is
-merged with hivexregedit (both ship with Proxmox VE). Only the PC's clone is
-touched; the image and its snapshots are never mounted.
+prepare_image() makes what is the same on every PC part of the image, once
+per version (on Apply Writebacks of an OS image, or "Prepare image" in the
+UI): the server's ggnet-agent.exe in C:\\Program Files\\ggnet-agent (where
+install.ps1 puts it; only when it differs) with an appsettings.json naming
+this server unless the image has one, its service registered as install.ps1
+does, Fast Startup off, fixed addresses to DHCP and stale letters forgotten.
 
-personalize() never raises: a PC that boots with the image's name is better
-than a PC that does not boot, so a failure (an image without Windows yet, a
+The Windows partition of the clone is mounted with ntfs-3g and the hive is
+merged with hivexregedit (both ship with Proxmox VE). Only clones are
+mounted (a PC's writeback, or the clone that becomes the next image
+version); an image's snapshots never are.
+
+Neither method raises: a PC that boots with the image's name is better than
+a PC that does not boot, so a failure (an image without Windows yet, a
 hibernated Windows that ntfs-3g refuses to mount) is returned as a reason
 for the caller to log.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 
 from app.runner import CommandRunner
 
@@ -68,6 +85,26 @@ _LETTER_RE = re.compile(r'^"\\\\DosDevices\\\\([A-Za-z]):"=', re.M)
 NIC_ID_RE = re.compile(r"^VEN_([0-9A-F]{4})&DEV_([0-9A-F]{4})&SUBSYS_([0-9A-F]{8})&REV_([0-9A-F]{2})$")
 
 
+AGENT_DIR = ("Program Files", "ggnet-agent")
+AGENT_EXE = "ggnet-agent.exe"
+AGENT_SERVICE = "ggnet-agent"
+AGENT_IMAGE_PATH = '"C:\\Program Files\\ggnet-agent\\ggnet-agent.exe"'
+# sc failure: restart after 5 s, 5 s, then 30 s; reset the count after a day
+# (SERVICE_FAILURE_ACTIONS as Windows stores it).
+AGENT_FAILURE_ACTIONS = bytes.fromhex(
+    "80510100" "00000000" "00000000" "03000000" "14000000"
+    "01000000" "88130000" "01000000" "88130000" "01000000" "30750000")
+
+
+@dataclass(frozen=True)
+class AgentInstall:
+    """The server's agent, put into an OS image by prepare_image()."""
+
+    exe: Path
+    sha256: str
+    server_url: str
+
+
 @dataclass(frozen=True)
 class OsSetup:
     """What a Boot Mode PC's Windows is told about itself."""
@@ -76,6 +113,13 @@ class OsSetup:
     env: Mapping[str, str] = field(default_factory=dict)
     # The boot network card's hardware ID (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), if known.
     boot_nic: str | None = None
+
+
+@dataclass(frozen=True)
+class ImagePrep:
+    """What prepare_image() makes part of an OS image (the same for every PC)."""
+
+    agent: AgentInstall | None = None
 
 
 def _reg_string(value: str) -> str:
@@ -193,6 +237,58 @@ def nic_patch(export: str, nic: str) -> tuple[str | None, str | None]:
     return "\n".join(lines).lstrip("\n"), None
 
 
+def _hex(kind: str, data: bytes) -> str:
+    return f"{kind}:" + ",".join(f"{b:02x}" for b in data)
+
+
+def agent_service_patch(control_set: int) -> list[str]:
+    """The agent's service as install.ps1 creates it, and Fast Startup off."""
+    cs = f"\\ControlSet{control_set:03d}"
+    return [
+        "", f"[{cs}\\Services\\{AGENT_SERVICE}]",
+        '"Type"=dword:00000010',            # own process
+        '"Start"=dword:00000002',           # automatic
+        '"ErrorControl"=dword:00000001',
+        f'"ImagePath"={_hex("hex(2)", (AGENT_IMAGE_PATH + chr(0)).encode("utf-16-le"))}',
+        '"ObjectName"="LocalSystem"',
+        '"DisplayName"="ggNet agent"',
+        '"Description"="Connects the ggNet game disk over iSCSI and reports to the ggNet server."',
+        f'"FailureActions"={_hex("hex", AGENT_FAILURE_ACTIONS)}',
+        # "Shut down" with Fast Startup is a hibernation: the server would not see a new boot.
+        "", f"[{cs}\\Control\\Session Manager\\Power]",
+        '"HiberbootEnabled"=dword:00000000',
+    ]
+
+
+def _cleanup_lines(cs: str, dhcp_interfaces: Sequence[str], forget_letters: Sequence[str]) -> list[str]:
+    """Fixed addresses to DHCP, and every letter but C: forgotten."""
+    lines: list[str] = []
+    for iface in dhcp_interfaces:
+        lines += [
+            "", f"[{cs}\\Services\\Tcpip\\Parameters\\Interfaces\\{iface}]",
+            '"EnableDHCP"=dword:00000001',
+            '"IPAddress"=-', '"SubnetMask"=-', '"DefaultGateway"=-', '"DefaultGatewayMetric"=-',
+        ]
+    if forget_letters:
+        lines += ["", "[\\MountedDevices]"]
+        for letter in forget_letters:
+            if len(letter) != 1 or not letter.isalpha() or letter.upper() == "C":
+                raise ValueError(f"Invalid drive letter to forget: {letter!r}")
+            lines.append(f'"\\\\DosDevices\\\\{letter.upper()}:"=-')
+    return lines
+
+
+def image_patch(control_set: int, dhcp_interfaces: Sequence[str] = (), forget_letters: Sequence[str] = (),
+                agent_service: bool = False) -> str:
+    """The .reg text prepare_image() merges into an image's SYSTEM hive."""
+    cs = f"\\ControlSet{control_set:03d}"
+    lines = ["Windows Registry Editor Version 5.00"]
+    lines += _cleanup_lines(cs, dhcp_interfaces, forget_letters)
+    if agent_service:
+        lines += agent_service_patch(control_set)
+    return "\n".join(lines) + "\n"
+
+
 def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[str] = (),
                    forget_letters: Sequence[str] = (), extra: str | None = None) -> str:
     """The .reg text hivexregedit merges into the SYSTEM hive."""
@@ -215,18 +311,7 @@ def registry_patch(setup: OsSetup, control_set: int, dhcp_interfaces: Sequence[s
             if not _ENV_KEY_RE.match(key):
                 raise ValueError(f"Invalid environment variable name: {key!r}")
             lines.append(f"{_reg_string(key)}={_reg_string(value)}")
-    for iface in dhcp_interfaces:
-        lines += [
-            "", f"[{cs}\\Services\\Tcpip\\Parameters\\Interfaces\\{iface}]",
-            '"EnableDHCP"=dword:00000001',
-            '"IPAddress"=-', '"SubnetMask"=-', '"DefaultGateway"=-', '"DefaultGatewayMetric"=-',
-        ]
-    if forget_letters:
-        lines += ["", "[\\MountedDevices]"]
-        for letter in forget_letters:
-            if len(letter) != 1 or not letter.isalpha() or letter.upper() == "C":
-                raise ValueError(f"Invalid drive letter to forget: {letter!r}")
-            lines.append(f'"\\\\DosDevices\\\\{letter.upper()}:"=-')
+    lines += _cleanup_lines(cs, dhcp_interfaces, forget_letters)
     if extra:
         lines += ["", extra]
     return "\n".join(lines) + "\n"
@@ -294,16 +379,29 @@ class WindowsSetup:
         except ValueError as e:
             return str(e)
         try:
-            return self._personalize(device, setup)
+            return self._on_windows(device, setup.computer_name,
+                                    lambda root, hive: self._merge(hive, setup))
         except Exception as e:     # never fail the provisioning it is part of
             logger.exception("Setting up Windows on %s failed", device)
             return f"unexpected error: {e}"
 
-    def _personalize(self, device: str, setup: OsSetup) -> str | None:
+    def prepare_image(self, device: str, prep: ImagePrep, label: str = "image") -> str | None:
+        """
+        Make an OS clone that is about to become an image version ready for
+        every PC (see the module doc). None when done, else why not.
+        """
+        try:
+            return self._on_windows(device, f"prepare-{label}", lambda root, hive: self._prepare(root, hive, prep))
+        except Exception as e:     # never fail the apply it is part of
+            logger.exception("Preparing the image on %s failed", device)
+            return f"unexpected error: {e}"
+
+    def _on_windows(self, device: str, name: str, work: Callable[[Path, Path], str | None]) -> str | None:
+        """Mount the disk's Windows partition and run `work(root, SYSTEM hive)` on it."""
         parts = self.ntfs_partitions(device)
         if not parts:
             return f"no Windows partition found on {device}"
-        mount = self.run_dir / setup.computer_name
+        mount = self.run_dir / name
         reasons = []
         for part in parts:
             try:
@@ -319,7 +417,7 @@ class WindowsSetup:
                 if hive is None:
                     reasons.append(f"{part}: no Windows on it")
                     continue
-                return self._merge(hive, setup)
+                return work(mount, hive)
             finally:
                 if not self._run(["umount", str(mount)])[0]:
                     logger.error("Could not unmount %s", mount)
@@ -328,6 +426,50 @@ class WindowsSetup:
                 except OSError:
                     pass
         return "; ".join(reasons)
+
+    def _install_agent(self, root: Path, agent: AgentInstall) -> tuple[bool, str | None]:
+        """
+        The server's agent into the mounted Windows: (whether the service can
+        be registered, why not). The file is written only when it differs.
+        """
+        program_files = _find_dir(root, AGENT_DIR[:1])
+        if program_files is None:
+            return False, "no Program Files folder in the image"
+        folder = _find_dir(program_files, AGENT_DIR[1:]) or program_files / AGENT_DIR[1]
+        exe = folder / AGENT_EXE
+        try:
+            folder.mkdir(exist_ok=True)
+            if not _same_file(exe, agent.exe, agent.sha256):
+                tmp = folder / f"{AGENT_EXE}.new"
+                shutil.copyfile(agent.exe, tmp)
+                os.replace(tmp, exe)
+                logger.info("Agent copied into the image")
+            settings = folder / "appsettings.json"
+            if not settings.exists():
+                settings.write_text(json.dumps(agent_settings(agent.server_url), indent=2), encoding="utf-8")
+        except OSError as e:
+            return exe.is_file(), f"copying the agent failed: {e}"
+        return True, None
+
+    def _merge_reg(self, hive: Path, name: str, patch: str) -> str | None:
+        reg = self.run_dir / f"{name}.reg"
+        try:
+            reg.write_text(patch, encoding="utf-8")
+            ok, _, err = self._run(["hivexregedit", "--merge", str(hive), str(reg)])
+        finally:
+            reg.unlink(missing_ok=True)
+        return None if ok else f"editing the registry failed: {err.strip()}"
+
+    def _prepare(self, root: Path, hive: Path, prep: ImagePrep) -> str | None:
+        agent_ok, agent_problem = self._install_agent(root, prep.agent) if prep.agent else (False, None)
+        control_set = self.control_set(hive)
+        fixed = self.static_interfaces(hive, control_set)
+        letters = self.reserved_letters(hive)
+        problem = self._merge_reg(hive, "prepare", image_patch(control_set, fixed, letters, agent_ok))
+        if problem is None:
+            logger.info("Image prepared (agent: %s, DHCP: %s, letters forgotten: %s)",
+                        "yes" if agent_ok else "no", ", ".join(fixed) or "-", ", ".join(letters) or "-")
+        return "; ".join(p for p in (problem, agent_problem) if p) or None
 
     def _merge(self, hive: Path, setup: OsSetup) -> str | None:
         control_set = self.control_set(hive)
@@ -341,14 +483,9 @@ class WindowsSetup:
             else:
                 nic_reg, nic_problem = nic_patch(export, setup.boot_nic)
         patch = registry_patch(setup, control_set, fixed, letters, nic_reg)
-        reg = self.run_dir / f"{setup.computer_name}.reg"
-        try:
-            reg.write_text(patch, encoding="utf-8")
-            ok, _, err = self._run(["hivexregedit", "--merge", str(hive), str(reg)])
-        finally:
-            reg.unlink(missing_ok=True)
-        if not ok:
-            return f"editing the registry failed: {err.strip()}"
+        problem = self._merge_reg(hive, setup.computer_name, patch)
+        if problem:
+            return problem
         logger.info("Windows on %s set up as %s", hive, setup.computer_name)
         if fixed:
             logger.info("Fixed IPv4 addresses switched to DHCP on %s: %s", setup.computer_name,
@@ -360,6 +497,53 @@ class WindowsSetup:
         if nic_problem:
             logger.warning("%s: %s", setup.computer_name, nic_problem)
         return nic_problem
+
+
+def agent_settings(server_url: str) -> dict:
+    """appsettings.json as install.ps1 writes it (Boot Mode: the game disk is D:)."""
+    return {
+        "Agent": {
+            "ServerUrl": server_url.rstrip("/"),
+            "DriveLetter": "D",
+            "HeartbeatSeconds": 30,
+            "ManageInitiatorName": True,
+            "HideLocalDisks": True,
+        },
+        "Logging": {"EventLog": {"LogLevel": {
+            "Default": "Information", "Microsoft": "Warning", "System.Net.Http.HttpClient": "Warning"}}},
+    }
+
+
+def _same_file(path: Path, source: Path, sha256: str) -> bool:
+    """Whether `path` already holds the source (size first, then the checksum)."""
+    try:
+        if not path.is_file() or path.stat().st_size != source.stat().st_size:
+            return False
+        h = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest() == sha256
+    except OSError:
+        return False
+
+
+def _find_dir(root: Path, parts: tuple[str, ...]) -> Path | None:
+    """root/parts as directories, without regard to case (as Windows does)."""
+    path = root
+    for name in parts:
+        exact = path / name
+        if exact.is_dir():
+            path = exact
+            continue
+        try:
+            match = next((p for p in path.iterdir() if p.name.lower() == name.lower() and p.is_dir()), None)
+        except OSError:
+            return None
+        if match is None:
+            return None
+        path = match
+    return path
 
 
 def _find(root: Path, parts: tuple[str, ...]) -> Path | None:

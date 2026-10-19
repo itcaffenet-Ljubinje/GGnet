@@ -50,7 +50,7 @@ from app.api.v1.schemas import (
 from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus, User, UserRole
 from app.db.session import get_db
 from app.services import discovery
-from app.services.os_setup import os_setup_for
+from app.services.os_setup import image_prep, os_setup_for
 from app.services.provisioning import (
     ClientDisk,
     PartialApplyError,
@@ -628,7 +628,8 @@ def apply_writebacks(
     applies = [WritebackApply(clone, disk.zvol_path, disk.snapshot) for disk, clone in targets]
     try:
         news = prov.apply_writebacks(machine.name, machine.initiator_iqn, applies,
-                                     machine.clone_zvol, machine.os_clone_zvol if boot else None)
+                                     machine.clone_zvol, machine.os_clone_zvol if boot else None,
+                                     os_prep=image_prep() if boot and body.os else None)
     except PartialApplyError as e:
         for disk, _ in targets:
             disk.snapshot = e.applied.get(disk.zvol_path, disk.snapshot)

@@ -43,15 +43,11 @@ def get_wol_sender():
     return lambda mac: send_wol(mac, broadcast, net.get("server_ip"))
 
 
-@lru_cache(maxsize=1)
 def get_agent_package():
     """The agent package in [paths] agent_dir (default <data_dir>/agent)."""
-    from pathlib import Path
+    from app.services.agent_package import default_package
 
-    from app.services.agent_package import AgentPackage
-
-    paths = get_config()["paths"]
-    return AgentPackage(Path(paths.get("agent_dir") or Path(paths["data_dir"]) / "agent"))
+    return default_package()
 
 
 def get_server_url() -> str:

@@ -18,9 +18,13 @@ import os
 import threading
 import zipfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
-FILES = ("ggnet-agent.exe", "install.ps1", "uninstall.ps1")
+from app.config import get_config
+
+AGENT_EXE_NAME = "ggnet-agent.exe"
+FILES = (AGENT_EXE_NAME, "install.ps1", "uninstall.ps1")
 VERSION_FILE = "VERSION"
 
 
@@ -96,6 +100,13 @@ class AgentPackage:
                     z.writestr(f"ggnet-agent/{VERSION_FILE}", package.version + "\n")
             os.replace(tmp, target)
             return target
+
+
+@lru_cache(maxsize=1)
+def default_package() -> AgentPackage:
+    """The package in [paths] agent_dir (default <data_dir>/agent), one per process."""
+    paths = get_config()["paths"]
+    return AgentPackage(Path(paths.get("agent_dir") or Path(paths["data_dir"]) / "agent"))
 
 
 def _sha256(path: Path) -> str:
