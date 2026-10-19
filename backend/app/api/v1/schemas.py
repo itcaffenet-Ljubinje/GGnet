@@ -289,6 +289,7 @@ class MachineOut(BaseModel):
     reported_mac: str | None
     link_speed_mbps: int | None
     hardware: MachineHardware | None = Field(validation_alias="hardware_info")
+    boot_nic: str | None
     status: MachineStatus
     last_error: str | None
     clone_zvol: str | None
@@ -522,6 +523,7 @@ class DiscoveredOut(BaseModel):
     hostname: str | None
     ip_address: str | None
     agent_version: str | None
+    boot_nic: str | None
     seen_count: int
     ignored: bool
     first_seen_at: datetime

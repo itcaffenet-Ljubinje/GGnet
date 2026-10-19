@@ -111,7 +111,7 @@ class Provisioner:
             return None
         problem = self.windows.personalize(self.zfs.zvol_device_path(os_clone), os_setup)
         if problem:
-            logger.warning("%s boots with the image's identity: %s", os_setup.computer_name, problem)
+            logger.warning("Windows setup of %s is incomplete: %s", os_setup.computer_name, problem)
         return problem
 
     def _detach(self, machine_name: str, initiator_iqn: str) -> None:

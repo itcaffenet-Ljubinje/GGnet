@@ -32,3 +32,12 @@ export const SLOW_LINK_MBPS = 1000;
 export function formatRate(bps: number): string {
   return `${formatBytes(Math.round(bps))}/s`;
 }
+
+const NIC_VENDORS: Record<string, string> = { "10EC": "Realtek", "8086": "Intel", "14E4": "Broadcom", "1969": "Atheros", "1D6A": "Aquantia" };
+
+/** "Realtek 8168 rev 16" from a PCI hardware ID (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16). */
+export function formatNic(id: string): string {
+  const m = /^VEN_([0-9A-F]{4})&DEV_([0-9A-F]{4})&SUBSYS_[0-9A-F]{8}&REV_([0-9A-F]{2})$/.exec(id);
+  if (!m) return id;
+  return `${NIC_VENDORS[m[1]] ?? `Vendor ${m[1]}`} ${m[2]} rev ${m[3]}`;
+}

@@ -17,6 +17,11 @@ boot falls through to its next boot device instead of stopping in iPXE:
                                 `[boot] unregistered = "local"` exits at once
                                 (also set in the web UI: Settings → Network boot).
 
+autoexec.ipxe (scripts/install_ggnet.sh) also sends the boot NIC's PCI IDs
+(pci, cls, sub, rev); the server keeps them as the PC's `boot_nic` and adds
+that card to its OS writeback when the image knows the chip only in another
+revision or board (Add hardware, app.windows_setup).
+
 Before it answers a provisioned PC, the server discards its writebacks like
 the watcher does after a disconnect (app.services.writebacks), unless the PC
 keeps its writeback. No authentication yet (planned with JWT); the script
@@ -139,16 +144,44 @@ def sanboot_script(m: Machine, portal_ip: str, portal_port: int, target_iqn: str
     )
 
 
+def boot_nic_id(pci: str, cls: str, sub: str, rev: str) -> str | None:
+    """
+    The boot NIC's hardware ID as Windows names it, from PCI config space as
+    iPXE reads it (hexraw, highest byte first): `pci` offset 0, 4 bytes
+    (device, vendor), `cls` offset 9, 3 bytes (class, subclass, interface),
+    `sub` offset 0x2c, 4 bytes (subsystem, subsystem vendor), `rev` offset 8.
+    None unless it is a network controller (class 02), so a misread device
+    never gets a network card's driver.
+    """
+    parts = [v.strip().lower().replace(":", "") for v in (pci, cls, sub, rev)]
+    if [len(v) for v in parts] != [8, 6, 8, 2] or not all(
+            all(c in "0123456789abcdef" for c in v) for v in parts):
+        return None
+    pci, cls, sub, rev = (v.upper() for v in parts)
+    if not cls.startswith("02") or pci[4:] in ("FFFF", "0000"):
+        return None
+    return f"VEN_{pci[4:]}&DEV_{pci[:4]}&SUBSYS_{sub}&REV_{rev}"
+
+
 def _find(db: Session, mac: str) -> Machine | None:
     """The machine with this MAC set by the admin, else the one whose agent reported it."""
     return (db.scalar(select(Machine).where(Machine.mac == mac))
             or db.scalar(select(Machine).where(Machine.reported_mac == mac).order_by(Machine.id)))
 
 
+# What autoexec.ipxe (scripts/install_ggnet.sh) reads from the boot NIC's PCI
+# config space before it asks for the script; empty when it could not.
+NIC_QUERY = "&pci=${ggnet_pci}&cls=${ggnet_cls}&sub=${ggnet_sub}&rev=${ggnet_rev}"
+
+
 @router.get("/ipxe", response_class=PlainTextResponse)
 def ipxe_script(
     request: Request,
     mac: str = "",
+    pci: str = "",
+    cls: str = "",
+    sub: str = "",
+    rev: str = "",
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
     settings: WritebackSettings = Depends(get_writeback_settings),
@@ -162,15 +195,16 @@ def ipxe_script(
 
     # [boot] settings: config.toml's, or the ones saved in the web UI.
     cfg = pxe.effective_config(db)
+    nic = boot_nic_id(pci, cls, sub, rev)
     m = _find(db, mac)
     if m is None:
         logger.info("iPXE request from unregistered MAC %s", mac)
         discovery.record(db, mac, DiscoverySource.PXE,
-                         ip_address=request.client.host if request.client else None)
+                         ip_address=request.client.host if request.client else None, boot_nic=nic)
         if unregistered_mode(cfg) == "local":
             return exit_script(f"This PC is not registered in ggNet ({mac}). Booting from local disk.")
         # ${net0/mac} is iPXE's, so the PC asks with its own MAC like the first time.
-        return wait_script(mac, f"{request.base_url}api/v1/boot/ipxe?mac=${{net0/mac}}")
+        return wait_script(mac, f"{request.base_url}api/v1/boot/ipxe?mac=${{net0/mac}}{NIC_QUERY}")
     if m.mode is not MachineMode.BOOT:
         return exit_script(f"ggNet: {m.name} is in Disk Mode. Booting from local disk.")
     if m.status is not MachineStatus.PROVISIONED or m.os_clone_zvol is None:
@@ -178,7 +212,7 @@ def ipxe_script(
         logger.warning("iPXE request from %s, which cannot boot: %s", m.name, reason)
         return exit_script(f"ggNet: {m.name} cannot boot from the network: {reason}")
 
-    if not on_ipxe(db, prov, m, settings):
+    if not on_ipxe(db, prov, m, settings, boot_nic=nic):
         logger.error("iPXE request from %s: %s", m.name, m.last_error)
         return exit_script(f"ggNet: {m.name} cannot boot from the network: {m.last_error}")
     logger.info("iPXE: %s boots %s + %s", m.name, m.os_clone_snapshot, m.clone_snapshot)

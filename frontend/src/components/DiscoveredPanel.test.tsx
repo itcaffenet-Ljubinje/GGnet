@@ -59,6 +59,16 @@ describe("DiscoveredPanel", () => {
     expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();   // no name yet
   });
 
+  it("shows the network card iPXE read", () => {
+    render(
+      <Panel
+        discovered={[found({ source: "pxe", boot_nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16" })]}
+        reload={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Realtek 8168 rev 16")).toBeInTheDocument();
+  });
+
   it("ignores a PC after confirming", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = stubFetch(200, found({ ignored: true }));

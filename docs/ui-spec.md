@@ -47,7 +47,8 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Bulk delete | todo (backend) |
 | Zones (e.g. Main Arena, VIP) for filtering and bulk actions | todo |
 | Fixed IP per PC (as a DHCP reservation hint, not in Windows) | todo |
-| Add hardware: a PC whose board the OS image does not know yet (see architecture, "Add hardware") | todo |
+| Add hardware: iPXE reads the boot NIC's PCI IDs; the same chip in another revision or board is added to each fresh OS writeback automatically; shown in New PCs and Settings → Hardware | done |
+| Add hardware for a chip the image has no driver for (driver library, inject into the image) | todo |
 
 ## Images
 

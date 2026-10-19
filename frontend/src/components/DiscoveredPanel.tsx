@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { api, type Discovered, type GameDisk, type MachineMode } from "../api";
+import { formatNic } from "../format";
 
 interface Props {
   discovered: Discovered[];
@@ -99,6 +100,11 @@ function DiscoveredRow({ d, disks, busy, run, reload }: { d: Discovered } & Omit
       <td>
         {d.source === "pxe" ? "Network boot" : `Agent ${d.agent_version ?? ""}`}
         {d.seen_count > 1 && <div className="muted small">{d.seen_count} times</div>}
+        {d.boot_nic && (
+          <div className="muted small" title={`PCI\\${d.boot_nic}`}>
+            {formatNic(d.boot_nic)}
+          </div>
+        )}
       </td>
       <td className="small">{new Date(d.last_seen_at).toLocaleString()}</td>
       <td>

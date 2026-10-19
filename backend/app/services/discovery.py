@@ -33,6 +33,7 @@ def record(
     hostname: str | None = None,
     ip_address: str | None = None,
     agent_version: str | None = None,
+    boot_nic: str | None = None,
 ) -> DiscoveredMachine | None:
     """Note a knock from an unregistered MAC (normalized aa:bb:..); commits."""
     if db.scalar(select(Machine.id).where(Machine.mac == mac)) is not None:
@@ -56,8 +57,17 @@ def record(
         row.ip_address = ip_address[:45]
     if agent_version:
         row.agent_version = agent_version[:32]
+    if boot_nic:
+        row.boot_nic = boot_nic
     db.commit()
     return row
+
+
+def boot_nic_of(db: Session, mac: str | None) -> str | None:
+    """The boot network card iPXE reported for an unregistered MAC."""
+    if not mac:
+        return None
+    return db.scalar(select(DiscoveredMachine.boot_nic).where(DiscoveredMachine.mac == mac))
 
 
 def forget(db: Session, mac: str | None) -> None:

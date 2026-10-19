@@ -301,7 +301,9 @@ def create_machine(
         conflict(f"Machine '{body.name}' needs a game disk with its OS image")
 
     machine = Machine(name=body.name, mode=body.mode, mac=body.mac, drive_letter=body.drive_letter,
-                      initiator_iqn=body.initiator_iqn or default_iqn(prov, body.name, body.mac))
+                      initiator_iqn=body.initiator_iqn or default_iqn(prov, body.name, body.mac),
+                      # Known when it waited on the iPXE screen: Add hardware works on its first boot.
+                      boot_nic=discovery.boot_nic_of(db, body.mac))
     db.add(machine)
     try:
         db.commit()
