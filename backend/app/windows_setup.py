@@ -46,6 +46,11 @@ UI): the server's ggnet-agent.exe in C:\\Program Files\\ggnet-agent (where
 install.ps1 puts it; only when it differs) with an appsettings.json naming
 this server unless the image has one, its service registered as install.ps1
 does, Fast Startup off, fixed addresses to DHCP and stale letters forgotten.
+It also tunes Windows for a diskless PC (tuning_patch, software_patch):
+nothing goes to sleep, PCIe and USB power saving and the network card's
+Energy Efficient Ethernet are off (the C: disk runs over that link), a fixed
+page file, and no automatic Windows Update, maintenance (defragmentation),
+search index or SysMain, which would only fill each writeback for nothing.
 
 The Windows partition of the clone is mounted with ntfs-3g and the hive is
 merged with hivexregedit (both ship with Proxmox VE). Only clones are
@@ -76,6 +81,7 @@ logger = logging.getLogger("ggnet.windows")
 
 DEFAULT_RUN_DIR = Path("/run/ggnet/windows")
 HIVE = ("Windows", "System32", "config", "SYSTEM")
+SOFTWARE_HIVE = ("Windows", "System32", "config", "SOFTWARE")
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,14}$")
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 _CURRENT_RE = re.compile(r'^"Current"=dword:([0-9a-fA-F]{8})\s*$', re.M)
@@ -120,6 +126,8 @@ class ImagePrep:
     """What prepare_image() makes part of an OS image (the same for every PC)."""
 
     agent: AgentInstall | None = None
+    # Power, paging and background writes set for a diskless PC (tuning_patch()).
+    tuning: bool = True
 
 
 def _reg_string(value: str) -> str:
@@ -260,6 +268,108 @@ def agent_service_patch(control_set: int) -> list[str]:
     ]
 
 
+HIGH_PERFORMANCE = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
+BALANCED = "381b4222-f694-41f0-9685-ff5bb260df2e"
+# (subgroup, setting) of the power plan, all set to 0 on AC and DC, as
+# `powercfg /setacvalueindex` stores them.
+POWER_SETTINGS = (
+    ("238c9fa8-0aad-41ed-83f4-97be242c8f20", "29f6c1db-86da-48c5-9fdb-f2b67b1f44da"),  # sleep after: never
+    ("238c9fa8-0aad-41ed-83f4-97be242c8f20", "9d7815a6-7ee4-497e-8888-515a05f02364"),  # hibernate after: never
+    ("238c9fa8-0aad-41ed-83f4-97be242c8f20", "94ac6d29-73ce-41a6-809f-6363ba21b47e"),  # hybrid sleep: off
+    ("7516b95f-f776-4464-8c53-06167f40cc99", "3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e"),  # display off after: never
+    ("0012ee47-9041-4b5d-9b77-535fba8b1442", "6738e2c4-e8a5-4a42-b16a-e040e769756e"),  # disk off after: never
+    ("501a4d13-42af-4429-9fd1-a8218c268e20", "ee12f906-d277-404b-b6da-e5fa1a576df5"),  # PCIe ASPM: off
+    ("2a737441-1930-4402-8d77-b2bebba308a3", "48e6b7a6-50f5-4782-a5d4-53bb8f07e226"),  # USB selective suspend: off
+)
+PAGE_FILE_MB = 4096
+# Services that write to the disk all day for nothing: the writeback is
+# discarded at every restart (search index, prefetch training).
+IDLE_WRITERS = ("WSearch", "SysMain")
+NET_CLASS = "{4d36e972-e325-11ce-bfc1-08002be10318}"
+# Network card power saving that drops or slows the link the C: disk runs
+# over (Realtek and Intel keywords); set to "0" where the driver has them.
+# Wake-on-LAN is left alone.
+NIC_POWER_SAVING = ("*EEE", "AdvancedEEE", "EEELinkAdvertisement", "EnableGreenEthernet",
+                    "GigaLite", "PowerSavingMode", "*SelectiveSuspend")
+_NET_ADAPTER_RE = re.compile(r"\\Control\\Class\\" + re.escape(NET_CLASS) + r"\\(\d{4})$", re.I)
+
+
+def _nic_lines(cs: str, export: str) -> list[str]:
+    """Power saving keywords off on every network adapter that has them."""
+    lines: list[str] = []
+    for path, values in _reg_blocks(export):
+        m = _NET_ADAPTER_RE.search(path)
+        if not m:
+            continue
+        names = [n for n in NIC_POWER_SAVING if any(v.partition("=")[0].strip('"') == n for v in values)]
+        if names:
+            lines += ["", f"[{cs}\\Control\\Class\\{NET_CLASS}\\{m.group(1)}]",
+                      *(f'"{n}"="0"' for n in names)]
+    return lines
+
+
+def tuning_patch(control_set: int, net_class_export: str = "") -> list[str]:
+    """
+    SYSTEM hive lines for a diskless PC: High performance with nothing ever
+    going to sleep (the display included; shutting idle PCs down is the cafe
+    software's), no hibernation or Fast Startup, a fixed 4 GB page file that
+    is not wiped at shutdown, small crash dumps, no search index or SysMain,
+    and the network cards' power saving off.
+    """
+    cs = f"\\ControlSet{control_set:03d}"
+    schemes = f"{cs}\\Control\\Power\\User\\PowerSchemes"
+    lines = ["", f"[{schemes}]", f'"ActivePowerScheme"="{HIGH_PERFORMANCE}"']
+    for scheme in (HIGH_PERFORMANCE, BALANCED):
+        lines += ["", f"[{schemes}\\{scheme}]"]
+        # hivexregedit creates a key only under an existing one: parents first.
+        for subgroup in dict.fromkeys(s for s, _ in POWER_SETTINGS):
+            lines += ["", f"[{schemes}\\{scheme}\\{subgroup}]"]
+            for setting in (t for s, t in POWER_SETTINGS if s == subgroup):
+                lines += ["", f"[{schemes}\\{scheme}\\{subgroup}\\{setting}]",
+                          '"ACSettingIndex"=dword:00000000', '"DCSettingIndex"=dword:00000000']
+    page_files = f"c:\\pagefile.sys {PAGE_FILE_MB} {PAGE_FILE_MB}\0\0".encode("utf-16-le")
+    lines += [
+        "", f"[{cs}\\Control\\Power]",
+        '"HibernateEnabled"=dword:00000000',
+        '"HibernateEnabledDefault"=dword:00000000',
+        "", f"[{cs}\\Control\\Session Manager\\Power]",
+        '"HiberbootEnabled"=dword:00000000',
+        "", f"[{cs}\\Control\\Session Manager\\Memory Management]",
+        f'"PagingFiles"={_hex("hex(7)", page_files)}',
+        '"ClearPageFileAtShutdown"=dword:00000000',
+        "", f"[{cs}\\Control\\CrashControl]",
+        '"CrashDumpEnabled"=dword:00000003',          # small memory dump
+    ]
+    for service in IDLE_WRITERS:
+        lines += ["", f"[{cs}\\Services\\{service}]", '"Start"=dword:00000004']
+    return lines + _nic_lines(cs, net_class_export)
+
+
+def software_patch() -> str:
+    """
+    SOFTWARE hive .reg for a diskless PC: no automatic Windows Update (the
+    image is updated on a PC with Keep writeback, then applied; drivers from
+    Windows Update could replace the boot network card's), no automatic Store
+    app updates, and no automatic maintenance (defragmentation and the like).
+    """
+    # A fresh Windows has no WindowsUpdate or WindowsStore policy keys yet:
+    # each key's parent comes first (hivexregedit creates only one level).
+    return "\n".join([
+        "Windows Registry Editor Version 5.00",
+        "", "[\\Policies\\Microsoft]",
+        "", "[\\Policies\\Microsoft\\Windows]",
+        "", "[\\Policies\\Microsoft\\Windows\\WindowsUpdate]",
+        '"ExcludeWUDriversInQualityUpdate"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU]",
+        '"NoAutoUpdate"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\WindowsStore]",
+        '"AutoDownload"=dword:00000002',
+        "", "[\\Microsoft\\Windows NT\\CurrentVersion\\Schedule]",
+        "", "[\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\Maintenance]",
+        '"MaintenanceDisabled"=dword:00000001',
+    ]) + "\n"
+
+
 def _cleanup_lines(cs: str, dhcp_interfaces: Sequence[str], forget_letters: Sequence[str]) -> list[str]:
     """Fixed addresses to DHCP, and every letter but C: forgotten."""
     lines: list[str] = []
@@ -279,13 +389,15 @@ def _cleanup_lines(cs: str, dhcp_interfaces: Sequence[str], forget_letters: Sequ
 
 
 def image_patch(control_set: int, dhcp_interfaces: Sequence[str] = (), forget_letters: Sequence[str] = (),
-                agent_service: bool = False) -> str:
+                agent_service: bool = False, tuning: bool = False, net_class_export: str = "") -> str:
     """The .reg text prepare_image() merges into an image's SYSTEM hive."""
     cs = f"\\ControlSet{control_set:03d}"
     lines = ["Windows Registry Editor Version 5.00"]
     lines += _cleanup_lines(cs, dhcp_interfaces, forget_letters)
     if agent_service:
         lines += agent_service_patch(control_set)
+    if tuning:
+        lines += tuning_patch(control_set, net_class_export)
     return "\n".join(lines) + "\n"
 
 
@@ -460,16 +572,39 @@ class WindowsSetup:
             reg.unlink(missing_ok=True)
         return None if ok else f"editing the registry failed: {err.strip()}"
 
+    def net_class(self, hive: Path, control_set: int) -> str:
+        """The network adapters' class key as .reg text; empty when unreadable."""
+        key = f"\\ControlSet{control_set:03d}\\Control\\Class\\{NET_CLASS}"
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
+        return out if ok else ""
+
     def _prepare(self, root: Path, hive: Path, prep: ImagePrep) -> str | None:
         agent_ok, agent_problem = self._install_agent(root, prep.agent) if prep.agent else (False, None)
         control_set = self.control_set(hive)
         fixed = self.static_interfaces(hive, control_set)
         letters = self.reserved_letters(hive)
-        problem = self._merge_reg(hive, "prepare", image_patch(control_set, fixed, letters, agent_ok))
+        nics = self.net_class(hive, control_set) if prep.tuning else ""
+        problem = self._merge_reg(hive, "prepare", image_patch(control_set, fixed, letters, agent_ok,
+                                                               prep.tuning, nics))
+        tuning_problem = self._tune_software(root) if prep.tuning and problem is None else None
         if problem is None:
-            logger.info("Image prepared (agent: %s, DHCP: %s, letters forgotten: %s)",
-                        "yes" if agent_ok else "no", ", ".join(fixed) or "-", ", ".join(letters) or "-")
-        return "; ".join(p for p in (problem, agent_problem) if p) or None
+            logger.info("Image prepared (agent: %s, diskless tuning: %s, DHCP: %s, letters forgotten: %s)",
+                        "yes" if agent_ok else "no", "yes" if prep.tuning and not tuning_problem else "no",
+                        ", ".join(fixed) or "-", ", ".join(letters) or "-")
+        return "; ".join(p for p in (problem, agent_problem, tuning_problem) if p) or None
+
+    def _tune_software(self, root: Path) -> str | None:
+        """The SOFTWARE hive's part of the tuning, and the hibernation file gone."""
+        hiberfil = _find(root, ("hiberfil.sys",))
+        if hiberfil is not None and hiberfil.is_file():
+            try:
+                hiberfil.unlink()
+            except OSError as e:
+                logger.warning("Could not delete %s: %s", hiberfil, e)
+        software = _find(root, SOFTWARE_HIVE)
+        if software is None:
+            return "no SOFTWARE hive in the image"
+        return self._merge_reg(software, "prepare-software", software_patch())
 
     def _merge(self, hive: Path, setup: OsSetup) -> str | None:
         control_set = self.control_set(hive)

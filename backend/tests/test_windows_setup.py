@@ -411,7 +411,8 @@ def _merged(runner) -> dict:
     merged = {}
 
     def merge(cmd):
-        merged["reg"] = Path(cmd[3]).read_text(encoding="utf-8")
+        key = "reg" if Path(cmd[2]).name.upper() == "SYSTEM" else "software"
+        merged[key] = Path(cmd[3]).read_text(encoding="utf-8")
         return True, "", ""
     runner.responses[("hivexregedit", "--merge")] = merge
     return merged
@@ -419,7 +420,9 @@ def _merged(runner) -> dict:
 
 def _image(windows) -> Path:
     """An image's Windows as prepare_image mounts it."""
-    return _windows_on(windows, "prepare-win11").parents[3]
+    root = _windows_on(windows, "prepare-win11").parents[3]
+    (root / "Windows" / "System32" / "config" / "SOFTWARE").write_bytes(b"regf")
+    return root
 
 
 def test_image_patch_registers_the_agent_service():
@@ -469,7 +472,7 @@ def test_prepare_image_puts_the_agent_in_and_cleans_up(windows, runner, tmp_path
     assert seen["settings"]["Agent"]["ServerUrl"] == "http://192.168.0.40:8088"
     assert seen["settings"]["Agent"]["DriveLetter"] == "D"
     from app.windows_setup import image_patch
-    assert merged["reg"] == image_patch(2, [FIXED], ["D", "E", "F"], agent_service=True)
+    assert merged["reg"] == image_patch(2, [FIXED], ["D", "E", "F"], agent_service=True, tuning=True)
     assert "ComputerName" not in merged["reg"]            # no PC's identity in the image
 
 
@@ -507,7 +510,7 @@ def test_an_image_without_program_files_gets_no_agent_service(windows, runner, t
     merged = _merged(runner)
     assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") == "no Program Files folder in the image"
     assert "ggnet-agent" not in merged["reg"]
-    assert "HiberbootEnabled" not in merged["reg"]
+    assert "HiberbootEnabled" in merged["reg"]                    # the tuning still goes in
 
 
 def test_a_pcs_writeback_gets_only_its_identity(windows, runner):
@@ -515,3 +518,106 @@ def test_a_pcs_writeback_gets_only_its_identity(windows, runner):
     merged = _merged(runner)
     assert windows.personalize(DEVICE, SETUP) is None
     assert "ggnet-agent" not in merged["reg"] and "HiberbootEnabled" not in merged["reg"]
+
+
+# ── Diskless tuning (prepare_image) ──────────────────────────────────
+
+NET_CLASS_EXPORT = (
+    "Windows Registry Editor Version 5.00\r\n\r\n"
+    "[\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}]\r\n"
+    '"Class"="Net"\r\n\r\n'
+    "[\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001]\r\n"
+    '"DriverDesc"="Realtek PCIe GbE Family Controller"\r\n'
+    '"*EEE"="1"\r\n"EnableGreenEthernet"="1"\r\n"*WakeOnMagicPacket"="1"\r\n\r\n'
+    "[\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001\\Ndi]\r\n"
+    '"*EEE"="1"\r\n\r\n'
+    "[\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0002]\r\n"
+    '"DriverDesc"="WAN Miniport (IP)"\r\n'
+)
+
+
+def test_tuning_keeps_the_pc_awake_and_writing_little():
+    from app.windows_setup import BALANCED, HIGH_PERFORMANCE, image_patch, tuning_patch
+
+    patch = image_patch(2, tuning=True)
+    schemes = "[\\ControlSet002\\Control\\Power\\User\\PowerSchemes"
+    assert f'{schemes}]\n"ActivePowerScheme"="{HIGH_PERFORMANCE}"' in patch
+    for scheme in (HIGH_PERFORMANCE, BALANCED):
+        # the display never turns off; PCIe link power management off
+        assert (f"{schemes}\\{scheme}\\7516b95f-f776-4464-8c53-06167f40cc99\\3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e]\n"
+                '"ACSettingIndex"=dword:00000000\n"DCSettingIndex"=dword:00000000') in patch
+        assert f"{schemes}\\{scheme}\\501a4d13-42af-4429-9fd1-a8218c268e20\\ee12f906-d277-404b-b6da-e5fa1a576df5]" in patch
+    assert '"HibernateEnabled"=dword:00000000' in patch and '"HiberbootEnabled"=dword:00000000' in patch
+    page_files = "c:\\pagefile.sys 4096 4096\0\0".encode("utf-16-le")
+    assert '"PagingFiles"=hex(7):' + ",".join(f"{b:02x}" for b in page_files) in patch
+    assert '"ClearPageFileAtShutdown"=dword:00000000' in patch
+    assert '[\\ControlSet002\\Control\\CrashControl]\n"CrashDumpEnabled"=dword:00000003' in patch
+    assert '[\\ControlSet002\\Services\\WSearch]\n"Start"=dword:00000004' in patch
+    assert '[\\ControlSet002\\Services\\SysMain]\n"Start"=dword:00000004' in patch
+    assert tuning_patch(1)[1] == "[\\ControlSet001\\Control\\Power\\User\\PowerSchemes]"
+    # hivexregedit creates one level at a time: every key's parent is named before it.
+    keys = [line[1:-1] for line in patch.splitlines() if line.startswith("[\\ControlSet002\\Control\\Power\\User")]
+    for key in keys[1:]:
+        assert key.rsplit("\\", 1)[0] in keys[: keys.index(key)], key
+
+
+def test_tuning_turns_off_the_network_cards_power_saving_but_not_wake_on_lan():
+    from app.windows_setup import image_patch
+
+    patch = image_patch(2, tuning=True, net_class_export=NET_CLASS_EXPORT)
+    key = "[\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+    assert f'{key}\\0001]\n"*EEE"="0"\n"EnableGreenEthernet"="0"\n' in patch
+    assert "WakeOnMagicPacket" not in patch
+    assert f"{key}\\0002]" not in patch                  # nothing to turn off there
+    assert "\\Ndi]" not in patch                         # the driver's own definitions stay
+
+
+def test_software_patch_stops_automatic_updates_and_maintenance():
+    from app.windows_setup import software_patch
+
+    patch = software_patch()
+    assert patch.startswith("Windows Registry Editor Version 5.00\n")
+    assert '[\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU]\n"NoAutoUpdate"=dword:00000001' in patch
+    assert '"ExcludeWUDriversInQualityUpdate"=dword:00000001' in patch
+    assert '[\\Policies\\Microsoft\\WindowsStore]\n"AutoDownload"=dword:00000002' in patch
+    assert '"MaintenanceDisabled"=dword:00000001' in patch
+
+
+def test_prepare_image_tunes_both_hives_and_drops_the_hibernation_file(windows, runner, tmp_path):
+    from app.windows_setup import image_patch, software_patch
+
+    root = _image(windows)
+    (root / "program files").mkdir()
+    (root / "HIBERFIL.SYS").write_bytes(b"hibr")
+    select = runner.responses[("hivexregedit", "--export")]
+    runner.responses[("hivexregedit", "--export")] = lambda cmd: (
+        (True, NET_CLASS_EXPORT, "") if cmd[-1].endswith("bfc1-08002be10318}") else select)
+    merged = _merged(runner)
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
+    assert merged["reg"] == image_patch(2, agent_service=True, tuning=True, net_class_export=NET_CLASS_EXPORT)
+    assert merged["software"] == software_patch()
+    assert not (root / "HIBERFIL.SYS").exists()
+    config = root / "Windows" / "System32" / "config"
+    merges = [c[2] for c in runner.calls if c[:2] == ["hivexregedit", "--merge"]]
+    assert merges == [str(config / "SYSTEM"), str(config / "SOFTWARE")]
+
+
+def test_prepare_image_without_tuning_leaves_windows_as_it_is(windows, runner, tmp_path):
+    from app.windows_setup import ImagePrep
+
+    root = _image(windows)
+    (root / "Program Files").mkdir()
+    (root / "hiberfil.sys").write_bytes(b"hibr")
+    merged = _merged(runner)
+    prep = ImagePrep(agent=_agent(tmp_path), tuning=False)
+    assert windows.prepare_image(DEVICE, prep, label="win11") is None
+    assert "PowerSchemes" not in merged["reg"] and "software" not in merged
+    assert (root / "hiberfil.sys").exists()
+
+
+def test_an_image_without_a_software_hive_is_reported(windows, runner, tmp_path):
+    root = _windows_on(windows, "prepare-win11").parents[3]
+    (root / "Program Files").mkdir()
+    merged = _merged(runner)
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") == "no SOFTWARE hive in the image"
+    assert "PowerSchemes" in merged["reg"]               # the SYSTEM part is in

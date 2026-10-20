@@ -69,7 +69,10 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     const msg =
       `Prepare "${disk.name}" for all PCs?\n\n` +
       "A new version is made from the newest one, with the server's agent (Settings → Client app) and " +
-      "its service, Fast Startup off, fixed IP addresses switched to DHCP and old drive letters forgotten. " +
+      "its service, Fast Startup off, fixed IP addresses switched to DHCP and old drive letters forgotten.\n\n" +
+      "Windows is also set up for diskless PCs: High performance, no sleep or hibernation (the display " +
+      "stays on), PCIe, USB and network card power saving off, a fixed 4 GB page file, and no automatic " +
+      "Windows Update, Store updates, maintenance (defragmentation), search index or SysMain.\n\n" +
       "PCs move to it at their next reboot. Apply Writebacks of an OS image does this already.";
     if (!window.confirm(msg)) return;
     await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id));
