@@ -100,6 +100,28 @@ describe("MachinesPage", () => {
     expect(screen.queryByRole("button", { name: "Apply writebacks" })).not.toBeInTheDocument();
   });
 
+  it("says whether the writeback is clean, in use, pending reset or kept", () => {
+    const pc = (id: number, overrides: Partial<Machine>) =>
+      machine({ id, name: `pc0${id}`, game_disk_id: 1, status: "provisioned", ...overrides });
+    render(
+      <MachinesPage
+        disks={DISKS}
+        machines={[
+          pc(1, {}),
+          pc(2, { writeback_dirty: true, session_active: true }),
+          pc(3, { writeback_dirty: true, session_active: false }),
+          pc(4, { writeback_dirty: true, keep_writeback: true }),
+        ]}
+        reload={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Clean")).toBeInTheDocument();
+    expect(screen.getByText("In use")).toBeInTheDocument();
+    expect(screen.getByText("Pending reset")).toBeInTheDocument();
+    expect(screen.getByText("Kept")).toBeInTheDocument();
+    expect(screen.queryByText("Changed")).not.toBeInTheDocument();
+  });
+
   it("turns keep writeback on without asking", async () => {
     const fetchMock = stubFetch(200, machine());
     const confirm = vi.spyOn(window, "confirm");

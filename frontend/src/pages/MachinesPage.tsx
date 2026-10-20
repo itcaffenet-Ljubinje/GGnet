@@ -484,9 +484,16 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                           </label>
                           {m.keep_writeback ? (
                             <span className="badge badge-warn">Kept</span>
+                          ) : m.writeback_dirty && m.session_active ? (
+                            <span className="badge badge-blue" title="The PC is on and writing to its disks">
+                              In use
+                            </span>
                           ) : m.writeback_dirty ? (
-                            <span className="badge" title="The PC wrote to its disks since the last reset">
-                              Changed
+                            <span
+                              className="badge"
+                              title="The PC is off; what it wrote is discarded before its next start"
+                            >
+                              Pending reset
                             </span>
                           ) : (
                             <span className="badge badge-provisioned">
