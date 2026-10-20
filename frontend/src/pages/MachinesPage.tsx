@@ -960,7 +960,8 @@ function SecureBootIcon({ machine: m }: { machine: Machine }) {
       </span>
     );
   }
-  if (on === undefined || on === null) return null;
+  // Reported at each start: only a running PC's state is known.
+  if (on === undefined || on === null || !isOnline(m)) return null;
   return on ? (
     <span className="secure-boot-on" title="Secure Boot on" aria-label="Secure Boot on">
       <Lock size={12} />

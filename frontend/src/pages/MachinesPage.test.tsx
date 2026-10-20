@@ -459,14 +459,16 @@ describe("MachinesPage", () => {
 
   it("shows whether a PC booted with Secure Boot", () => {
     const hw = { nic: null, cpu: null, gpus: [], motherboard: null, memory_bytes: null };
+    const up = { last_seen_at: new Date().toISOString() };
     render(
       <MachinesPage
         disks={DISKS}
         machines={[
-          machine({ id: 1, name: "pc01", hardware: { ...hw, secure_boot: true } }),
-          machine({ id: 2, name: "pc02", hardware: { ...hw, secure_boot: false } }),
-          machine({ id: 3, name: "pc03" }),
+          machine({ id: 1, name: "pc01", ...up, hardware: { ...hw, secure_boot: true } }),
+          machine({ id: 2, name: "pc02", ...up, hardware: { ...hw, secure_boot: false } }),
+          machine({ id: 3, name: "pc03", ...up }),
           machine({ id: 4, name: "pc04", mok_state: "requested", hardware: { ...hw, secure_boot: false } }),
+          machine({ id: 5, name: "pc05", ...up, agent_stopped: true, hardware: { ...hw, secure_boot: true } }),
         ]}
         reload={vi.fn()}
       />,
@@ -476,6 +478,8 @@ describe("MachinesPage", () => {
     expect(within(row("pc01")).getByLabelText("Secure Boot on")).toBeInTheDocument();
     expect(within(row("pc02")).getByLabelText("Secure Boot off")).toBeInTheDocument();
     expect(within(row("pc03")).queryByLabelText(/Secure Boot/)).toBeNull();
+    // Off: its last start says nothing about the next one.
+    expect(within(row("pc05")).queryByLabelText(/Secure Boot/)).toBeNull();
   });
 
   describe("bulk", () => {
