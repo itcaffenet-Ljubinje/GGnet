@@ -48,6 +48,7 @@ export function machine(overrides: Partial<Machine> = {}): Machine {
     writeback_dirty: false,
     writeback_bytes: null,
     writeback_large: false,
+    ipxe_at: null,
     session_active: null,
     session_changed_at: null,
     booted_at: null,

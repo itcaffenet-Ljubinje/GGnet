@@ -44,6 +44,16 @@ class QuietAccessLog(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(QuietAccessLog())
 
+# ggNet's own messages (writebacks discarded, disks mapped, images prepared,
+# maintenance) go to the journal next to uvicorn's; without a handler Python
+# would drop everything below WARNING.
+_ggnet_log = logging.getLogger("ggnet")
+if not _ggnet_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    _ggnet_log.addHandler(_handler)
+    _ggnet_log.setLevel(logging.INFO)
+
 
 def read_version() -> str:
     try:
@@ -63,7 +73,7 @@ async def lifespan(_app: FastAPI):
     from app.db.session import get_sessionmaker
     from app.services.maintenance import MaintenanceJob
     from app.services.retention import JobSettings, RetentionJob
-    from app.services.writebacks import WritebackSettings, WritebackSizer, WritebackWatcher
+    from app.services.writebacks import SpareMaker, WritebackSettings, WritebackSizer, WritebackWatcher
 
     cfg = get_config()
     settings = WritebackSettings.from_config(cfg)
@@ -71,6 +81,8 @@ async def lifespan(_app: FastAPI):
                MaintenanceJob(get_sessionmaker(), get_server_monitor())]
     if settings.auto_discard:
         workers.append(WritebackWatcher(get_sessionmaker(), get_provisioner(), settings))
+        if settings.spares:
+            workers.append(SpareMaker(get_sessionmaker(), get_provisioner()))
     job = JobSettings.from_config(cfg)
     if job.job:
         workers.append(RetentionJob(get_sessionmaker(), get_provisioner(), job.interval))

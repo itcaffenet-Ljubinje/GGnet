@@ -45,6 +45,8 @@ class FakeHost:
             return self._zfs(cmd[1:])
         if cmd[0] == "targetcli":
             return self._targetcli(cmd[1:])
+        if cmd[0] == "udevadm":
+            return self._ok()
         if cmd[0] == "cat":
             if "/statistics/" in cmd[1]:
                 return self._cat_stats(cmd[1:])

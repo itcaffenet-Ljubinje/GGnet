@@ -43,7 +43,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Per PC: Wake-on-LAN, Shutdown, Reboot | done |
 | Per PC: Keep Writeback, Discard Writeback, Pin version | done |
 | Per PC: Apply Writebacks with a choice: OS only / game only / both (Boot Mode) | done |
-| Writeback state: Clean / In use / Pending reset / Kept, with the size the PC has written (measured every minute); orange over the large-writeback warning of Settings → Retention (not for Keep, no automatic action) | done |
+| Writeback state: Clean / In use / Starting (Boot Mode, iPXE handed over to Windows) / Pending reset / Kept, with the size the PC has written (measured every minute); orange over the large-writeback warning of Settings → Retention (not for Keep, no automatic action) | done |
 | Bulk dock at the bottom: quick select (all / online / offline), power, assign disk, pin, drive letter, stop keeping writebacks | done |
 | Bulk delete | todo (backend) |
 | Zones (e.g. Main Arena, VIP) for filtering and bulk actions | todo |

@@ -5,13 +5,26 @@ values and returns a result, or raises ProvisioningError with the reason.
 
 All operations go through one lock: one backend process, ~17 machines, and
 parallel zfs/targetcli calls on the same zvol would collide.
+
+Spare writebacks: a Boot Mode PC that restarts waits at iPXE while its
+writebacks are reset. So a spare of each, `<clone>_spare`, is made ahead in
+the background (make_spares: cloned from the version the PC should run and,
+for the OS, already set up as that PC), and a reset only swaps it in
+(destroy the old clone, rename the spare) instead of cloning and setting up
+Windows. A spare is used only while its origin and, for the OS, its setup
+tag (SETUP_PROP) still match; otherwise the reset clones as before. Spares
+are made under the machine's own lock only, so making one never holds up
+another PC's reset.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 import threading
+import time
 from dataclasses import dataclass
 
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
@@ -47,6 +60,17 @@ class WritebackApply:
 
 _VERSION_RE = re.compile(r"^v(\d+)$")
 
+SPARE_SUFFIX = "_spare"            # '_' never appears in a machine name
+SETUP_PROP = "ggnet:setup"         # on an OS spare: which setup it was made with
+
+
+def setup_tag(setup: OsSetup | None) -> str:
+    """A short fingerprint of what personalize() writes, to tell a stale OS spare."""
+    if setup is None:
+        return "none"
+    data = json.dumps([setup.computer_name, sorted(setup.env.items()), setup.boot_nic])
+    return hashlib.sha256(data.encode()).hexdigest()[:16]
+
 
 def next_version(snapshots: list[str]) -> str:
     """Name of the next image version: `base` counts as v1, so base → v2 → v3 ..."""
@@ -75,6 +99,13 @@ class Provisioner:
         # Boot Mode: writes the PC's identity into its fresh OS writeback.
         self.windows = windows
         self.lock = threading.Lock()
+        # Per machine: a reset and the making of its spares never overlap.
+        self._machine_locks: dict[str, threading.Lock] = {}
+        self._machine_locks_guard = threading.Lock()
+
+    def _machine_lock(self, name: str) -> threading.Lock:
+        with self._machine_locks_guard:
+            return self._machine_locks.setdefault(name, threading.Lock())
 
     # ── Helpers ───────────────────────────────────────────────────────
 
@@ -114,17 +145,86 @@ class Provisioner:
             logger.warning("Windows setup of %s is incomplete: %s", os_setup.computer_name, problem)
         return problem
 
-    def _detach(self, machine_name: str, initiator_iqn: str) -> None:
+    def _detach(self, machine_name: str, initiator_iqn: str, save: bool = True, legacy: bool = True) -> None:
         """
         Remove the machine's ACL and backstores and verify the backstores are
         really gone: LIO keeps a zvol open while its backstore exists, so
         destroying the clone would fail with "dataset is busy" (or, worse, the
         client would keep a session to a disk that is being replaced).
+        `save=False` when the disks are mapped again right after (attach saves);
+        `legacy=False` when the machine is known to be on the shared target.
         """
-        self.iscsi.detach(machine_name, initiator_iqn)
-        for slot in SLOTS:
-            if self.iscsi.backstore_exists(machine_name, slot) is not False:
-                raise self._fail("The iSCSI disk was not removed", self.iscsi.runner)
+        self.iscsi.detach(machine_name, initiator_iqn, save=save, legacy=legacy)
+        names = self.iscsi.backstores()
+        if names is None or any(self.iscsi.backstore_name(machine_name, slot) in names for slot in SLOTS):
+            raise self._fail("The iSCSI disk was not removed", self.iscsi.runner)
+
+    # ── Spare writebacks ──────────────────────────────────────────────
+
+    @staticmethod
+    def spare_path(clone: str) -> str:
+        return clone + SPARE_SUFFIX
+
+    def _spare_ok(self, spare: str, snapshot: str, tag: str | None = None) -> bool:
+        """Whether `spare` exists, comes from `snapshot` and (OS) was set up with `tag`."""
+        if not self.zfs.dataset_exists(spare) or self.zfs.get_property(spare, "origin") != snapshot:
+            return False
+        return tag is None or self.zfs.get_property(spare, SETUP_PROP) == tag
+
+    def _swap_in_spare(self, clone: str) -> bool:
+        """Replace the clone with its spare (destroy, rename); False leaves no spare behind."""
+        spare = self.spare_path(clone)
+        if self.zfs.dataset_exists(clone) and not self.zfs.destroy(clone, recursive=True):
+            return False
+        if self.zfs.rename_dataset(spare, clone):
+            return True
+        self.zfs.destroy(spare, recursive=True)
+        return False
+
+    def make_spares(
+        self, machine_name: str, clone_zvol: str, snapshot_path: str,
+        os_clone_zvol: str | None = None, os_snapshot_path: str | None = None,
+        os_setup: OsSetup | None = None,
+    ) -> list[str]:
+        """
+        Make (or renew) the spares of a machine's writebacks; a current one is
+        kept. Runs in the background, under the machine's lock only. Returns
+        the spares made. A spare that cannot be set up completely is removed:
+        a reset then clones as before.
+        """
+        wanted = [(clone_zvol, snapshot_path, None)]
+        if os_clone_zvol is not None and os_snapshot_path is not None:
+            wanted.append((os_clone_zvol, os_snapshot_path, os_setup))
+        made = []
+        with self._machine_lock(machine_name):
+            for clone, snap, setup in wanted:
+                spare = self.spare_path(clone)
+                tag = setup_tag(setup) if clone == os_clone_zvol else None
+                if self._spare_ok(spare, snap, tag):
+                    continue
+                if self.zfs.dataset_exists(spare) and not self.zfs.destroy(spare, recursive=True):
+                    logger.warning("Could not remove the stale spare %s", spare)
+                    continue
+                if not self.zfs.clone(snap, spare):
+                    logger.warning("Could not make the spare %s", spare)
+                    continue
+                if tag is not None:
+                    problem = self._set_up_os(spare, setup)
+                    if problem or not self.zfs.set_property(spare, SETUP_PROP, tag):
+                        self.zfs.destroy(spare, recursive=True)
+                        continue
+                made.append(spare)
+        if made:
+            logger.info("Spare writebacks ready for %s", machine_name)
+        return made
+
+    def drop_spares(self, machine_name: str, *clones: str | None) -> None:
+        """Remove a machine's spares (it keeps its writebacks, or is gone)."""
+        with self._machine_lock(machine_name):
+            for clone in filter(None, clones):
+                spare = self.spare_path(clone)
+                if self.zfs.dataset_exists(spare) and not self.zfs.destroy(spare, recursive=True):
+                    logger.warning("Could not remove the spare %s", spare)
 
     # ── Game disk (master) ────────────────────────────────────────────
 
@@ -157,11 +257,20 @@ class Provisioner:
         details = self.zfs.snapshot_details(zvol_path)
         if details is None:
             raise self._fail(f"Listing versions of {zvol_path} failed")
+        for d in details:            # a spare is not a PC using the version
+            d["clones"] = [c for c in d["clones"] if not c.endswith(SPARE_SUFFIX)]
         return details
 
+    def _drop_spares_from(self, snapshot: str) -> None:
+        """Remove the spares made from a version about to be deleted (the maker renews them)."""
+        for c in self.zfs.list_clients():
+            if c["zvol"].endswith(SPARE_SUFFIX) and c["cloned_from"] == snapshot:
+                if not self.zfs.destroy(c["zvol"], recursive=True):
+                    logger.warning("Could not remove the spare %s", c["zvol"])
+
     def writebacks(self) -> list[dict]:
-        """Every client clone on the host with its size and origin."""
-        return self.zfs.list_clients()
+        """Every client clone on the host with its size and origin (spares not included)."""
+        return [c for c in self.zfs.list_clients() if not c["zvol"].endswith(SPARE_SUFFIX)]
 
     def set_comment(self, zvol_path: str, name: str, comment: str) -> None:
         """Set (or with "" remove) the comment of one version."""
@@ -173,6 +282,7 @@ class Provisioner:
     def delete_snapshot(self, zvol_path: str, name: str) -> None:
         with self.lock:
             self._clear()
+            self._drop_spares_from(f"{zvol_path}@{name}")
             if not self.zfs.destroy_snapshot(f"{zvol_path}@{name}"):
                 raise self._fail(f"Deleting {zvol_path}@{name} failed")
 
@@ -197,6 +307,7 @@ class Provisioner:
                 raise ProvisioningError(f"{zvol_path}@{name} does not exist")
             older = snaps[: snaps.index(name)]
             for old in older:
+                self._drop_spares_from(f"{zvol_path}@{old}")
                 if not self.zfs.destroy_snapshot(f"{zvol_path}@{old}"):
                     raise self._fail(f"Deleting {zvol_path}@{old} failed")
             if name != "base" and not self.zfs.rename_snapshot(zvol_path, name, "base"):
@@ -310,6 +421,7 @@ class Provisioner:
         self, machine_name: str, initiator_iqn: str, clone_zvol: str, snapshot_path: str,
         os_clone_zvol: str | None = None, os_snapshot_path: str | None = None,
         os_setup: OsSetup | None = None, keep: frozenset[str] = frozenset(),
+        target_iqn: str | None = None,
     ) -> ClientDisk:
         """
         Order: detach (ACL + backstores) → destroy clones → clone → attach.
@@ -319,22 +431,51 @@ class Provisioner:
         `os_setup` is written into the fresh OS clone before it is mapped.
         `keep` names writebacks ("game", "os") that are only mapped again,
         not re-cloned; their snapshot argument is then the one they came from.
-        The client must be powered off or disconnected.
+        The client must be powered off or disconnected. `target_iqn` is the
+        machine's recorded target: only one of the old per-client design
+        (or an unknown one) is looked for and removed.
+
+        This runs while a restarting PC waits at iPXE, so it sends as few
+        targetcli commands as it can: each one loads the whole LIO
+        configuration.
         """
         if (os_clone_zvol is None) != (os_snapshot_path is None):
             raise ProvisioningError("An OS writeback needs both its zvol and its snapshot")
-        with self.lock:
+        legacy = target_iqn != self.iscsi.target_iqn()
+        with self._machine_lock(machine_name), self.lock:
+            t0 = time.monotonic()
             self._clear()
-            self._detach(machine_name, initiator_iqn)
-            if "game" not in keep and not self.zfs.reset_clone(clone_zvol, snapshot_path):
-                raise self._fail(f"Resetting clone {clone_zvol} failed")
+            self._detach(machine_name, initiator_iqn, save=False, legacy=legacy)
+            t_detach = time.monotonic()
+            swapped = False
+            if "game" not in keep:
+                if self._spare_ok(self.spare_path(clone_zvol), snapshot_path) and self._swap_in_spare(clone_zvol):
+                    swapped = True
+                elif not self.zfs.reset_clone(clone_zvol, snapshot_path):
+                    raise self._fail(f"Resetting clone {clone_zvol} failed")
             reset_os = os_clone_zvol is not None and "os" not in keep
-            if reset_os and not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
-                raise self._fail(f"Resetting clone {os_clone_zvol} failed")
-            problem = self._set_up_os(os_clone_zvol, os_setup) if reset_os else None
-            iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol))
+            problem = None
+            if reset_os:
+                spare = self.spare_path(os_clone_zvol)
+                if self._spare_ok(spare, os_snapshot_path, setup_tag(os_setup)) \
+                        and self._swap_in_spare(os_clone_zvol):
+                    swapped = True                      # already set up as this PC
+                else:
+                    if not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
+                        raise self._fail(f"Resetting clone {os_clone_zvol} failed")
+                    problem = self._set_up_os(os_clone_zvol, os_setup)
+            if swapped:
+                # A renamed zvol gets its /dev/zvol link from udev a moment later.
+                self.zfs.runner.run(["udevadm", "settle", "--timeout=10"], quiet=True)
+            t_disks = time.monotonic()
+            iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol),
+                                    fresh=True)
             if iqn is None:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
+            t_end = time.monotonic()
+            logger.info("Reset of %s in %.1f s (unmap %.1f, writebacks %.1f%s, map %.1f)",
+                        machine_name, t_end - t0, t_detach - t0, t_disks - t_detach,
+                        " from spares" if swapped else "", t_end - t_disks)
         return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path, problem)
 
     def rename(
@@ -351,6 +492,7 @@ class Provisioner:
         new_clone = self.client_path(new_name)
         new_os = self.os_client_path(new_name) if os_clone_zvol is not None else None
         pairs = [(clone_zvol, new_clone)] + ([(os_clone_zvol, new_os)] if os_clone_zvol else [])
+        self.drop_spares(old_name, clone_zvol, os_clone_zvol)    # made for the old name
         with self.lock:
             self._clear()
             for _, new in pairs:
@@ -417,12 +559,15 @@ class Provisioner:
         clones = [clone_zvol or self.client_path(machine_name)]
         if os_clone_zvol is not None:
             clones.append(os_clone_zvol)
-        with self.lock:
+        with self._machine_lock(machine_name), self.lock:
             self._clear()
             self._detach(machine_name, initiator_iqn)
             for clone in clones:
                 if self.zfs.dataset_exists(clone) and not self.zfs.destroy(clone, recursive=True):
                     raise self._fail(f"Deleting clone {clone} failed")
+                spare = self.spare_path(clone)
+                if self.zfs.dataset_exists(spare) and not self.zfs.destroy(spare, recursive=True):
+                    logger.warning("Could not remove the spare %s", spare)
 
     # ── Writeback lifecycle ───────────────────────────────────────────
 

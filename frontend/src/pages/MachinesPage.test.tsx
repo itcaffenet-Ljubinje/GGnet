@@ -122,6 +122,27 @@ describe("MachinesPage", () => {
     expect(screen.queryByText("Changed")).not.toBeInTheDocument();
   });
 
+  it("says Starting while a boot mode PC goes from iPXE to Windows", () => {
+    const now = Date.now();
+    const iso = (ms: number) => new Date(now - ms).toISOString();
+    const pc = (id: number, overrides: Partial<Machine>) =>
+      machine({ id, name: `pc0${id}`, mode: "boot", game_disk_id: 1, status: "provisioned",
+                writeback_dirty: true, session_active: false, ...overrides });
+    render(
+      <MachinesPage
+        disks={DISKS}
+        machines={[
+          pc(1, { ipxe_at: iso(30_000), session_changed_at: iso(10_000) }),       // iPXE handed over
+          pc(2, { ipxe_at: iso(30 * 60_000), session_changed_at: iso(60_000) }),  // long ago: it went off
+        ]}
+        reload={vi.fn()}
+      />,
+    );
+    const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(within(row("pc01")).getByText("Starting")).toBeInTheDocument();
+    expect(within(row("pc02")).getByText("Pending reset")).toBeInTheDocument();
+  });
+
   it("shows how much a PC wrote and flags a large writeback", () => {
     const pc = (id: number, overrides: Partial<Machine>) =>
       machine({ id, name: `pc0${id}`, game_disk_id: 1, status: "provisioned", ...overrides });

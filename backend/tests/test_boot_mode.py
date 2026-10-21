@@ -679,3 +679,30 @@ def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
     assert "no Program Files folder" in r.text
     assert client.get(f"/api/v1/game-disks/{os_disk['id']}").json()["snapshot"] == "base"
     assert ["zfs", "destroy", "tank/ggnet/writebacks/win11_ggnet_prep"] in [c[:3] for c in host.calls]
+
+
+# ── Spare writebacks ──────────────────────────────────────────────────
+
+def test_a_restarting_pc_boots_on_its_spares(client, host, prov, disks, windows, auto, db_url):
+    from app.services.writebacks import refresh_spares
+
+    m = _boot_machine(client, disks)
+    engine = make_engine(db_url)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    with Session() as db:
+        refresh_spares(db, prov)
+    assert {f"{GAME_CLONE}_spare", f"{OS_CLONE}_spare"} <= set(host.datasets)
+    # The PC restarts: iPXE asks while its writebacks are dirty.
+    _mark_dirty(db_url)
+    windows.done.clear()
+    host.calls.clear()
+    _ipxe(client)
+    assert _clones_made(host) == []                       # swapped in, nothing cloned
+    assert windows.done == []                             # nor set up again
+    assert host.datasets[OS_CLONE]["origin"].endswith("@base")
+    # Keep writeback: no spares.
+    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": True})
+    with Session() as db:
+        refresh_spares(db, prov)
+    assert not [d for d in host.datasets if d.endswith("_spare")]
+    engine.dispose()

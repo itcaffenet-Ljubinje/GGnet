@@ -293,6 +293,7 @@ export interface Machine {
   writeback_dirty: boolean;
   writeback_bytes: number | null;
   writeback_large: boolean;
+  ipxe_at: string | null;
   session_active: boolean | null;
   session_changed_at: string | null;
   booted_at: string | null;
