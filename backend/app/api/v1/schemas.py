@@ -307,6 +307,8 @@ class MachineOut(BaseModel):
     agent_stopped: bool
     keep_writeback: bool
     writeback_dirty: bool
+    writeback_bytes: int | None
+    writeback_large: bool
     session_active: bool | None
     session_changed_at: datetime | None
     booted_at: datetime | None
@@ -432,6 +434,8 @@ class RetentionIn(BaseModel):
     unused_snapshot_days: int = Field(14, ge=1, le=3650)
     keep_newest_snapshots: int = Field(3, ge=1, le=100)
     inactive_writeback_hours: int = Field(24, ge=1, le=24 * 365)
+    # A PC's writeback (not kept) larger than this is flagged on Machines; 0 = never.
+    writeback_warning_gb: int = Field(20, ge=0, le=10_000)
 
 
 class RetentionActionOut(BaseModel):

@@ -146,6 +146,7 @@ def _set_provisioned(m: Machine, cd: ClientDisk) -> None:
     m.os_clone_snapshot = cd.os_clone_snapshot
     m.iscsi_target_iqn = cd.iscsi_target_iqn
     m.writeback_dirty = False
+    m.writeback_bytes, m.writeback_large = 0, False
 
 
 def _keep_sync(db: Session, prov: Provisioner, m: Machine) -> None:

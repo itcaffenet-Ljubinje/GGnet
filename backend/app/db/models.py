@@ -9,6 +9,7 @@ import json
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     Enum,
@@ -191,6 +192,11 @@ class Machine(Base):
     # The client wrote (was connected) since the clone was made; a clean
     # clone is never discarded again.
     writeback_dirty: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Bytes the PC has written into its writebacks (OS and game disk), as
+    # ZFS last measured them (app.services.writebacks.measure); None = not yet.
+    writeback_bytes: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    # Over the size warning of Settings → Retention (never for a kept writeback).
+    writeback_large: Mapped[bool] = mapped_column(Boolean, default=False)
     # Last iSCSI session state seen in LIO (None = never read) and since when.
     session_active: Mapped[bool | None] = mapped_column(Boolean, default=None)
     session_changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)

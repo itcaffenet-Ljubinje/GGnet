@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
+  AlertTriangle,
   CheckCircle2,
   HardDrive,
   KeyRound,
@@ -483,17 +484,26 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                             Keep
                           </label>
                           {m.keep_writeback ? (
-                            <span className="badge badge-warn">Kept</span>
+                            <span className="badge badge-warn">Kept{writebackSize(m)}</span>
+                          ) : m.writeback_large ? (
+                            <span
+                              className="badge badge-warn"
+                              title="This PC has written more than the warning size (Settings → Retention). Nothing is done to it; it is discarded as usual when the PC restarts."
+                            >
+                              <AlertTriangle size={12} />
+                              {m.session_active ? "In use" : "Pending reset"}
+                              {writebackSize(m)}
+                            </span>
                           ) : m.writeback_dirty && m.session_active ? (
                             <span className="badge badge-blue" title="The PC is on and writing to its disks">
-                              In use
+                              In use{writebackSize(m)}
                             </span>
                           ) : m.writeback_dirty ? (
                             <span
                               className="badge"
                               title="The PC is off; what it wrote is discarded before its next start"
                             >
-                              Pending reset
+                              Pending reset{writebackSize(m)}
                             </span>
                           ) : (
                             <span className="badge badge-provisioned">
@@ -947,6 +957,11 @@ const APPLY: Record<ApplyKey, ApplyChoice> = {
 };
 
 /** ggNet2's lock: whether Windows booted with Secure Boot on (anti-cheats need it), as the agent reports. */
+/** " · 6.2 GB": what the PC has written into its writebacks, once measured. */
+function writebackSize(m: Machine): string {
+  return m.writeback_bytes ? ` · ${formatBytes(m.writeback_bytes)}` : "";
+}
+
 function SecureBootIcon({ machine: m }: { machine: Machine }) {
   const on = m.hardware?.secure_boot;
   if (m.mok_state === "requested" && !on) {

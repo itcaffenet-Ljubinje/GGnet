@@ -60,6 +60,13 @@ const NUMBERS: { key: keyof RetentionSettings; label: string; min: number; max: 
     max: 8760,
     hint: "A PC with Keep Writeback that has been off this long loses its writeback.",
   },
+  {
+    key: "writeback_warning_gb",
+    label: "Large writeback warning (GB)",
+    min: 0,
+    max: 10000,
+    hint: "A PC that has written more than this is shown in orange on Machines; nothing is done to it. 0 turns it off.",
+  },
 ];
 
 function settingsOf(r: Retention): RetentionSettings {

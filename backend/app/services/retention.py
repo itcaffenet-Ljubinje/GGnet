@@ -49,6 +49,7 @@ class RetentionSettings:
     unused_snapshot_days: int = 14
     keep_newest_snapshots: int = 3
     inactive_writeback_hours: int = 24
+    writeback_warning_gb: int = 20          # 0 = no warning
 
 
 @dataclass

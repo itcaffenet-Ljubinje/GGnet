@@ -122,6 +122,26 @@ describe("MachinesPage", () => {
     expect(screen.queryByText("Changed")).not.toBeInTheDocument();
   });
 
+  it("shows how much a PC wrote and flags a large writeback", () => {
+    const pc = (id: number, overrides: Partial<Machine>) =>
+      machine({ id, name: `pc0${id}`, game_disk_id: 1, status: "provisioned", ...overrides });
+    render(
+      <MachinesPage
+        disks={DISKS}
+        machines={[
+          pc(1, { writeback_dirty: true, session_active: true, writeback_bytes: 6.5 * 2 ** 30 }),
+          pc(2, { writeback_dirty: true, session_active: true, writeback_bytes: 25 * 2 ** 30, writeback_large: true }),
+        ]}
+        reload={vi.fn()}
+      />,
+    );
+    const row = (name: string) => screen.getByText(name).closest("tr")!;
+    expect(within(row("pc01")).getByText("In use · 6.50 GB")).toHaveClass("badge-blue");
+    const large = within(row("pc02")).getByText(/In use · 25\.0 GB/);
+    expect(large).toHaveClass("badge-warn");
+    expect(large).toHaveAttribute("title", expect.stringContaining("Nothing is done to it"));
+  });
+
   it("turns keep writeback on without asking", async () => {
     const fetchMock = stubFetch(200, machine());
     const confirm = vi.spyOn(window, "confirm");

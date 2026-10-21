@@ -65,6 +65,7 @@ export interface RetentionSettings {
   unused_snapshot_days: number;
   keep_newest_snapshots: number;
   inactive_writeback_hours: number;
+  writeback_warning_gb: number;
 }
 
 export interface RetentionAction {
@@ -212,6 +213,8 @@ export interface Machine {
   agent_stopped: boolean;
   keep_writeback: boolean;
   writeback_dirty: boolean;
+  writeback_bytes: number | null;
+  writeback_large: boolean;
   session_active: boolean | null;
   session_changed_at: string | null;
   booted_at: string | null;

@@ -679,3 +679,53 @@ def test_the_comment_stays_when_the_version_is_merged_into_base(client, host, di
     r = client.post(f"/api/v1/game-disks/{disk['id']}/snapshots/v2/merge-into-base")
     assert r.status_code == 200, r.text
     assert _by_name(client, disk)["base"]["comment"] == "v2 notes"
+
+
+# ── Writeback sizes ───────────────────────────────────────────────────
+
+def test_writeback_sizes_and_the_warning(client, prov, disk, make_session, monkeypatch, caplog):
+    pc01, pc02 = _machine(client, disk), _machine(client, disk, "pc02")
+    client.put(f"/api/v1/machines/{pc02['id']}/keep-writeback", json={"enabled": True})
+    clones = [
+        {"zvol": "tank/ggnet/writebacks/pc01", "used": 25 * writebacks.GB, "cloned_from": f"{MASTER}@base"},
+        {"zvol": "tank/ggnet/writebacks/pc02", "used": 40 * writebacks.GB, "cloned_from": f"{MASTER}@base"},
+    ]
+    monkeypatch.setattr(prov, "writebacks", lambda: clones)
+    assert _get(client, pc01)["writeback_bytes"] == 0          # fresh clone
+
+    with make_session() as db:
+        writebacks.measure(db, prov, 20 * writebacks.GB)
+    a, b = _get(client, pc01), _get(client, pc02)
+    assert (a["writeback_bytes"], a["writeback_large"]) == (25 * writebacks.GB, True)
+    assert (b["writeback_bytes"], b["writeback_large"]) == (40 * writebacks.GB, False)   # kept: meant to grow
+    assert [r.message for r in caplog.records if "has written" in r.message] == [
+        "pc01 has written 25.0 GB into its writeback (warning at 20 GB)"]
+    caplog.clear()
+    with make_session() as db:                                  # logged once, not every minute
+        writebacks.measure(db, prov, 20 * writebacks.GB)
+    assert not [r for r in caplog.records if "has written" in r.message]
+
+    with make_session() as db:                                  # 0: no warning
+        writebacks.measure(db, prov, 0)
+    assert _get(client, pc01)["writeback_large"] is False
+
+    monkeypatch.setattr(prov, "writebacks", lambda: [])        # ZFS unreadable: last values stay
+    with make_session() as db:
+        writebacks.measure(db, prov, 20 * writebacks.GB)
+    assert _get(client, pc01)["writeback_bytes"] == 25 * writebacks.GB
+
+
+def test_a_discard_resets_the_size(client, host, prov, disk, make_session, monkeypatch):
+    m = _machine(client, disk)
+    monkeypatch.setattr(prov, "writebacks", lambda: [
+        {"zvol": "tank/ggnet/writebacks/pc01", "used": 30 * writebacks.GB, "cloned_from": f"{MASTER}@base"}])
+    with make_session() as db:
+        writebacks.measure(db, prov, 20 * writebacks.GB)
+    assert _get(client, m)["writeback_large"] is True
+    host.sessions.add(_iqn("pc01"))
+    _tick(make_session, prov, T0)
+    host.sessions.discard(_iqn("pc01"))
+    _tick(make_session, prov, T0 + timedelta(seconds=5))
+    _tick(make_session, prov, T0 + timedelta(seconds=40))
+    after = _get(client, m)
+    assert (after["writeback_bytes"], after["writeback_large"]) == (0, False)
