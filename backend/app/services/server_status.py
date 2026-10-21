@@ -1,17 +1,19 @@
 """
 The Server page: the ZFS pool (health, space, scrub, TRIM, each disk's
 errors), the ZFS RAM cache (ARC), the host's memory and each pool disk's
-SMART health. Everything is read-only except starting or stopping a scrub.
+SMART health. Everything is read-only except starting or stopping a scrub or a TRIM.
 
 Sources (OpenZFS 2.3+ JSON output, smartctl 7.3+ JSON output):
   zpool status -t -j --json-int <pool>   state, scan, vdev tree, TRIM per disk
+  zpool scrub [-s] / zpool trim [-s]     start or stop a scrub or a TRIM
   zpool list -j --json-int <pool>        size, allocated, free, fragmentation
   /proc/spl/kstat/zfs/arcstats           ARC size, target max/min, hits, misses
   /proc/meminfo                          total and available RAM
   smartctl -j -H -A -i <disk>            passed, temperature, wear, power-on hours
 
-SMART is read at most every SMART_TTL per disk: asking eight SSDs on every
-page refresh is pointless (the values change slowly) and not free.
+SMART is read only when the admin asks (read_smart); the page shows the last
+reading with its time. Its values change slowly, and asking every disk on
+every page refresh is not free.
 """
 
 from __future__ import annotations
@@ -28,7 +30,6 @@ from app.runner import CommandRunner
 
 logger = logging.getLogger("ggnet.server")
 
-SMART_TTL = 300.0
 _PART_RE = re.compile(r"-part\d+$")
 
 
@@ -61,6 +62,8 @@ def parse_pool(status_json: str, list_json: str, pool: str) -> dict[str, Any] | 
                 "write_errors": int(d.get("write_errors") or 0),
                 "checksum_errors": int(d.get("checksum_errors") or 0),
                 "trim_state": d.get("trim_state"),
+                "trim_percent": round(100 * d["trimmed"] / d["to_trim"], 1)
+                if d.get("trim_state") == "ACTIVE" and d.get("to_trim") else None,
                 "trim_time": d.get("trim_time") or None,
                 "trim_notsup": bool(d.get("trim_notsup")),
             })
@@ -148,12 +151,13 @@ def disk_device(path: str | None) -> str | None:
 
 class ServerMonitor:
     def __init__(self, pool: str, runner: Optional[CommandRunner] = None, proc: Path = Path("/proc"),
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.time):
         self.pool_name = pool
         self.runner = runner or CommandRunner(timeout=30)
         self.proc = proc
         self.clock = clock
-        self._smart: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._smart: dict[str, dict[str, Any]] = {}
+        self.smart_read_at: float | None = None
         self._lock = threading.Lock()
 
     def pool(self) -> dict[str, Any] | None:
@@ -178,26 +182,34 @@ class ServerMonitor:
         return parse_meminfo(text) if text else None
 
     def smart(self, device: str) -> dict[str, Any]:
-        """A disk's SMART summary, read again only after SMART_TTL."""
-        now = self.clock()
+        """A disk's last SMART reading; empty until read_smart() ran."""
         with self._lock:
-            cached = self._smart.get(device)
-            if cached and now - cached[0] < SMART_TTL:
-                return cached[1]
-        # smartctl's exit status is a bit mask (bit 3 and up: the disk reports
-        # problems), so its JSON is read whatever it returns.
-        _, out, _ = self.runner.run(["smartctl", "-j", "-H", "-A", "-i", device], quiet=True)
-        info = parse_smart(out)
-        with self._lock:
-            self._smart[device] = (now, info)
-        return info
+            return self._smart.get(device, {})
 
-    def scrub(self, start: bool) -> bool:
-        cmd = ["zpool", "scrub", self.pool_name] if start else ["zpool", "scrub", "-s", self.pool_name]
+    def read_smart(self, devices: list[str]) -> None:
+        """Ask every disk for its SMART data now."""
+        readings = {}
+        for device in devices:
+            # smartctl's exit status is a bit mask (bit 3 and up: the disk
+            # reports problems), so its JSON is read whatever it returns.
+            _, out, _ = self.runner.run(["smartctl", "-j", "-H", "-A", "-i", device], quiet=True)
+            readings[device] = parse_smart(out)
+        with self._lock:
+            self._smart = readings
+            self.smart_read_at = self.clock()
+
+    def _zpool(self, verb: str, start: bool) -> bool:
+        cmd = ["zpool", verb, self.pool_name] if start else ["zpool", verb, "-s", self.pool_name]
         ok, _, _ = self.runner.run(cmd)
         if ok:
-            logger.info("Scrub of %s %s", self.pool_name, "started" if start else "stopped")
+            logger.info("%s of %s %s", verb.capitalize(), self.pool_name, "started" if start else "stopped")
         return ok
+
+    def scrub(self, start: bool) -> bool:
+        return self._zpool("scrub", start)
+
+    def trim(self, start: bool) -> bool:
+        return self._zpool("trim", start)
 
     @property
     def last_error(self) -> str:

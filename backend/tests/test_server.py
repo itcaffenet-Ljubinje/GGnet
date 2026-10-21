@@ -38,7 +38,7 @@ STATUS = json.dumps({"output_version": {"command": "zpool status"}, "pools": {PO
         "mirror-0": {"name": "mirror-0", "vdev_type": "mirror", "state": "ONLINE", "vdevs": {
             "a1": _disk("a1"), "a2": _disk("a2")}},
         "mirror-1": {"name": "mirror-1", "vdev_type": "mirror", "state": "DEGRADED", "vdevs": {
-            "b1": _disk("b1", checksum_errors=3),
+            "b1": _disk("b1", checksum_errors=3, trim_state="ACTIVE", trimmed=300, to_trim=1200),
             "b2": _disk("b2", state="FAULTED", trim_time=0, trim_state="UNTRIMMED")}},
     }}},
 }}})
@@ -72,7 +72,8 @@ def test_parse_pool_reads_the_tree_scan_and_space():
     assert [(g["name"], g["state"], g["disks"]) for g in p["groups"]] == [
         ("mirror-0", "ONLINE", ["a1", "a2"]), ("mirror-1", "DEGRADED", ["b1", "b2"])]
     b1, b2 = p["disks"][2:]
-    assert (b1["group"], b1["checksum_errors"]) == ("mirror-1", 3)
+    assert (b1["group"], b1["checksum_errors"], b1["trim_percent"]) == ("mirror-1", 3, 25.0)
+    assert p["disks"][0]["trim_percent"] is None                     # COMPLETE
     assert (b2["state"], b2["trim_time"]) == ("FAULTED", None)
 
 
@@ -107,24 +108,20 @@ def monitor(tmp_path) -> tuple[ServerMonitor, FakeRunner]:
     (tmp_path / "spl" / "kstat" / "zfs").mkdir(parents=True)
     (tmp_path / "spl" / "kstat" / "zfs" / "arcstats").write_text(ARCSTATS)
     (tmp_path / "meminfo").write_text(MEMINFO)
-    clock = iter(range(0, 10_000, 100))
-    return ServerMonitor(POOL, runner, proc=tmp_path, clock=lambda: next(clock)), runner
+    return ServerMonitor(POOL, runner, proc=tmp_path, clock=lambda: 1792000000.0), runner
 
 
-def test_smart_is_read_again_only_after_a_while(monitor):
-    mon, runner = monitor
-    for _ in range(3):                                  # t = 0, 100, 200 s
-        mon.smart("/dev/disk/by-id/scsi-a1")
-    assert sum(c[0] == "smartctl" for c in runner.calls) == 1
-    mon.smart("/dev/disk/by-id/scsi-a1")                # t = 300 s: stale
-    assert sum(c[0] == "smartctl" for c in runner.calls) == 2
-
-
-def test_server_api(client, monitor, prov, monkeypatch):
+@pytest.fixture
+def server(client, monitor, prov, monkeypatch):
     mon, runner = monitor
     app.dependency_overrides[get_server_monitor] = lambda: mon
     monkeypatch.setattr(prov, "writebacks", lambda: [{"zvol": "w/pc01", "used": 3 << 30},
                                                       {"zvol": "w/pc01-os", "used": 1 << 30}])
+    return client, runner
+
+
+def test_server_api(server):
+    client, runner = server
     r = client.get("/api/v1/server")
     assert r.status_code == 200, r.text
     s = r.json()
@@ -135,24 +132,45 @@ def test_server_api(client, monitor, prov, monkeypatch):
     pool = s["pool"]
     assert (pool["state"], pool["scan"]["percent"]) == ("DEGRADED", 25.0)
     assert pool["last_trim"] is None                     # one disk was never trimmed
-    a1 = pool["disks"][0]
-    assert (a1["smart_passed"], a1["temperature"], a1["wear_percent"]) == (True, 32, 35)
-    assert ["smartctl", "-j", "-H", "-A", "-i", "/dev/disk/by-id/scsi-a1"] in runner.calls
+    assert pool["disks"][2]["trim_percent"] == 25.0
 
-    r = client.post("/api/v1/server/scrub", json={"action": "stop"})
-    assert r.status_code == 200
-    assert ["zpool", "scrub", "-s", POOL] in runner.calls
+
+def test_smart_is_read_only_when_asked(server):
+    client, runner = server
+    s = client.get("/api/v1/server").json()
+    assert not [c for c in runner.calls if c[0] == "smartctl"]      # the page alone never asks the disks
+    assert s["smart_read_at"] is None and s["pool"]["disks"][0]["smart_passed"] is None
+
+    r = client.post("/api/v1/server/smart")
+    assert r.status_code == 200, r.text
+    assert [c[-1] for c in runner.calls if c[0] == "smartctl"] == [
+        f"/dev/disk/by-id/scsi-{n}" for n in ("a1", "a2", "b1", "b2")]   # whole disks, not -part1
+    a1 = r.json()["pool"]["disks"][0]
+    assert (a1["smart_passed"], a1["temperature"], a1["wear_percent"]) == (True, 32, 35)
+    assert r.json()["smart_read_at"].startswith("2026-10-14T17:46:40")
+
+    runner.calls.clear()
+    s = client.get("/api/v1/server").json()              # the last reading stays, no new one
+    assert s["pool"]["disks"][0]["temperature"] == 32
+    assert not [c for c in runner.calls if c[0] == "smartctl"]
+
+
+def test_scrub_and_trim(server):
+    client, runner = server
+    assert client.post("/api/v1/server/scrub", json={"action": "stop"}).status_code == 200
+    assert client.post("/api/v1/server/trim", json={"action": "start"}).status_code == 200
+    assert client.post("/api/v1/server/trim", json={"action": "stop"}).status_code == 200
+    assert [c for c in runner.calls if c[1] in ("scrub", "trim")] == [
+        ["zpool", "scrub", "-s", POOL], ["zpool", "trim", POOL], ["zpool", "trim", "-s", POOL]]
     runner.responses[("zpool", "scrub")] = (False, "", "no active scrub")
     r = client.post("/api/v1/server/scrub", json={"action": "start"})
     assert r.status_code == 502
-    assert "no active scrub" in r.text
+    assert client.post("/api/v1/server/trim", json={"action": "pause"}).status_code == 422
 
 
-def test_unreadable_pool_still_shows_the_rest(client, monitor, prov, monkeypatch):
-    mon, runner = monitor
+def test_unreadable_pool_still_shows_the_rest(server):
+    client, runner = server
     runner.responses[("zpool", "status")] = (False, "", "no such pool")
-    app.dependency_overrides[get_server_monitor] = lambda: mon
-    monkeypatch.setattr(prov, "writebacks", lambda: [])
     s = client.get("/api/v1/server").json()
     assert s["pool"] is None and s["arc"]["hit_percent"] == 95.0
 

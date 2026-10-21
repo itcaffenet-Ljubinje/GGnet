@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Cpu, Database, HardDrive, MemoryStick, Play, Square } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Cpu, Database, HardDrive, MemoryStick, Play, RefreshCw, Square } from "lucide-react";
 
 import { api, type Pool, type PoolDisk, type ServerStatus, type User } from "../api";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -53,6 +53,21 @@ export function ServerPage({ user }: { user?: User | null }) {
     await run(`scrub-${action}`, async () => setStatus(await api.scrub(action)));
   }
 
+  async function trim(action: "start" | "stop") {
+    const msg =
+      action === "start"
+        ? "Start a TRIM of the pool?\n\nZFS tells each SSD which blocks are free, so it can erase them ahead " +
+          "and new writes stay fast. Nothing on the pool changes. It takes minutes to an hour and the disks are " +
+          "a little busier meanwhile: best when the cafe is closed."
+        : "Stop the running TRIM? It can be started again later.";
+    if (!window.confirm(msg)) return;
+    await run(`trim-${action}`, async () => setStatus(await api.trim(action)));
+  }
+
+  async function readSmart() {
+    await run("smart", async () => setStatus(await api.readSmart()));
+  }
+
   const pool = status?.pool ?? null;
   return (
     <section aria-label="Server">
@@ -63,8 +78,10 @@ export function ServerPage({ user }: { user?: User | null }) {
           <p className="error-text">The ZFS pool could not be read.</p>
         </div>
       )}
-      {pool && <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} />}
-      {pool && <DisksCard pool={pool} />}
+      {pool && <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />}
+      {pool && status && (
+        <DisksCard pool={pool} readAt={status.smart_read_at} admin={admin} busy={busy} onRead={readSmart} />
+      )}
       {status?.arc && <CacheCard status={status} />}
     </section>
   );
@@ -129,16 +146,22 @@ function PoolCard({
   admin,
   busy,
   onScrub,
+  onTrim,
 }: {
   pool: Pool;
   admin: boolean;
   busy: string | null;
   onScrub: (action: "start" | "stop") => void;
+  onTrim: (action: "start" | "stop") => void;
 }) {
   const scan = pool.scan;
   const scanning = scan?.state === "scanning";
   const scrubAge = scan?.function === "scrub" ? daysSince(scan.end_time) : null;
   const trimAge = daysSince(pool.last_trim);
+  const trimming = pool.disks.filter((d) => d.trim_state === "ACTIVE");
+  const trimPercent = trimming.length
+    ? Math.round(trimming.reduce((sum, d) => sum + (d.trim_percent ?? 0), 0) / trimming.length)
+    : null;
   const used = pool.capacity ?? 0;
   return (
     <div className="card" aria-label="Pool">
@@ -192,29 +215,70 @@ function PoolCard({
         )}
       </div>
 
-      <div>
-        <div className="strong">TRIM</div>
-        <div className={trimAge === null || trimAge > STALE_DAYS ? "small warn-text" : "small"}>
-          {pool.last_trim ? `Last: ${when(pool.last_trim)} (${trimAge} days ago)` : "Never trimmed"}
-          {(trimAge === null || trimAge > STALE_DAYS) && (
-            <>
-              {" "}
-              <AlertTriangle size={12} /> Tells the SSDs which blocks are free, so they stay fast. Proxmox's monthly
-              TRIM skips pools that are not all NVMe.
-            </>
+      <div className="form-row">
+        <div>
+          <div className="strong">TRIM</div>
+          {trimming.length ? (
+            <div className="small">Running: {trimPercent}%</div>
+          ) : (
+            <div className={trimAge === null || trimAge > STALE_DAYS ? "small warn-text" : "small"}>
+              {pool.last_trim ? `Last: ${when(pool.last_trim)} (${trimAge} days ago)` : "Never trimmed"}
+              {(trimAge === null || trimAge > STALE_DAYS) && (
+                <>
+                  {" "}
+                  <AlertTriangle size={12} /> Proxmox's monthly TRIM skips pools that are not all NVMe: start it here.
+                </>
+              )}
+            </div>
           )}
+          <div className="muted small">Tells the SSDs which blocks are free, so writes stay fast.</div>
         </div>
+        {admin && (
+          <div className="actions-cell">
+            {trimming.length ? (
+              <button type="button" className="secondary small" onClick={() => onTrim("stop")} disabled={busy !== null}>
+                <Square size={13} /> Stop TRIM
+              </button>
+            ) : (
+              <button type="button" className="secondary small" onClick={() => onTrim("start")} disabled={busy !== null}>
+                <Play size={13} /> Start TRIM
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function DisksCard({ pool }: { pool: Pool }) {
+function DisksCard({
+  pool,
+  readAt,
+  admin,
+  busy,
+  onRead,
+}: {
+  pool: Pool;
+  readAt: string | null;
+  admin: boolean;
+  busy: string | null;
+  onRead: () => void;
+}) {
   return (
     <div className="card" aria-label="Disks">
       <h3 className="card-title section-title">
         <HardDrive size={15} /> Disks
       </h3>
+      <div className="form-row">
+        <span className="muted small">
+          {readAt ? `SMART read ${when(readAt)}` : "SMART not read yet: temperature, wear and health show after reading."}
+        </span>
+        {admin && (
+          <button type="button" className="secondary small" onClick={onRead} disabled={busy !== null}>
+            <RefreshCw size={13} /> {busy === "smart" ? "Reading…" : "Read SMART"}
+          </button>
+        )}
+      </div>
       <div className="table-wrapper">
         <table>
           <thead>

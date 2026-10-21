@@ -154,6 +154,7 @@ export interface PoolDisk {
   write_errors: number;
   checksum_errors: number;
   trim_state: string | null;
+  trim_percent: number | null;
   trim_time: string | null;
   trim_supported: boolean;
   smart_passed: boolean | null;
@@ -186,6 +187,7 @@ export interface ServerStatus {
   memory: { total_bytes: number; available_bytes: number } | null;
   writebacks_bytes: number;
   writebacks_count: number;
+  smart_read_at: string | null;
 }
 
 /** Hardware the agent reports (ggRock's Hardware tab). */
@@ -430,6 +432,8 @@ export const api = {
   getStorage: () => request<Storage>("GET", "/v1/storage"),
   getServer: () => request<ServerStatus>("GET", "/v1/server"),
   scrub: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/scrub", { action }),
+  trim: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/trim", { action }),
+  readSmart: () => request<ServerStatus>("POST", "/v1/server/smart"),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),
   getBootSettings: () => request<BootSettingsOut>("GET", "/v1/settings/boot"),
   saveBootSettings: (body: BootSettings) => request<BootSettingsOut>("PUT", "/v1/settings/boot", body),

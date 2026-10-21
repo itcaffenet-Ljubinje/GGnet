@@ -20,6 +20,7 @@ function disk(name: string, overrides: Partial<PoolDisk> = {}): PoolDisk {
     write_errors: 0,
     checksum_errors: 0,
     trim_state: "COMPLETE",
+    trim_percent: null,
     trim_time: old,
     trim_supported: true,
     smart_passed: true,
@@ -53,6 +54,7 @@ function status(overrides: Partial<ServerStatus> = {}): ServerStatus {
     memory: { total_bytes: 188 * GB, available_bytes: 99 * GB },
     writebacks_bytes: 2 * GB,
     writebacks_count: 26,
+    smart_read_at: recent,
     ...overrides,
   };
 }
@@ -79,7 +81,7 @@ describe("ServerPage", () => {
   it("warns about an old TRIM and a disk that needs a look", async () => {
     stub(status());
     render(<ServerPage />);
-    expect(await screen.findByText(/skips pools that are not all NVMe/)).toBeInTheDocument();
+    expect(await screen.findByText(/skips pools that are not all NVMe: start it here/)).toBeInTheDocument();
     expect(screen.getByText("2 disks, 1 need a look")).toBeInTheDocument();
     const row = screen.getByText("SN-a2", { exact: false }).closest("tr")!;
     expect(row).toHaveClass("row-warn");
@@ -98,6 +100,23 @@ describe("ServerPage", () => {
     render(<ServerPage user={STAFF} />);
     expect(await screen.findByText("Pool STORAGE-01")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /scrub/ })).toBeNull();
+  });
+
+  it("reads SMART only on request, and starts or stops a TRIM", async () => {
+    const s = status({ smart_read_at: null });
+    s.pool!.disks[0] = disk("a1", { trim_state: "ACTIVE", trim_percent: 40 });
+    s.pool!.disks[1] = disk("a2", { trim_state: "ACTIVE", trim_percent: 60 });
+    const mock = stub(s);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<ServerPage />);
+    expect(await screen.findByText(/SMART not read yet/)).toBeInTheDocument();
+    expect(screen.getByText("Running: 50%")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Read SMART/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Stop TRIM/ }));
+    expect(calls(mock).filter((c) => c.method === "POST")).toEqual([
+      { url: "/api/v1/server/smart", method: "POST", body: undefined },
+      { url: "/api/v1/server/trim", method: "POST", body: { action: "stop" } },
+    ]);
   });
 
   it("says when the pool cannot be read", async () => {

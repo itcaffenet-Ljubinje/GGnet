@@ -744,10 +744,11 @@ class PoolDiskOut(BaseModel):
     read_errors: int
     write_errors: int
     checksum_errors: int
-    trim_state: str | None
+    trim_state: str | None                   # ACTIVE while a TRIM runs
+    trim_percent: float | None               # while a TRIM runs
     trim_time: datetime | None               # last TRIM of this disk
     trim_supported: bool
-    # SMART (None when the disk does not report it)
+    # SMART, as last read (None: not read yet, or the disk does not report it)
     smart_passed: bool | None
     model: str | None
     serial: str | None
@@ -790,7 +791,10 @@ class ServerOut(BaseModel):
     memory: MemoryOut | None
     writebacks_bytes: int                    # every PC's writebacks together
     writebacks_count: int
+    smart_read_at: datetime | None           # when SMART was last read (on request only)
 
 
-class ScrubIn(BaseModel):
+class PoolActionIn(BaseModel):
+    """Start or stop a scrub or a TRIM."""
+
     action: Literal["start", "stop"]

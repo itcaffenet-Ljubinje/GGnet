@@ -1,7 +1,7 @@
 """
 API for the Server page: the ZFS pool, its disks, the RAM cache and the
 writebacks' total (app.services.server_status). Read-only, except starting
-or stopping a scrub.
+or stopping a scrub or a TRIM, and reading SMART on request.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.api.v1.schemas import (
     PoolGroupOut,
     PoolOut,
     PoolScanOut,
-    ScrubIn,
+    PoolActionIn,
     ServerOut,
 )
 from app.services.provisioning import Provisioner
@@ -28,7 +28,7 @@ from app.services.server_status import ServerMonitor, disk_device
 router = APIRouter(prefix="/server", tags=["server"])
 
 
-def _time(ts: int | None) -> datetime | None:
+def _time(ts: float | None) -> datetime | None:
     return datetime.fromtimestamp(ts, timezone.utc) if ts else None
 
 
@@ -44,7 +44,7 @@ def _pool(mon: ServerMonitor) -> PoolOut | None:
             name=d["name"], group=d["group"], state=d["state"],
             read_errors=d["read_errors"], write_errors=d["write_errors"],
             checksum_errors=d["checksum_errors"],
-            trim_state=d["trim_state"], trim_time=_time(d["trim_time"]),
+            trim_state=d["trim_state"], trim_percent=d["trim_percent"], trim_time=_time(d["trim_time"]),
             trim_supported=not d["trim_notsup"],
             smart_passed=s.get("passed"), model=s.get("model"), serial=s.get("serial"),
             capacity_bytes=s.get("capacity"), temperature=s.get("temperature"),
@@ -81,16 +81,45 @@ def get_server(
         memory=MemoryOut(total_bytes=mem["total"], available_bytes=mem["available"]) if mem else None,
         writebacks_bytes=sum(c["used"] for c in clones),
         writebacks_count=len(clones),
+        smart_read_at=_time(mon.smart_read_at),
     )
+
+
+@router.post("/smart", response_model=ServerOut)
+def read_smart(
+    mon: ServerMonitor = Depends(get_server_monitor),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """Read every pool disk's SMART data now (smartctl); the page shows the last reading."""
+    p = mon.pool()
+    if p is None:
+        host_failed(f"Reading pool {mon.pool_name} failed: {mon.last_error}")
+    mon.read_smart([dev for d in p["disks"] if (dev := disk_device(d["path"]))])
+    return get_server(mon, prov)
+
+
+def _pool_action(mon: ServerMonitor, prov: Provisioner, what: str, start: bool) -> ServerOut:
+    ok = mon.scrub(start) if what == "scrub" else mon.trim(start)
+    if not ok:
+        host_failed(f"{'Starting' if start else 'Stopping'} the {what} failed: {mon.last_error}")
+    return get_server(mon, prov)
 
 
 @router.post("/scrub", response_model=ServerOut)
 def scrub(
-    body: ScrubIn,
+    body: PoolActionIn,
     mon: ServerMonitor = Depends(get_server_monitor),
     prov: Provisioner = Depends(get_provisioner),
 ):
     """Start or stop a scrub of the pool. A scrub reads every block: PCs are slower meanwhile."""
-    if not mon.scrub(body.action == "start"):
-        host_failed(f"{'Starting' if body.action == 'start' else 'Stopping'} the scrub failed: {mon.last_error}")
-    return get_server(mon, prov)
+    return _pool_action(mon, prov, "scrub", body.action == "start")
+
+
+@router.post("/trim", response_model=ServerOut)
+def trim(
+    body: PoolActionIn,
+    mon: ServerMonitor = Depends(get_server_monitor),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """Start or stop a TRIM: ZFS tells each SSD which blocks are free, so writes stay fast."""
+    return _pool_action(mon, prov, "trim", body.action == "start")

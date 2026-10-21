@@ -85,8 +85,8 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Item | Status |
 |---|---|
 | Pool: size, used, free, fragmentation, health, layout, per-disk state and errors | done |
-| Scrub: last result, progress, start / stop (admin); TRIM: last run, warning when older than 35 days | done |
-| Disks: SMART passed, temperature, wear (endurance used), power-on hours (read every 5 min) | done |
+| Scrub and TRIM: last result or progress, start / stop (admin); warning when older than 35 days | done |
+| Disks: SMART passed, temperature, wear (endurance used), power-on hours, read only on "Read SMART" | done |
 | ARC size, target max and hit ratio; server RAM; all writebacks' total | done |
 | Scrub / TRIM schedule set from the UI (today Proxmox's monthly cron; its TRIM skips non-NVMe pools) | todo |
 | ARC maximum set from the UI | todo |
