@@ -716,3 +716,117 @@ class ActivityOut(BaseModel):
     action: str
     status_code: int
     ip_address: str | None
+
+
+# ── Server ────────────────────────────────────────────────────────────
+
+class PoolScanOut(BaseModel):
+    function: str | None                     # scrub | resilver
+    state: str | None                        # scanning | finished | canceled
+    start_time: datetime | None
+    end_time: datetime | None
+    errors: int
+    percent: float | None                    # while scanning
+    paused: bool
+
+
+class PoolGroupOut(BaseModel):
+    name: str                                # mirror-0
+    type: str                                # mirror | raidz1 | disk
+    state: str
+    disks: list[str]
+
+
+class PoolDiskOut(BaseModel):
+    name: str
+    group: str
+    state: str                               # ONLINE | DEGRADED | FAULTED | ...
+    read_errors: int
+    write_errors: int
+    checksum_errors: int
+    trim_state: str | None                   # ACTIVE while a TRIM runs
+    trim_percent: float | None               # while a TRIM runs
+    trim_time: datetime | None               # last TRIM of this disk
+    trim_supported: bool
+    # SMART, as last read (None: not read yet, or the disk does not report it)
+    smart_passed: bool | None
+    model: str | None
+    serial: str | None
+    capacity_bytes: int | None
+    temperature: int | None
+    wear_percent: int | None                 # endurance used
+    power_on_hours: int | None
+
+
+class PoolOut(BaseModel):
+    name: str
+    state: str                               # ONLINE | DEGRADED | ...
+    size_bytes: int | None
+    allocated_bytes: int | None
+    free_bytes: int | None
+    fragmentation: int | None                # percent
+    capacity: int | None                     # percent
+    errors: int                              # data errors
+    scan: PoolScanOut | None
+    last_trim: datetime | None               # oldest last TRIM over the disks
+    groups: list[PoolGroupOut]
+    disks: list[PoolDiskOut]
+
+
+class ArcOut(BaseModel):
+    size_bytes: int
+    max_bytes: int
+    min_bytes: int
+    hit_percent: float | None                # since boot
+
+
+class MemoryOut(BaseModel):
+    total_bytes: int
+    available_bytes: int
+
+
+class ServerOut(BaseModel):
+    pool: PoolOut | None                     # None: zpool could not be read
+    arc: ArcOut | None
+    memory: MemoryOut | None
+    writebacks_bytes: int                    # every PC's writebacks together
+    writebacks_count: int
+    smart_read_at: datetime | None           # when SMART was last read (on request only)
+
+
+class PoolActionIn(BaseModel):
+    """Start or stop a scrub or a TRIM."""
+
+    action: Literal["start", "stop"]
+
+
+class MaintenanceIn(BaseModel):
+    """Weekly TRIM and scrub in a window when the cafe is closed (server local time)."""
+
+    enabled: bool = False
+    weekday: int = Field(6, ge=0, le=6)               # 0 Monday … 6 Sunday
+    start: str = Field("03:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    end: str = Field("07:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")   # before start: next morning
+    trim: bool = True
+    scrub: bool = True
+    order: Literal["trim_first", "scrub_first"] = "trim_first"
+
+
+class MaintenanceStepOut(BaseModel):
+    name: str                                         # trim | scrub
+    status: str                                       # waiting | running | paused | done | stopped | failed
+    started_at: datetime | None
+    finished_at: datetime | None
+    error: str | None
+
+
+class MaintenanceRunOut(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    closed: bool
+    steps: list[MaintenanceStepOut]
+
+
+class MaintenanceOut(MaintenanceIn):
+    next_window: datetime | None                      # when the next one starts, if enabled
+    last_run: MaintenanceRunOut | None

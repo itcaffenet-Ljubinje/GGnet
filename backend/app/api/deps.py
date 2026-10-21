@@ -30,6 +30,14 @@ def get_writeback_settings() -> WritebackSettings:
 
 
 @lru_cache(maxsize=1)
+def get_server_monitor():
+    """The Server page's view of the pool named in config.toml (caches SMART)."""
+    from app.services.server_status import ServerMonitor
+
+    return ServerMonitor(get_config()["storage"]["pool"])
+
+
+@lru_cache(maxsize=1)
 def get_traffic_monitor() -> TrafficMonitor:
     return TrafficMonitor()
 
