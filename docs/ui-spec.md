@@ -23,7 +23,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 
 | Item | Status |
 |---|---|
-| Header: navigation (Machines, Images, Settings, later Server), storage widget (used %, color by threshold) | done |
+| Header: navigation (Machines, Images, Server, Settings), storage widget (used %, color by threshold) | done |
 | Mobile bottom navigation with counts (machines, images) | done |
 | Shared styles from ggNet2 (`styles.css` tokens, cards, badges, modals, drawers) | done |
 
@@ -84,8 +84,13 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 
 | Item | Status |
 |---|---|
-| Pool: size, used, free, health, last scrub, next scheduled scrub | todo |
-| ARC size and hit ratio, IOPS and throughput per zvol, network per interface | todo |
+| Pool: size, used, free, fragmentation, health, layout, per-disk state and errors | done |
+| Scrub: last result, progress, start / stop (admin); TRIM: last run, warning when older than 35 days | done |
+| Disks: SMART passed, temperature, wear (endurance used), power-on hours (read every 5 min) | done |
+| ARC size, target max and hit ratio; server RAM; all writebacks' total | done |
+| Scrub / TRIM schedule set from the UI (today Proxmox's monthly cron; its TRIM skips non-NVMe pools) | todo |
+| ARC maximum set from the UI | todo |
+| IOPS and throughput per zvol, network per interface | todo |
 | iSCSI sessions live (initiator, IP, since when) | todo |
 | Activity log (who did what, when, result; failed sign-ins too) in Settings → Activity | done |
 | Schedule: power PCs on / off at set times | todo |

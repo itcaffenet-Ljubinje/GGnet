@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import require_user
-from app.api.v1 import agent, auth, boot, discovery, game_disks, machines, settings
+from app.api.v1 import agent, auth, boot, discovery, game_disks, machines, server, settings
 from app.config import get_config
 
 VERSION_FILE = Path(__file__).resolve().parents[2] / "VERSION"
@@ -89,6 +89,7 @@ app.include_router(game_disks.router, prefix="/api/v1", dependencies=signed_in)
 app.include_router(machines.router, prefix="/api/v1", dependencies=signed_in)
 app.include_router(settings.router, prefix="/api/v1", dependencies=signed_in)
 app.include_router(discovery.router, prefix="/api/v1", dependencies=signed_in)
+app.include_router(server.router, prefix="/api/v1", dependencies=signed_in)
 app.include_router(auth.users, prefix="/api/v1")
 app.include_router(auth.activity, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")

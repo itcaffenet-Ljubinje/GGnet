@@ -2369,3 +2369,8 @@ a.button-link:hover {
   max-height: 420px;
   overflow-y: auto;
 }
+
+/* Server page: a disk that needs a look */
+tr.row-warn td {
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Clock, Layers, LogOut, Monitor, RefreshCw, Server, Settings as SettingsIcon, UserRound } from "lucide-react";
+import { Clock, Database, Layers, LogOut, Monitor, RefreshCw, Server, Settings as SettingsIcon, UserRound } from "lucide-react";
 
 import {
   api,
@@ -16,9 +16,10 @@ import { isOnline } from "./components/AgentState";
 import { SignIn } from "./components/SignIn";
 import { GameDisksPage } from "./pages/GameDisksPage";
 import { MachinesPage } from "./pages/MachinesPage";
+import { ServerPage } from "./pages/ServerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
-type Tab = "machines" | "disks" | "settings";
+type Tab = "machines" | "disks" | "server" | "settings";
 
 // Machine status changes on the host (reset, errors) are picked up by polling.
 const REFRESH_MS = 10_000;
@@ -116,6 +117,7 @@ function Console({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const tabs: { id: Tab; label: string; icon: typeof Monitor; count?: number }[] = [
     { id: "machines", label: "Machines", icon: Monitor, count: machines.length },
     { id: "disks", label: "Images", icon: Layers, count: disks.length },
+    { id: "server", label: "Server", icon: Database },
     { id: "settings", label: "Settings", icon: SettingsIcon },
   ];
 
@@ -222,6 +224,8 @@ function Console({ user, onSignOut }: { user: User; onSignOut: () => void }) {
           />
         ) : tab === "disks" ? (
           <GameDisksPage disks={disks} machines={machines} reload={reload} />
+        ) : tab === "server" ? (
+          <ServerPage user={user} />
         ) : (
           <SettingsPage storage={storage} reload={reload} user={user} onPasswordChanged={onSignOut} />
         )}

@@ -135,6 +135,59 @@ export interface Storage {
   warning: boolean;
 }
 
+/** Server page: the ZFS pool, its disks (with SMART), the RAM cache. */
+export interface PoolScan {
+  function: string | null;
+  state: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  errors: number;
+  percent: number | null;
+  paused: boolean;
+}
+
+export interface PoolDisk {
+  name: string;
+  group: string;
+  state: string;
+  read_errors: number;
+  write_errors: number;
+  checksum_errors: number;
+  trim_state: string | null;
+  trim_time: string | null;
+  trim_supported: boolean;
+  smart_passed: boolean | null;
+  model: string | null;
+  serial: string | null;
+  capacity_bytes: number | null;
+  temperature: number | null;
+  wear_percent: number | null;
+  power_on_hours: number | null;
+}
+
+export interface Pool {
+  name: string;
+  state: string;
+  size_bytes: number | null;
+  allocated_bytes: number | null;
+  free_bytes: number | null;
+  fragmentation: number | null;
+  capacity: number | null;
+  errors: number;
+  scan: PoolScan | null;
+  last_trim: string | null;
+  groups: { name: string; type: string; state: string; disks: string[] }[];
+  disks: PoolDisk[];
+}
+
+export interface ServerStatus {
+  pool: Pool | null;
+  arc: { size_bytes: number; max_bytes: number; min_bytes: number; hit_percent: number | null } | null;
+  memory: { total_bytes: number; available_bytes: number } | null;
+  writebacks_bytes: number;
+  writebacks_count: number;
+}
+
 /** Hardware the agent reports (ggRock's Hardware tab). */
 export interface MachineHardware {
   nic: string | null;
@@ -375,6 +428,8 @@ export const api = {
 
   getAgentPackage: () => request<AgentPackage>("GET", "/v1/agent/package"),
   getStorage: () => request<Storage>("GET", "/v1/storage"),
+  getServer: () => request<ServerStatus>("GET", "/v1/server"),
+  scrub: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/scrub", { action }),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),
   getBootSettings: () => request<BootSettingsOut>("GET", "/v1/settings/boot"),
   saveBootSettings: (body: BootSettings) => request<BootSettingsOut>("PUT", "/v1/settings/boot", body),

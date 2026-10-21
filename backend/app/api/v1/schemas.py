@@ -716,3 +716,81 @@ class ActivityOut(BaseModel):
     action: str
     status_code: int
     ip_address: str | None
+
+
+# ── Server ────────────────────────────────────────────────────────────
+
+class PoolScanOut(BaseModel):
+    function: str | None                     # scrub | resilver
+    state: str | None                        # scanning | finished | canceled
+    start_time: datetime | None
+    end_time: datetime | None
+    errors: int
+    percent: float | None                    # while scanning
+    paused: bool
+
+
+class PoolGroupOut(BaseModel):
+    name: str                                # mirror-0
+    type: str                                # mirror | raidz1 | disk
+    state: str
+    disks: list[str]
+
+
+class PoolDiskOut(BaseModel):
+    name: str
+    group: str
+    state: str                               # ONLINE | DEGRADED | FAULTED | ...
+    read_errors: int
+    write_errors: int
+    checksum_errors: int
+    trim_state: str | None
+    trim_time: datetime | None               # last TRIM of this disk
+    trim_supported: bool
+    # SMART (None when the disk does not report it)
+    smart_passed: bool | None
+    model: str | None
+    serial: str | None
+    capacity_bytes: int | None
+    temperature: int | None
+    wear_percent: int | None                 # endurance used
+    power_on_hours: int | None
+
+
+class PoolOut(BaseModel):
+    name: str
+    state: str                               # ONLINE | DEGRADED | ...
+    size_bytes: int | None
+    allocated_bytes: int | None
+    free_bytes: int | None
+    fragmentation: int | None                # percent
+    capacity: int | None                     # percent
+    errors: int                              # data errors
+    scan: PoolScanOut | None
+    last_trim: datetime | None               # oldest last TRIM over the disks
+    groups: list[PoolGroupOut]
+    disks: list[PoolDiskOut]
+
+
+class ArcOut(BaseModel):
+    size_bytes: int
+    max_bytes: int
+    min_bytes: int
+    hit_percent: float | None                # since boot
+
+
+class MemoryOut(BaseModel):
+    total_bytes: int
+    available_bytes: int
+
+
+class ServerOut(BaseModel):
+    pool: PoolOut | None                     # None: zpool could not be read
+    arc: ArcOut | None
+    memory: MemoryOut | None
+    writebacks_bytes: int                    # every PC's writebacks together
+    writebacks_count: int
+
+
+class ScrubIn(BaseModel):
+    action: Literal["start", "stop"]
