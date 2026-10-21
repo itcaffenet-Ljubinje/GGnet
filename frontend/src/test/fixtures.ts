@@ -46,6 +46,8 @@ export function machine(overrides: Partial<Machine> = {}): Machine {
     agent_stopped: false,
     keep_writeback: false,
     writeback_dirty: false,
+    writeback_bytes: null,
+    writeback_large: false,
     session_active: null,
     session_changed_at: null,
     booted_at: null,

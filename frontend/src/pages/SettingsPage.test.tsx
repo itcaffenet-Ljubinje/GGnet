@@ -14,6 +14,7 @@ const DEFAULTS: Retention = {
   unused_snapshot_days: 14,
   keep_newest_snapshots: 3,
   inactive_writeback_hours: 24,
+  writeback_warning_gb: 20,
   saved: false,
   last_run: null,
 };
@@ -94,6 +95,7 @@ describe("SettingsPage", () => {
           unused_snapshot_days: 14,
           keep_newest_snapshots: 3,
           inactive_writeback_hours: 24,
+          writeback_warning_gb: 20,
         },
       },
     ]);

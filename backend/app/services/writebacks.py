@@ -44,6 +44,8 @@ logger = logging.getLogger("ggnet.writebacks")
 # Windows boot times from two heartbeats of the same boot differ by
 # rounding; only a jump larger than this is a new boot.
 BOOT_TOLERANCE = timedelta(seconds=120)
+# Sizes in binary units, as ZFS and the UI show them.
+GB = 1 << 30
 
 
 @dataclass(frozen=True)
@@ -103,6 +105,7 @@ def discard(db: Session, prov: Provisioner, m: Machine, reason: str) -> bool:
     m.os_clone_zvol, m.os_clone_snapshot = cd.os_clone_zvol, cd.os_clone_snapshot
     m.iscsi_target_iqn = cd.iscsi_target_iqn
     m.writeback_dirty = False
+    m.writeback_bytes, m.writeback_large = 0, False
     m.last_error = None
     db.commit()
     logger.info("Discarded writeback of %s (%s)", m.name, reason)
@@ -228,6 +231,67 @@ def tick(make_session: Callable[[], Session], prov: Provisioner,
             except Exception:       # one bad machine must not stop the others
                 logger.exception("Writeback watcher failed for %s", m.name)
                 db.rollback()
+
+
+def measure(db: Session, prov: Provisioner, warning_bytes: int) -> None:
+    """
+    Store how much each PC has written into its writebacks (OS and game disk)
+    and flag the ones over `warning_bytes` (0: none). A kept writeback is
+    meant to grow (installs, updates), so it is never flagged. Nothing is
+    done about a large one: a PC is never restarted for it. A new warning is
+    logged once.
+    """
+    used = {c["zvol"]: c["used"] for c in prov.writebacks()}
+    if not used:
+        return      # nothing listed (ZFS unreadable): keep the last values
+    machines = db.scalars(select(Machine).where(Machine.status.in_(
+        [MachineStatus.PROVISIONED, MachineStatus.EDITING]))).all()
+    for m in machines:
+        zvols = [z for z in (m.clone_zvol, m.os_clone_zvol) if z]
+        if not any(z in used for z in zvols):
+            continue
+        size = sum(used.get(z, 0) for z in zvols)
+        large = bool(warning_bytes) and size > warning_bytes and not m.keep_writeback
+        if large and not m.writeback_large:
+            logger.warning("%s has written %.1f GB into its writeback (warning at %.0f GB)",
+                           m.name, size / GB, warning_bytes / GB)
+        if (size, large) != (m.writeback_bytes, m.writeback_large):
+            # Observed state, not an edit of the machine: keep updated_at.
+            db.execute(update(Machine).where(Machine.id == m.id).values(
+                writeback_bytes=size, writeback_large=large, updated_at=Machine.updated_at))
+    db.commit()
+
+
+class WritebackSizer:
+    """Background thread running measure() every `interval`."""
+
+    def __init__(self, make_session: Callable[[], Session], prov: Provisioner,
+                 interval: timedelta = timedelta(seconds=60)):
+        self.make_session = make_session
+        self.prov = prov
+        self.interval = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._loop, name="ggnet-writeback-sizes", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=10)
+
+    def _loop(self) -> None:
+        from app.services import retention     # retention imports this module
+
+        while not self._stop.wait(self.interval.total_seconds()):
+            try:
+                with self.make_session() as db:
+                    s, _ = retention.load_settings(db)
+                    measure(db, self.prov, s.writeback_warning_gb * GB)
+            except Exception:
+                logger.exception("Measuring writebacks failed")
 
 
 class WritebackWatcher:

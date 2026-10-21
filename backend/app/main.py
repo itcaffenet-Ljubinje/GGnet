@@ -62,11 +62,11 @@ async def lifespan(_app: FastAPI):
     from app.api.deps import get_provisioner
     from app.db.session import get_sessionmaker
     from app.services.retention import JobSettings, RetentionJob
-    from app.services.writebacks import WritebackSettings, WritebackWatcher
+    from app.services.writebacks import WritebackSettings, WritebackSizer, WritebackWatcher
 
     cfg = get_config()
     settings = WritebackSettings.from_config(cfg)
-    workers = []
+    workers = [WritebackSizer(get_sessionmaker(), get_provisioner())]
     if settings.auto_discard:
         workers.append(WritebackWatcher(get_sessionmaker(), get_provisioner(), settings))
     job = JobSettings.from_config(cfg)
