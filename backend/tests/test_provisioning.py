@@ -78,6 +78,38 @@ def test_reset_order(host, prov, published):
     assert host.visible(IQN) == [DEV]
 
 
+def test_reset_sends_few_targetcli_commands(host, prov, published):
+    """A restarting PC waits for this at iPXE, and each targetcli call loads all of LIO."""
+    prov.provision("pc01", IQN, SNAP)
+    host.calls.clear()
+    prov.reset("pc01", IQN, CLONE, SNAP, target_iqn=TARGET)
+    tcli = [c[1:] for c in host.calls if c[0] == "targetcli"]
+    assert tcli == [
+        [f"/iscsi/{TARGET}/tpg1/acls", "delete", IQN],
+        ["/backstores/block", "delete", "pc01-os"],
+        ["/backstores/block", "delete", "pc01-game"],
+        ["/backstores/block", "ls", "depth=1"],                  # both slots checked at once
+        [f"/iscsi/{TARGET}/tpg1/luns", "ls", "depth=1"],         # the shared target is known by now
+        ["/backstores/block", "create", "name=pc01-game", f"dev={DEV}"],
+        [f"/iscsi/{TARGET}/tpg1/luns", "create", "/backstores/block/pc01-game", "lun=0", "add_mapped_luns=false"],
+        [f"/iscsi/{TARGET}/tpg1/acls", "create", IQN, "add_mapped_luns=false"],
+        [f"/iscsi/{TARGET}/tpg1/acls/{IQN}", "create", "mapped_lun=0", "tpg_lun_or_backstore=lun0",
+         "write_protect=false"],
+        ["saveconfig"],                                           # saved once
+    ]
+    assert host.visible(IQN) == [DEV]
+
+
+def test_reset_of_an_old_per_client_machine_still_cleans_up(host, prov, published):
+    prov.provision("pc01", IQN, SNAP)
+    host.calls.clear()
+    prov.reset("pc01", IQN, CLONE, SNAP, target_iqn="iqn.2025-05.net.ggnet:client-pc01")
+    assert ["targetcli", "/iscsi", "delete", "iqn.2025-05.net.ggnet:client-pc01"] in host.calls
+    host.calls.clear()
+    prov.reset("pc01", IQN, CLONE, SNAP)                           # unknown target: same
+    assert ["targetcli", "/backstores/block", "delete", "client-pc01"] in host.calls
+
+
 def test_reset_leaves_other_machines_alone(host, prov, published):
     """With one shared target, resetting pc01 must not touch pc02's session."""
     iqn2 = "iqn.1991-05.com.microsoft:pc02"

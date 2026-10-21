@@ -95,7 +95,7 @@ def discard(db: Session, prov: Provisioner, m: Machine, reason: str) -> bool:
     try:
         cd = prov.reset(m.name, m.initiator_iqn, clone, m.target_snapshot_path,
                         os_clone, m.os_snapshot_path if os_clone else None,
-                        os_setup_for(m) if os_clone else None)
+                        os_setup_for(m) if os_clone else None, target_iqn=m.iscsi_target_iqn)
     except ProvisioningError as e:
         m.status = MachineStatus.ERROR
         m.last_error = f"Automatic writeback discard failed: {e}"

@@ -114,17 +114,19 @@ class Provisioner:
             logger.warning("Windows setup of %s is incomplete: %s", os_setup.computer_name, problem)
         return problem
 
-    def _detach(self, machine_name: str, initiator_iqn: str) -> None:
+    def _detach(self, machine_name: str, initiator_iqn: str, save: bool = True, legacy: bool = True) -> None:
         """
         Remove the machine's ACL and backstores and verify the backstores are
         really gone: LIO keeps a zvol open while its backstore exists, so
         destroying the clone would fail with "dataset is busy" (or, worse, the
         client would keep a session to a disk that is being replaced).
+        `save=False` when the disks are mapped again right after (attach saves);
+        `legacy=False` when the machine is known to be on the shared target.
         """
-        self.iscsi.detach(machine_name, initiator_iqn)
-        for slot in SLOTS:
-            if self.iscsi.backstore_exists(machine_name, slot) is not False:
-                raise self._fail("The iSCSI disk was not removed", self.iscsi.runner)
+        self.iscsi.detach(machine_name, initiator_iqn, save=save, legacy=legacy)
+        names = self.iscsi.backstores()
+        if names is None or any(self.iscsi.backstore_name(machine_name, slot) in names for slot in SLOTS):
+            raise self._fail("The iSCSI disk was not removed", self.iscsi.runner)
 
     # ── Game disk (master) ────────────────────────────────────────────
 
@@ -310,6 +312,7 @@ class Provisioner:
         self, machine_name: str, initiator_iqn: str, clone_zvol: str, snapshot_path: str,
         os_clone_zvol: str | None = None, os_snapshot_path: str | None = None,
         os_setup: OsSetup | None = None, keep: frozenset[str] = frozenset(),
+        target_iqn: str | None = None,
     ) -> ClientDisk:
         """
         Order: detach (ACL + backstores) → destroy clones → clone → attach.
@@ -319,20 +322,28 @@ class Provisioner:
         `os_setup` is written into the fresh OS clone before it is mapped.
         `keep` names writebacks ("game", "os") that are only mapped again,
         not re-cloned; their snapshot argument is then the one they came from.
-        The client must be powered off or disconnected.
+        The client must be powered off or disconnected. `target_iqn` is the
+        machine's recorded target: only one of the old per-client design
+        (or an unknown one) is looked for and removed.
+
+        This runs while a restarting PC waits at iPXE, so it sends as few
+        targetcli commands as it can: each one loads the whole LIO
+        configuration.
         """
         if (os_clone_zvol is None) != (os_snapshot_path is None):
             raise ProvisioningError("An OS writeback needs both its zvol and its snapshot")
+        legacy = target_iqn != self.iscsi.target_iqn()
         with self.lock:
             self._clear()
-            self._detach(machine_name, initiator_iqn)
+            self._detach(machine_name, initiator_iqn, save=False, legacy=legacy)
             if "game" not in keep and not self.zfs.reset_clone(clone_zvol, snapshot_path):
                 raise self._fail(f"Resetting clone {clone_zvol} failed")
             reset_os = os_clone_zvol is not None and "os" not in keep
             if reset_os and not self.zfs.reset_clone(os_clone_zvol, os_snapshot_path):
                 raise self._fail(f"Resetting clone {os_clone_zvol} failed")
             problem = self._set_up_os(os_clone_zvol, os_setup) if reset_os else None
-            iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol))
+            iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol),
+                                    fresh=True)
             if iqn is None:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
         return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path, problem)
