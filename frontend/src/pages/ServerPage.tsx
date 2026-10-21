@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Cpu, Database, HardDrive, MemoryStick, Pla
 
 import { api, type Pool, type PoolDisk, type ServerStatus, type User } from "../api";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { MaintenanceSchedule } from "../components/MaintenanceSchedule";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 
@@ -79,6 +80,7 @@ export function ServerPage({ user }: { user?: User | null }) {
         </div>
       )}
       {pool && <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />}
+      {pool && <MaintenanceSchedule admin={admin} />}
       {pool && status && (
         <DisksCard pool={pool} readAt={status.smart_read_at} admin={admin} busy={busy} onRead={readSmart} />
       )}

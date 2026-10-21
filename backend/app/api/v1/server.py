@@ -6,14 +6,18 @@ or stopping a scrub or a TRIM, and reading SMART on request.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_provisioner, get_server_monitor
 from app.api.v1.errors import host_failed
 from app.api.v1.schemas import (
     ArcOut,
+    MaintenanceIn,
+    MaintenanceOut,
     MemoryOut,
     PoolDiskOut,
     PoolGroupOut,
@@ -22,6 +26,8 @@ from app.api.v1.schemas import (
     PoolActionIn,
     ServerOut,
 )
+from app.db.session import get_db
+from app.services import maintenance
 from app.services.provisioning import Provisioner
 from app.services.server_status import ServerMonitor, disk_device
 
@@ -123,3 +129,24 @@ def trim(
 ):
     """Start or stop a TRIM: ZFS tells each SSD which blocks are free, so writes stay fast."""
     return _pool_action(mon, prov, "trim", body.action == "start")
+
+
+def _schedule(db: Session) -> MaintenanceOut:
+    s = maintenance.load_settings(db)
+    now = datetime.now()
+    start, _ = maintenance.window_at(s, now)
+    nxt = start + timedelta(days=7) if start <= now else start
+    return MaintenanceOut(**asdict(s), next_window=nxt if s.enabled else None,
+                          last_run=maintenance.last_run(db))
+
+
+@router.get("/schedule", response_model=MaintenanceOut)
+def get_schedule(db: Session = Depends(get_db)):
+    """The weekly TRIM and scrub window, and what it did last."""
+    return _schedule(db)
+
+
+@router.put("/schedule", response_model=MaintenanceOut)
+def put_schedule(body: MaintenanceIn, db: Session = Depends(get_db)):
+    maintenance.save_settings(db, maintenance.MaintenanceSettings(**body.model_dump()))
+    return _schedule(db)

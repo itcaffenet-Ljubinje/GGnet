@@ -88,7 +88,7 @@ Status: **done** (backend and UI), **backend** (API exists, UI missing or partia
 | Scrub and TRIM: last result or progress, start / stop (admin); warning when older than 35 days | done |
 | Disks: SMART passed, temperature, wear (endurance used), power-on hours, read only on "Read SMART" | done |
 | ARC size, target max and hit ratio; server RAM; all writebacks' total | done |
-| Scrub / TRIM schedule set from the UI (today Proxmox's monthly cron; its TRIM skips non-NVMe pools) | todo |
+| Schedule: weekly window (day, from, until) for TRIM and / or scrub in a chosen order, one after the other; paused at the end of the window and resumed the next week | done |
 | ARC maximum set from the UI | todo |
 | IOPS and throughput per zvol, network per interface | todo |
 | iSCSI sessions live (initiator, IP, since when) | todo |

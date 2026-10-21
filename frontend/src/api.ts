@@ -190,6 +190,29 @@ export interface ServerStatus {
   smart_read_at: string | null;
 }
 
+export interface MaintenanceSettings {
+  enabled: boolean;
+  weekday: number;
+  start: string;
+  end: string;
+  trim: boolean;
+  scrub: boolean;
+  order: "trim_first" | "scrub_first";
+}
+
+export interface MaintenanceStep {
+  name: string;
+  status: "waiting" | "running" | "paused" | "done" | "stopped" | "failed";
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+}
+
+export interface Maintenance extends MaintenanceSettings {
+  next_window: string | null;
+  last_run: { window_start: string; window_end: string; closed: boolean; steps: MaintenanceStep[] } | null;
+}
+
 /** Hardware the agent reports (ggRock's Hardware tab). */
 export interface MachineHardware {
   nic: string | null;
@@ -434,6 +457,8 @@ export const api = {
   scrub: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/scrub", { action }),
   trim: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/trim", { action }),
   readSmart: () => request<ServerStatus>("POST", "/v1/server/smart"),
+  getSchedule: () => request<Maintenance>("GET", "/v1/server/schedule"),
+  saveSchedule: (body: MaintenanceSettings) => request<Maintenance>("PUT", "/v1/server/schedule", body),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),
   getBootSettings: () => request<BootSettingsOut>("GET", "/v1/settings/boot"),
   saveBootSettings: (body: BootSettings) => request<BootSettingsOut>("PUT", "/v1/settings/boot", body),

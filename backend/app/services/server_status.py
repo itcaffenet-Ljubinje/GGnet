@@ -211,6 +211,13 @@ class ServerMonitor:
     def trim(self, start: bool) -> bool:
         return self._zpool("trim", start)
 
+    def scrub_pause(self) -> bool:
+        """Pause the running scrub; the next `zpool scrub` resumes it where it stopped."""
+        ok, _, _ = self.runner.run(["zpool", "scrub", "-p", self.pool_name])
+        if ok:
+            logger.info("Scrub of %s paused", self.pool_name)
+        return ok
+
     @property
     def last_error(self) -> str:
         return self.runner.last_error

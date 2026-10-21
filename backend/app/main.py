@@ -59,14 +59,16 @@ async def lifespan(_app: FastAPI):
     in dev defaults and tests). The retention job itself does nothing until
     the admin turns retention on in Settings.
     """
-    from app.api.deps import get_provisioner
+    from app.api.deps import get_provisioner, get_server_monitor
     from app.db.session import get_sessionmaker
+    from app.services.maintenance import MaintenanceJob
     from app.services.retention import JobSettings, RetentionJob
     from app.services.writebacks import WritebackSettings, WritebackSizer, WritebackWatcher
 
     cfg = get_config()
     settings = WritebackSettings.from_config(cfg)
-    workers = [WritebackSizer(get_sessionmaker(), get_provisioner())]
+    workers = [WritebackSizer(get_sessionmaker(), get_provisioner()),
+               MaintenanceJob(get_sessionmaker(), get_server_monitor())]
     if settings.auto_discard:
         workers.append(WritebackWatcher(get_sessionmaker(), get_provisioner(), settings))
     job = JobSettings.from_config(cfg)

@@ -798,3 +798,35 @@ class PoolActionIn(BaseModel):
     """Start or stop a scrub or a TRIM."""
 
     action: Literal["start", "stop"]
+
+
+class MaintenanceIn(BaseModel):
+    """Weekly TRIM and scrub in a window when the cafe is closed (server local time)."""
+
+    enabled: bool = False
+    weekday: int = Field(6, ge=0, le=6)               # 0 Monday … 6 Sunday
+    start: str = Field("03:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    end: str = Field("07:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")   # before start: next morning
+    trim: bool = True
+    scrub: bool = True
+    order: Literal["trim_first", "scrub_first"] = "trim_first"
+
+
+class MaintenanceStepOut(BaseModel):
+    name: str                                         # trim | scrub
+    status: str                                       # waiting | running | paused | done | stopped | failed
+    started_at: datetime | None
+    finished_at: datetime | None
+    error: str | None
+
+
+class MaintenanceRunOut(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    closed: bool
+    steps: list[MaintenanceStepOut]
+
+
+class MaintenanceOut(MaintenanceIn):
+    next_window: datetime | None                      # when the next one starts, if enabled
+    last_run: MaintenanceRunOut | None
