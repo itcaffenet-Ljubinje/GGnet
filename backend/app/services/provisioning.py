@@ -24,6 +24,7 @@ import json
 import logging
 import re
 import threading
+import time
 from dataclasses import dataclass
 
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
@@ -442,8 +443,10 @@ class Provisioner:
             raise ProvisioningError("An OS writeback needs both its zvol and its snapshot")
         legacy = target_iqn != self.iscsi.target_iqn()
         with self._machine_lock(machine_name), self.lock:
+            t0 = time.monotonic()
             self._clear()
             self._detach(machine_name, initiator_iqn, save=False, legacy=legacy)
+            t_detach = time.monotonic()
             swapped = False
             if "game" not in keep:
                 if self._spare_ok(self.spare_path(clone_zvol), snapshot_path) and self._swap_in_spare(clone_zvol):
@@ -464,10 +467,15 @@ class Provisioner:
             if swapped:
                 # A renamed zvol gets its /dev/zvol link from udev a moment later.
                 self.zfs.runner.run(["udevadm", "settle", "--timeout=10"], quiet=True)
+            t_disks = time.monotonic()
             iqn = self.iscsi.attach(machine_name, initiator_iqn, self._disks(clone_zvol, os_clone_zvol),
                                     fresh=True)
             if iqn is None:
                 raise self._fail("Exposing the disk over iSCSI failed", self.iscsi.runner)
+            t_end = time.monotonic()
+            logger.info("Reset of %s in %.1f s (unmap %.1f, writebacks %.1f%s, map %.1f)",
+                        machine_name, t_end - t0, t_detach - t0, t_disks - t_detach,
+                        " from spares" if swapped else "", t_end - t_disks)
         return ClientDisk(clone_zvol, snapshot_path, iqn, os_clone_zvol, os_snapshot_path, problem)
 
     def rename(
