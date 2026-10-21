@@ -54,6 +54,8 @@ class WritebackSettings:
     grace: timedelta = timedelta(seconds=30)
     poll: timedelta = timedelta(seconds=5)
     boot_window: timedelta = timedelta(seconds=300)
+    # Boot Mode: keep a spare of each writeback ready, so a restart only swaps it in.
+    spares: bool = True
 
     @classmethod
     def from_config(cls, cfg: Mapping[str, Any]) -> "WritebackSettings":
@@ -63,6 +65,7 @@ class WritebackSettings:
             grace=timedelta(seconds=int(wb.get("grace_seconds", 30))),
             poll=timedelta(seconds=int(wb.get("poll_seconds", 5))),
             boot_window=timedelta(seconds=int(wb.get("boot_window_seconds", 300))),
+            spares=bool(wb.get("spares", True)),
         )
 
 
@@ -292,6 +295,53 @@ class WritebackSizer:
                     measure(db, self.prov, s.writeback_warning_gb * GB)
             except Exception:
                 logger.exception("Measuring writebacks failed")
+
+
+def refresh_spares(db: Session, prov: Provisioner) -> None:
+    """
+    Boot Mode PCs whose writebacks are reset on every restart get spares of
+    them (Provisioner.make_spares); a PC that keeps its writebacks needs none.
+    """
+    for m in db.scalars(select(Machine).where(Machine.status == MachineStatus.PROVISIONED)).all():
+        if m.clone_zvol is None:
+            continue
+        try:
+            if m.mode is MachineMode.BOOT and _managed(m) and not m.keep_writeback:
+                prov.make_spares(m.name, m.clone_zvol, m.target_snapshot_path,
+                                 m.os_clone_zvol, m.os_snapshot_path, os_setup_for(m))
+            else:
+                prov.drop_spares(m.name, m.clone_zvol, m.os_clone_zvol)
+        except Exception:             # one bad machine must not stop the others
+            logger.exception("Spare writebacks of %s failed", m.name)
+
+
+class SpareMaker:
+    """Background thread running refresh_spares() every `interval`."""
+
+    def __init__(self, make_session: Callable[[], Session], prov: Provisioner,
+                 interval: timedelta = timedelta(seconds=30)):
+        self.make_session = make_session
+        self.prov = prov
+        self.interval = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._loop, name="ggnet-spares", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=30)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self.interval.total_seconds()):
+            try:
+                with self.make_session() as db:
+                    refresh_spares(db, self.prov)
+            except Exception:
+                logger.exception("Making spare writebacks failed")
 
 
 class WritebackWatcher:

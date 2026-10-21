@@ -372,10 +372,13 @@ inject_agent = true
 # unless the machine has Keep Writeback. grace_seconds rides out network blips.
 # boot_window_seconds: after a Boot Mode PC's iPXE request, its iSCSI session
 # drops while Windows takes over from iPXE; no discard during that window.
+# spares: keep a spare of each Boot Mode PC's writebacks ready (<name>_spare),
+# so a restart only swaps it in instead of cloning and setting Windows up.
 auto_discard = true
 grace_seconds = 30
 poll_seconds = 5
 boot_window_seconds = 300
+spares = true
 
 [web]
 bind = "$WEB_BIND"
