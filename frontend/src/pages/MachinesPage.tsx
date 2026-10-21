@@ -491,12 +491,19 @@ export function MachinesPage({ disks, machines, traffic = {}, discovered = [], r
                               title="This PC has written more than the warning size (Settings → Retention). Nothing is done to it; it is discarded as usual when the PC restarts."
                             >
                               <AlertTriangle size={12} />
-                              {m.session_active ? "In use" : "Pending reset"}
+                              {m.session_active ? "In use" : starting(m) ? "Starting" : "Pending reset"}
                               {writebackSize(m)}
                             </span>
                           ) : m.writeback_dirty && m.session_active ? (
                             <span className="badge badge-blue" title="The PC is on and writing to its disks">
                               In use{writebackSize(m)}
+                            </span>
+                          ) : m.writeback_dirty && starting(m) ? (
+                            <span
+                              className="badge badge-blue"
+                              title="The PC is starting: the network boot handed over to Windows, which connects in a moment"
+                            >
+                              Starting{writebackSize(m)}
                             </span>
                           ) : m.writeback_dirty ? (
                             <span
@@ -957,6 +964,23 @@ const APPLY: Record<ApplyKey, ApplyChoice> = {
 };
 
 /** ggNet2's lock: whether Windows booted with Secure Boot on (anti-cheats need it), as the agent reports. */
+// The server's boot window (writebacks.boot_window_seconds, 300 by default).
+const BOOT_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * A Boot Mode PC between iPXE and Windows' own iSCSI login: iPXE's session
+ * ends when Windows takes over, so for a moment the PC looks disconnected.
+ */
+export function starting(m: Machine, now = Date.now()): boolean {
+  return (
+    m.mode === "boot" &&
+    !m.session_active &&
+    m.ipxe_at !== null &&
+    now - Date.parse(m.ipxe_at) < BOOT_WINDOW_MS &&
+    (m.session_changed_at === null || Date.parse(m.session_changed_at) >= Date.parse(m.ipxe_at))
+  );
+}
+
 /** " · 6.2 GB": what the PC has written into its writebacks, once measured. */
 function writebackSize(m: Machine): string {
   return m.writeback_bytes ? ` · ${formatBytes(m.writeback_bytes)}` : "";

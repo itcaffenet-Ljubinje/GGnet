@@ -312,6 +312,7 @@ class MachineOut(BaseModel):
     session_active: bool | None
     session_changed_at: datetime | None
     booted_at: datetime | None
+    ipxe_at: datetime | None             # Boot Mode: when iPXE last asked for the boot script
     created_at: datetime
     updated_at: datetime
 
