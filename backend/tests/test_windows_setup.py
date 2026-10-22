@@ -551,7 +551,11 @@ def test_tuning_keeps_the_pc_awake_and_writing_little():
     page_files = "c:\\pagefile.sys 4096 4096\0\0".encode("utf-16-le")
     assert '"PagingFiles"=hex(7):' + ",".join(f"{b:02x}" for b in page_files) in patch
     assert '"ClearPageFileAtShutdown"=dword:00000000' in patch
-    assert '[\\ControlSet002\\Control\\CrashControl]\n"CrashDumpEnabled"=dword:00000003' in patch
+    assert '[\\ControlSet002\\Control\\CrashControl]\n"CrashDumpEnabled"=dword:00000000' in patch
+    assert ('[\\ControlSet002\\Services\\iScsiPrt\\Parameters]\n"WaitForNetworkAtBoot"=dword:00000000\n'
+            '"DelayForNetworkAtBoot"=dword:00000001') in patch
+    assert '"ArpRetryCount"=dword:00000000\n"DisableDhcpMediaSense"=dword:00000001' in patch
+    assert "ServiceGroupOrder" not in patch                # its order was not given
     assert '[\\ControlSet002\\Services\\WSearch]\n"Start"=dword:00000004' in patch
     assert '[\\ControlSet002\\Services\\SysMain]\n"Start"=dword:00000004' in patch
     assert tuning_patch(1)[1] == "[\\ControlSet001\\Control\\Power\\User\\PowerSchemes]"
@@ -621,3 +625,44 @@ def test_an_image_without_a_software_hive_is_reported(windows, runner, tmp_path)
     merged = _merged(runner)
     assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") == "no SOFTWARE hive in the image"
     assert "PowerSchemes" in merged["reg"]               # the SYSTEM part is in
+
+
+
+def _group_order_export(groups: list[str]) -> str:
+    data = ("\0".join(groups) + "\0\0").encode("utf-16-le")
+    return ("Windows Registry Editor Version 5.00\r\n\r\n[\\ControlSet002\\Control\\ServiceGroupOrder]\r\n"
+            '"List"=hex(7):' + ",".join(f"{b:02x}" for b in data) + "\r\n")
+
+
+WINDOWS_ORDER = ["System Reserved", "EMS", "WdfLoadGroup", "Boot Bus Extender", "System Bus Extender",
+                 "SCSI miniport", "Port", "Primary Disk", "Filter", "Boot File System", "Base",
+                 "Video", "NDIS Wrapper", "COM Infrastructure", "PlugPlay", "PNP_TDI", "NDIS", "TDI"]
+
+
+def _order_in(patch: str) -> list[str]:
+    raw = patch.split('[\\ControlSet002\\Control\\ServiceGroupOrder]\n"List"=hex(7):')[1].split("\n")[0]
+    return [g for g in bytes(int(x, 16) for x in raw.split(",")).decode("utf-16-le").split("\0") if g]
+
+
+def test_the_iscsi_initiator_loads_after_the_network_stack():
+    from app.windows_setup import ISCSI_GROUP, image_patch
+
+    patch = image_patch(2, tuning=True, group_order_export=_group_order_export(WINDOWS_ORDER))
+    assert _order_in(patch) == [
+        "System Reserved", "EMS", "WdfLoadGroup", "Boot Bus Extender", "System Bus Extender",
+        "NDIS Wrapper", "NDIS", "Base", "PNP_TDI", ISCSI_GROUP,
+        "SCSI miniport", "Port", "Primary Disk", "Filter", "Boot File System",
+        "Video", "COM Infrastructure", "PlugPlay", "TDI"]
+    assert f'[\\ControlSet002\\Services\\iScsiPrt]\n"Group"="{ISCSI_GROUP}"' in patch
+    # Prepared twice: the same order, the group once.
+    again = image_patch(2, tuning=True, group_order_export=_group_order_export(_order_in(patch)))
+    assert _order_in(again) == _order_in(patch)
+
+
+def test_an_unknown_group_order_is_left_alone():
+    from app.windows_setup import image_patch
+
+    no_tcpip = [g for g in WINDOWS_ORDER if g != "PNP_TDI"]
+    for export in ("", "garbage", _group_order_export(no_tcpip)):
+        patch = image_patch(2, tuning=True, group_order_export=export)
+        assert "ServiceGroupOrder" not in patch and "iScsiPrt]\n" not in patch

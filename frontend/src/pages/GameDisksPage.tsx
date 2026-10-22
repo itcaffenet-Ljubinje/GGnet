@@ -71,8 +71,9 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
       "A new version is made from the newest one, with the server's agent (Settings → Client app) and " +
       "its service, Fast Startup off, fixed IP addresses switched to DHCP and old drive letters forgotten.\n\n" +
       "Windows is also set up for diskless PCs: High performance, no sleep or hibernation (the display " +
-      "stays on), PCIe, USB and network card power saving off, a fixed 4 GB page file, and no automatic " +
-      "Windows Update, Store updates, maintenance (defragmentation), search index or SysMain.\n\n" +
+      "stays on), PCIe, USB and network card power saving off, a fixed 4 GB page file, no crash dumps, " +
+      "no automatic Windows Update, Store updates, maintenance (defragmentation), search index or SysMain, " +
+      "and the iSCSI driver loaded after the network, which saves about 25 s of every start.\n\n" +
       "PCs move to it at their next reboot. Apply Writebacks of an OS image does this already.";
     if (!window.confirm(msg)) return;
     await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id));
