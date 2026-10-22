@@ -464,7 +464,7 @@ class FakeWindows:
         self.problem = problem
         self.done: list[tuple[str, object, bool]] = []
 
-    def personalize(self, device, setup):
+    def personalize(self, device, setup, label=None):
         mapped = any(c[0] == "targetcli" and OS_CLONE.split("/")[-1] in " ".join(c)
                      for c in self.host.calls)
         self.done.append((device, setup, mapped))

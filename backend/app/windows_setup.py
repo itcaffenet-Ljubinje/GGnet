@@ -534,8 +534,13 @@ class WindowsSetup:
         ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
         return out if ok else None
 
-    def personalize(self, device: str, setup: OsSetup) -> str | None:
-        """Write the PC's identity into its OS clone. None when done, else why not."""
+    def personalize(self, device: str, setup: OsSetup, label: str | None = None) -> str | None:
+        """
+        Write the PC's identity into its OS clone. None when done, else why
+        not. `label` names the mount and .reg file (default: the computer
+        name); a PC's spare writeback is set up under its own label, so it
+        never shares them with a reset of the PC's writeback.
+        """
         try:
             registry_patch(setup, 1)   # validate before touching the host
             if setup.boot_nic and not NIC_ID_RE.match(setup.boot_nic):
@@ -543,8 +548,8 @@ class WindowsSetup:
         except ValueError as e:
             return str(e)
         try:
-            return self._on_windows(device, setup.computer_name,
-                                    lambda root, hive: self._merge(hive, setup))
+            name = label or setup.computer_name
+            return self._on_windows(device, name, lambda root, hive: self._merge(hive, setup, name))
         except Exception as e:     # never fail the provisioning it is part of
             logger.exception("Setting up Windows on %s failed", device)
             return f"unexpected error: {e}"
@@ -665,7 +670,7 @@ class WindowsSetup:
             return "no SOFTWARE hive in the image"
         return self._merge_reg(software, "prepare-software", software_patch())
 
-    def _merge(self, hive: Path, setup: OsSetup) -> str | None:
+    def _merge(self, hive: Path, setup: OsSetup, name: str | None = None) -> str | None:
         control_set = self.control_set(hive)
         fixed = self.static_interfaces(hive, control_set)
         letters = self.reserved_letters(hive)
@@ -677,7 +682,7 @@ class WindowsSetup:
             else:
                 nic_reg, nic_problem = nic_patch(export, setup.boot_nic)
         patch = registry_patch(setup, control_set, fixed, letters, nic_reg)
-        problem = self._merge_reg(hive, setup.computer_name, patch)
+        problem = self._merge_reg(hive, name or setup.computer_name, patch)
         if problem:
             return problem
         logger.info("Windows on %s set up as %s", hive, setup.computer_name)

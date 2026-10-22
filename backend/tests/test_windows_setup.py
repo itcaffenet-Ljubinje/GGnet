@@ -666,3 +666,14 @@ def test_an_unknown_group_order_is_left_alone():
     for export in ("", "garbage", _group_order_export(no_tcpip)):
         patch = image_patch(2, tuning=True, group_order_export=export)
         assert "ServiceGroupOrder" not in patch and "iScsiPrt]\n" not in patch
+
+
+
+def test_a_spare_is_set_up_under_its_own_label(windows, runner):
+    _windows_on(windows, "vip-05-spare")
+    merged = _merged(runner)
+    assert windows.personalize(DEVICE, SETUP, label="vip-05-spare") is None
+    mount = str(windows.run_dir / "vip-05-spare")
+    assert ["ntfs-3g", "-o", "rw,noatime", "/dev/zd16p3", mount] in runner.calls
+    assert any(c[:2] == ["hivexregedit", "--merge"] and c[3].endswith("vip-05-spare.reg") for c in runner.calls)
+    assert '"ComputerName"="VIP-05"' in merged["reg"]

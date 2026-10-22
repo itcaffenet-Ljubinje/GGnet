@@ -62,6 +62,7 @@ _VERSION_RE = re.compile(r"^v(\d+)$")
 
 SPARE_SUFFIX = "_spare"            # '_' never appears in a machine name
 SETUP_PROP = "ggnet:setup"         # on an OS spare: which setup it was made with
+SPARE_RETRY = 600.0                # seconds before spares that failed are tried again
 
 
 def setup_tag(setup: OsSetup | None) -> str:
@@ -102,6 +103,8 @@ class Provisioner:
         # Per machine: a reset and the making of its spares never overlap.
         self._machine_locks: dict[str, threading.Lock] = {}
         self._machine_locks_guard = threading.Lock()
+        # Per machine: when making its spares last failed (retried after SPARE_RETRY).
+        self._spare_failed: dict[str, float] = {}
 
     def _machine_lock(self, name: str) -> threading.Lock:
         with self._machine_locks_guard:
@@ -136,11 +139,14 @@ class Provisioner:
             return [game]
         return [Disk("os", self.zfs.zvol_device_path(os_clone)), game]
 
-    def _set_up_os(self, os_clone: str | None, os_setup: OsSetup | None) -> str | None:
+    def _set_up_os(self, os_clone: str | None, os_setup: OsSetup | None,
+                   label: str | None = None) -> str | None:
         """Personalize a fresh OS clone before it is mapped (app.windows_setup)."""
         if os_clone is None or os_setup is None or self.windows is None:
             return None
-        problem = self.windows.personalize(self.zfs.zvol_device_path(os_clone), os_setup)
+        device = self.zfs.zvol_device_path(os_clone)
+        problem = (self.windows.personalize(device, os_setup, label=label) if label
+                   else self.windows.personalize(device, os_setup))
         if problem:
             logger.warning("Windows setup of %s is incomplete: %s", os_setup.computer_name, problem)
         return problem
@@ -195,6 +201,10 @@ class Provisioner:
         if os_clone_zvol is not None and os_snapshot_path is not None:
             wanted.append((os_clone_zvol, os_snapshot_path, os_setup))
         made = []
+        failed_at = self._spare_failed.get(machine_name)
+        if failed_at is not None and time.monotonic() - failed_at < SPARE_RETRY:
+            return made
+        failed = False
         with self._machine_lock(machine_name):
             for clone, snap, setup in wanted:
                 spare = self.spare_path(clone)
@@ -203,16 +213,25 @@ class Provisioner:
                     continue
                 if self.zfs.dataset_exists(spare) and not self.zfs.destroy(spare, recursive=True):
                     logger.warning("Could not remove the stale spare %s", spare)
+                    failed = True
                     continue
                 if not self.zfs.clone(snap, spare):
                     logger.warning("Could not make the spare %s", spare)
+                    failed = True
                     continue
                 if tag is not None:
-                    problem = self._set_up_os(spare, setup)
+                    problem = self._set_up_os(spare, setup, label=f"{machine_name}-spare")
                     if problem or not self.zfs.set_property(spare, SETUP_PROP, tag):
                         self.zfs.destroy(spare, recursive=True)
+                        failed = True
                         continue
                 made.append(spare)
+        if failed:
+            # Not again every round: a reset clones as before meanwhile.
+            self._spare_failed[machine_name] = time.monotonic()
+            logger.warning("Spare writebacks of %s failed; next try in %d min", machine_name, SPARE_RETRY // 60)
+        else:
+            self._spare_failed.pop(machine_name, None)
         if made:
             logger.info("Spare writebacks ready for %s", machine_name)
         return made

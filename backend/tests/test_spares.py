@@ -21,8 +21,9 @@ class FakeWindows:
         self.problem = problem
         self.personalized: list[str] = []
 
-    def personalize(self, device, setup):
+    def personalize(self, device, setup, label=None):
         self.personalized.append(device)
+        self.labels = getattr(self, "labels", []) + [label]
         return self.problem
 
 
@@ -96,11 +97,21 @@ def test_a_new_image_version_makes_the_spares_stale(host, boot):
     assert host.datasets[OS_CLONE]["origin"] == f"{OS}@v2" and cd.os_clone_snapshot == f"{OS}@v2"
 
 
-def test_a_spare_that_cannot_be_set_up_is_removed(host, boot):
+def test_a_spare_that_cannot_be_set_up_is_removed_and_not_retried_at_once(host, boot, monkeypatch):
+    from app.services import provisioning
+
     boot.windows.problem = "no Windows partition found"
     assert boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP) == [
         f"{CLONE}_spare"]
     assert f"{OS_CLONE}_spare" not in host.datasets
+    assert boot.windows.labels[-1] == "pc01-spare"          # never the PC's own mount and .reg names
+    host.calls.clear()
+    boot.windows.problem = None
+    assert boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP) == []
+    assert host.calls == []                                 # backing off, not every round
+    monkeypatch.setattr(provisioning, "SPARE_RETRY", 0.0)
+    assert boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP) == [
+        f"{OS_CLONE}_spare"]
 
 
 def test_spares_go_with_the_machine(host, boot):
