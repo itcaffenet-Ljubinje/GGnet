@@ -582,6 +582,10 @@ WorkingDirectory=$INSTALL_DIR/backend
 ExecStart=$INSTALL_DIR/venv/bin/uvicorn $APP_MODULE --host $WEB_BIND --port $WEB_PORT
 Restart=on-failure
 RestartSec=3
+# On stop or restart only uvicorn gets SIGTERM: a writeback reset under way
+# (zfs, LIO) finishes before it exits, instead of being cut off mid-way.
+KillMode=mixed
+TimeoutStopSec=60
 
 [Install]
 WantedBy=multi-user.target

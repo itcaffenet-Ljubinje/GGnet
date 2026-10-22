@@ -363,7 +363,8 @@ class WritebackWatcher:
     def stop(self) -> None:
         self._stop.set()
         if self._thread:
-            self._thread.join(timeout=10)
+            # Let a discard under way finish (the unit stops with KillMode=mixed).
+            self._thread.join(timeout=45)
 
     def _loop(self) -> None:
         while not self._stop.wait(self.settings.poll.total_seconds()):
