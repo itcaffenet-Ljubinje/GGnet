@@ -13,6 +13,7 @@ command raises AssertionError, so the test fails instead of passing silently.
 
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 
@@ -32,6 +33,7 @@ class FakeHost:
         self.fail_on: dict[tuple[str, ...], str] = {}   # command prefix → stderr
         self.calls: list[list[str]] = []
         self.last_error = ""
+        self.lio_batch_missing = False                  # rtslib-fb not installed
 
     # ── Runner interface ──────────────────────────────────────────────
 
@@ -47,6 +49,8 @@ class FakeHost:
             return self._targetcli(cmd[1:])
         if cmd[0] == "udevadm":
             return self._ok()
+        if len(cmd) == 4 and cmd[1] == "-I" and cmd[2].endswith("lio_batch.py"):
+            return self._lio_batch(json.loads(cmd[3]))
         if cmd[0] == "cat":
             if "/statistics/" in cmd[1]:
                 return self._cat_stats(cmd[1:])
@@ -348,6 +352,59 @@ class FakeHost:
     def _ls(self, header: str, names) -> tuple:
         lines = [f"o- {header}"] + [f"  o- {n} ........ [...]" for n in names]
         return self._ok("\n".join(lines))
+
+    def _lio_batch(self, steps: list[dict]):
+        """lio_batch.py on the same model as targetcli (rtslib does the same things)."""
+        if self.lio_batch_missing:
+            return False, json.dumps({"ok": False, "error": "rtslib-fb is not available", "unavailable": True}), ""
+        results = []
+        for i, st in enumerate(steps):
+            op = st["op"]
+            tpg = f"/iscsi/{st.get('target')}/tpg1"
+            if op == "delete_acl":
+                t = self.targets.get(st["target"])
+                if t:
+                    t["acls"].pop(st["initiator"], None)
+                res = (True, "", "")
+            elif op == "delete_backstore":
+                if st["name"] in self.backstores:
+                    self._drop_backstore(st["name"])
+                res = (True, "", "")
+            elif op == "delete_target":
+                self.targets.pop(st["target"], None)
+                res = (True, "", "")
+            elif op == "list_backstores":
+                results.append(sorted(self.backstores))
+                continue
+            elif op == "create_backstore":
+                res = self._targetcli(["/backstores/block", "create", f"name={st['name']}", f"dev={st['dev']}"])
+            elif op == "create_lun":
+                t = self.targets.get(st["target"])
+                index = next(n for n in range(len(t["luns"]) + 1) if n not in t["luns"]) if t else 0
+                res = self._targetcli([f"{tpg}/luns", "create", f"/backstores/block/{st['backstore']}",
+                                       f"lun={index}", "add_mapped_luns=false"])
+                if res[0]:
+                    results.append(index)
+                    continue
+            elif op == "create_acl":
+                res = self._targetcli([f"{tpg}/acls", "create", st["initiator"], "add_mapped_luns=false"])
+            elif op == "map_lun":
+                t = self.targets.get(st["target"]) or {"luns": {}}
+                index = next((n for n, b in t["luns"].items() if b == st["backstore"]), -1)
+                res = self._targetcli([f"{tpg}/acls/{st['initiator']}", "create", f"mapped_lun={st['mapped_lun']}",
+                                       f"tpg_lun_or_backstore=lun{index}", "write_protect=false"])
+            elif op == "save":
+                res = (True, "", "")
+            else:
+                raise AssertionError(f"FakeHost does not know lio_batch step: {st}")
+            for prefix, err in self.fail_on.items():
+                if prefix == ("lio_batch", op):
+                    res = (False, "", err)
+            if not res[0]:
+                return False, json.dumps({"ok": False, "failed": i, "error": f"{op}: {res[2]}",
+                                          "results": results}), ""
+            results.append(None)
+        return True, json.dumps({"ok": True, "results": results}), ""
 
     def _targetcli(self, a: list[str]):
         if a == ["saveconfig"]:
