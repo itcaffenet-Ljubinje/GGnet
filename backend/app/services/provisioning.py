@@ -154,8 +154,7 @@ class Provisioner:
         `save=False` when the disks are mapped again right after (attach saves);
         `legacy=False` when the machine is known to be on the shared target.
         """
-        self.iscsi.detach(machine_name, initiator_iqn, save=save, legacy=legacy)
-        names = self.iscsi.backstores()
+        names = self.iscsi.remove(machine_name, initiator_iqn, save=save, legacy=legacy)
         if names is None or any(self.iscsi.backstore_name(machine_name, slot) in names for slot in SLOTS):
             raise self._fail("The iSCSI disk was not removed", self.iscsi.runner)
 

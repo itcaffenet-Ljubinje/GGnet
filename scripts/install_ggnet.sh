@@ -280,7 +280,7 @@ apt-get update -qq
 # ggNet runs its own instance, ggnet-pxe. ipxe: snponly.efi / ipxe.efi for TFTP.
 # Secure Boot: shim-signed (shim signed by Microsoft, and its MokManager),
 # sbsigntool and openssl to sign iPXE with the ggNet key.
-apt-get install -y -qq python3 python3-venv python3-pip targetcli-fb dnsmasq-base ipxe \
+apt-get install -y -qq python3 python3-venv python3-pip targetcli-fb python3-rtslib-fb dnsmasq-base ipxe \
     shim-signed sbsigntool openssl >/dev/null
 
 # ---------- 8. ZFS datasets ----------
@@ -347,6 +347,9 @@ cidr = "$SERVICE_CIDR"
 iscsi_portal = "$SERVICE_IP:3260"
 # One shared target for all clients: <iscsi_iqn_prefix>:<iscsi_target_name>
 iscsi_target_name = "storage"
+# Map and unmap a PC's disks in one rtslib run (python3-rtslib-fb) instead of
+# a targetcli call per step; false uses targetcli only.
+iscsi_batch = true
 dhcp_mode = "proxy"
 tftp_root = "$DATA_DIR/tftp"
 http_root = "$DATA_DIR/http"

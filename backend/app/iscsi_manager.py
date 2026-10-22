@@ -32,8 +32,10 @@ deprovisioning a machine migrates it to the shared target.
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
 import re
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Sequence
 
@@ -45,6 +47,10 @@ logger = logging.getLogger("ggnet.iscsi")
 DEFAULT_IQN_PREFIX = "iqn.2025-05.net.ggnet"
 DEFAULT_TARGET_NAME = "storage"
 DEFAULT_CONFIGFS = "/sys/kernel/config/target/iscsi"
+# lio_batch.py runs several LIO steps in one process; it needs Debian's
+# python3-rtslib-fb, so it is started with the system Python.
+BATCH_SCRIPT = Path(__file__).resolve().with_name("lio_batch.py")
+BATCH_PYTHON = "/usr/bin/python3"
 
 # Slots a machine can have, in the order of their mapped LUN numbers in Boot Mode.
 SLOTS = ("os", "game")
@@ -96,6 +102,9 @@ class ISCSIConfig:
     iqn_prefix: str = DEFAULT_IQN_PREFIX
     target_name: str = DEFAULT_TARGET_NAME
     configfs: str = DEFAULT_CONFIGFS       # where LIO exposes sessions
+    # Attach and detach through one lio_batch.py process instead of a
+    # targetcli call per step (config.toml services.iscsi_batch, on by default).
+    batch: bool = False
 
     @classmethod
     def from_config(cls, cfg: Optional[Mapping[str, Any]] = None) -> "ISCSIConfig":
@@ -107,6 +116,7 @@ class ISCSIConfig:
             iqn_prefix=str(services.get("iscsi_iqn_prefix") or DEFAULT_IQN_PREFIX),
             target_name=str(services.get("iscsi_target_name") or DEFAULT_TARGET_NAME),
             configfs=str(services.get("iscsi_configfs") or DEFAULT_CONFIGFS),
+            batch=bool(services.get("iscsi_batch", True)),
         )
 
 
@@ -135,9 +145,43 @@ class ISCSIManager:
         # second), so the shared target is looked up once, not before each
         # attach; a failed attach looks again next time.
         self._target_ok = False
+        self._batch_on = self.cfg.batch      # off for good once rtslib-fb turns out missing
 
     def _run(self, cmd: list[str], quiet: bool = False) -> tuple[bool, str, str]:
         return self.runner.run(cmd, quiet=quiet)
+
+    def _batch(self, steps: list[dict]) -> Optional[dict]:
+        """
+        Run LIO steps in one lio_batch.py process. Returns its answer
+        ({"ok": ..., "results": ..., "error": ...}), or None when batches
+        cannot be used (then the caller uses targetcli).
+        """
+        if not self._batch_on:
+            return None
+        _ok, out, err = self._run([BATCH_PYTHON, "-I", str(BATCH_SCRIPT), json.dumps(steps)], quiet=True)
+        try:
+            answer = json.loads(out.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            logger.error("lio_batch gave no answer (%s); using targetcli", err.strip() or "no output")
+            self._batch_on = False
+            return None
+        if answer.get("unavailable"):
+            logger.warning("%s; using targetcli", answer.get("error"))
+            self._batch_on = False
+            return None
+        if not answer.get("ok"):
+            self.runner.last_error = str(answer.get("error") or "lio_batch failed")
+        return answer
+
+    def _detach_steps(self, machine_id: str, initiator_iqn: str, save: bool, legacy: bool) -> list[dict]:
+        steps: list[dict] = [{"op": "delete_acl", "target": self.target_iqn(), "initiator": initiator_iqn}]
+        steps += [{"op": "delete_backstore", "name": self.backstore_name(machine_id, slot)} for slot in SLOTS]
+        if legacy:
+            steps += [{"op": "delete_target", "target": self.legacy_target_iqn(machine_id)},
+                      {"op": "delete_backstore", "name": f"client-{machine_id}"}]
+        if save:
+            steps.append({"op": "save"})
+        return steps
 
     # ── Names ─────────────────────────────────────────────────────────
 
@@ -360,6 +404,10 @@ class ISCSIManager:
         if not fresh:
             self.detach(machine_id, initiator_iqn, save=False)
 
+        batched = self._attach_batch(machine_id, initiator_iqn, disks)
+        if batched is not None:
+            return batched or None
+
         used = self._used_tpg_luns()
         if used is None:
             self.runner.last_error = self.runner.last_error or "targetcli cannot list LUNs"
@@ -403,6 +451,52 @@ class ISCSIManager:
         )
         return self.target_iqn()
 
+    def _attach_batch(self, machine_id: str, initiator_iqn: str, disks: Sequence[Disk]) -> Optional[str]:
+        """
+        attach()'s steps in one lio_batch.py run: the target IQN, "" when a
+        step failed (cleaned up, the reason in last_error), None when
+        batches cannot be used.
+        """
+        target = self.target_iqn()
+        names = [self.backstore_name(machine_id, d.slot) for d in disks]
+        steps: list[dict] = []
+        for disk, name in zip(disks, names):
+            steps += [{"op": "create_backstore", "name": name, "dev": disk.device},
+                      {"op": "create_lun", "target": target, "backstore": name}]
+        steps.append({"op": "create_acl", "target": target, "initiator": initiator_iqn})
+        steps += [{"op": "map_lun", "target": target, "initiator": initiator_iqn,
+                   "mapped_lun": mapped, "backstore": name} for mapped, name in enumerate(names)]
+        steps.append({"op": "save"})
+        answer = self._batch(steps)
+        if answer is None:
+            return None
+        if not answer.get("ok"):
+            err = self.runner.last_error
+            logger.error("iSCSI attach of %s failed: %s", machine_id, err)
+            self._target_ok = False
+            self.detach(machine_id, initiator_iqn)
+            self.runner.last_error = err
+            return ""
+        logger.info("iSCSI: %s (ACL %s) -> %s", machine_id, initiator_iqn,
+                    ", ".join(f"LUN {i}={d.device}" for i, d in enumerate(disks)))
+        return target
+
+    def remove(self, machine_id: str, initiator_iqn: str, save: bool = True,
+               legacy: bool = True) -> Optional[set[str]]:
+        """
+        detach(), then the backstore names that are left (to check that the
+        machine's are gone); None when they cannot be listed. One
+        lio_batch.py run when batches are on.
+        """
+        if not (self._valid_machine_id(machine_id) and self._valid_initiator(initiator_iqn)):
+            return None
+        answer = self._batch(self._detach_steps(machine_id, initiator_iqn, save, legacy)
+                             + [{"op": "list_backstores"}])
+        if answer is not None:
+            return set(answer["results"][-1]) if answer.get("ok") else None
+        self.detach(machine_id, initiator_iqn, save=save, legacy=legacy)
+        return self.backstores()
+
     def detach(self, machine_id: str, initiator_iqn: str, save: bool = True, legacy: bool = True) -> bool:
         """
         Remove everything of one machine: its ACL (with its mapped LUNs), its
@@ -415,6 +509,8 @@ class ISCSIManager:
         """
         if not (self._valid_machine_id(machine_id) and self._valid_initiator(initiator_iqn)):
             return False
+        if self._batch(self._detach_steps(machine_id, initiator_iqn, save, legacy)) is not None:
+            return True
         self._run(["targetcli", f"{self._tpg}/acls", "delete", initiator_iqn], quiet=True)
         for slot in SLOTS:
             self._run(["targetcli", "/backstores/block", "delete",
