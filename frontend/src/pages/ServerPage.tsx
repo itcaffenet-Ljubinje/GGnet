@@ -222,6 +222,14 @@ function PoolCard({
           <div className="strong">TRIM</div>
           {trimming.length ? (
             <div className="small">Running: {trimPercent}%</div>
+          ) : pool.autotrim ? (
+            <div className="small">
+              <CheckCircle2 size={12} /> Autotrim on: ZFS tells the SSDs about freed blocks as it goes.
+              <span className="muted">
+                {" "}
+                Last full TRIM: {pool.last_trim ? when(pool.last_trim) : "never"} (only needed now and then).
+              </span>
+            </div>
           ) : (
             <div className={trimAge === null || trimAge > STALE_DAYS ? "small warn-text" : "small"}>
               {pool.last_trim ? `Last: ${when(pool.last_trim)} (${trimAge} days ago)` : "Never trimmed"}

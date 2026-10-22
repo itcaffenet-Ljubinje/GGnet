@@ -770,6 +770,7 @@ class PoolOut(BaseModel):
     errors: int                              # data errors
     scan: PoolScanOut | None
     last_trim: datetime | None               # oldest last TRIM over the disks
+    autotrim: bool | None                    # ZFS trims freed blocks by itself (no need for a manual TRIM)
     groups: list[PoolGroupOut]
     disks: list[PoolDiskOut]
 

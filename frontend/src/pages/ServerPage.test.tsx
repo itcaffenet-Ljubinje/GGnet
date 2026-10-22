@@ -47,6 +47,7 @@ function status(overrides: Partial<ServerStatus> = {}): ServerStatus {
       errors: 0,
       scan: { function: "scrub", state: "finished", start_time: recent, end_time: recent, errors: 0, percent: null, paused: false },
       last_trim: old,
+      autotrim: false,
       groups: [{ name: "mirror-0", type: "mirror", state: "ONLINE", disks: ["a1", "a2"] }],
       disks: [disk("a1"), disk("a2", { temperature: 64, checksum_errors: 2 })],
     },
@@ -117,6 +118,15 @@ describe("ServerPage", () => {
       { url: "/api/v1/server/smart", method: "POST", body: undefined },
       { url: "/api/v1/server/trim", method: "POST", body: { action: "stop" } },
     ]);
+  });
+
+  it("with autotrim on, an old full TRIM is no warning", async () => {
+    const s = status();
+    s.pool!.autotrim = true;
+    stub(s);
+    render(<ServerPage />);
+    expect(await screen.findByText(/Autotrim on/)).toBeInTheDocument();
+    expect(screen.queryByText(/skips pools that are not all NVMe/)).toBeNull();
   });
 
   it("says when the pool cannot be read", async () => {

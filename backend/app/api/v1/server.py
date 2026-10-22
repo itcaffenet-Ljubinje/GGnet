@@ -66,6 +66,7 @@ def _pool(mon: ServerMonitor) -> PoolOut | None:
                             "end_time": _time(scan["end_time"])}) if scan else None,
         # The pool counts as trimmed when its least recently trimmed disk was.
         last_trim=None if not trims or None in trims else min(trims),
+        autotrim=p.get("autotrim"),
         groups=[PoolGroupOut(**g) for g in p["groups"]],
         disks=disks,
     )
