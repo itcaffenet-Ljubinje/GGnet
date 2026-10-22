@@ -7,6 +7,7 @@ Sources (OpenZFS 2.3+ JSON output, smartctl 7.3+ JSON output):
   zpool status -t -j --json-int <pool>   state, scan, vdev tree, TRIM per disk
   zpool scrub [-s] / zpool trim [-s]     start or stop a scrub or a TRIM
   zpool list -j --json-int <pool>        size, allocated, free, fragmentation
+  zpool get autotrim <pool>              whether ZFS trims freed blocks by itself
   /proc/spl/kstat/zfs/arcstats           ARC size, target max/min, hits, misses
   /proc/meminfo                          total and available RAM
   smartctl -j -H -A -i <disk>            passed, temperature, wear, power-on hours
@@ -165,7 +166,14 @@ class ServerMonitor:
         if not ok:
             return None
         ok, listing, _ = self.runner.run(["zpool", "list", "-j", "--json-int", self.pool_name])
-        return parse_pool(status, listing, self.pool_name) if ok else None
+        if not ok:
+            return None
+        pool = parse_pool(status, listing, self.pool_name)
+        if pool is not None:
+            ok, out, _ = self.runner.run(["zpool", "get", "-H", "-o", "value", "autotrim", self.pool_name],
+                                         quiet=True)
+            pool["autotrim"] = {"on": True, "off": False}.get(out.strip()) if ok else None
+        return pool
 
     def _read(self, *parts: str) -> str | None:
         try:

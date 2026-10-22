@@ -105,6 +105,7 @@ def monitor(tmp_path) -> tuple[ServerMonitor, FakeRunner]:
     runner.responses[("zpool", "status")] = (True, STATUS, "")
     runner.responses[("zpool", "list")] = (True, LIST, "")
     runner.responses[("smartctl",)] = (True, SMART_SAS, "")
+    runner.responses[("zpool", "get")] = (True, "on\n", "")
     (tmp_path / "spl" / "kstat" / "zfs").mkdir(parents=True)
     (tmp_path / "spl" / "kstat" / "zfs" / "arcstats").write_text(ARCSTATS)
     (tmp_path / "meminfo").write_text(MEMINFO)
@@ -132,6 +133,8 @@ def test_server_api(server):
     pool = s["pool"]
     assert (pool["state"], pool["scan"]["percent"]) == ("DEGRADED", 25.0)
     assert pool["last_trim"] is None                     # one disk was never trimmed
+    assert pool["autotrim"] is True
+    assert ["zpool", "get", "-H", "-o", "value", "autotrim", POOL] in runner.calls
     assert pool["disks"][2]["trim_percent"] == 25.0
 
 

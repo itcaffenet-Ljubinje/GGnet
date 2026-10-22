@@ -185,6 +185,23 @@ if [[ "$POOL" == "$OS_POOL" ]]; then
         || die "Aborted."
 fi
 
+# Pool settings for many PCs on SSDs. autotrim: ZFS tells the SSDs about
+# freed blocks as it goes (Proxmox's monthly TRIM cron skips pools that are
+# not all NVMe), which keeps writes fast as writebacks come and go.
+POOL_ASHIFT="$(zpool get -H -o value ashift "$POOL")"
+POOL_AUTOTRIM="$(zpool get -H -o value autotrim "$POOL")"
+POOL_SSD=1
+while read -r dev; do
+    [[ "$(lsblk -dno ROTA "$(readlink -f "$dev")" 2>/dev/null | tr -d ' ')" == "0" ]] || POOL_SSD=0
+done < <(zpool list -v -H -P "$POOL" | awk '$1 ~ /^\/dev\// {print $1}')
+SET_AUTOTRIM=0
+if [[ "$POOL_AUTOTRIM" == "off" && $POOL_SSD -eq 1 ]]; then
+    confirm "Pool $POOL is on SSDs but autotrim is off.\n\nTurn autotrim on? ZFS then tells the SSDs about freed blocks as it goes, so writes stay fast (recommended)." \
+        && SET_AUTOTRIM=1
+fi
+[[ "$POOL_ASHIFT" =~ ^[0-9]+$ && "$POOL_ASHIFT" -lt 12 && "$POOL_ASHIFT" -ne 0 ]] \
+    && red "Warning: pool $POOL has ashift=$POOL_ASHIFT; SSDs work best with 12 (4K) or more (set when the pool is created)."
+
 DS_ROOT="$POOL/$DATASET"
 if zfs list -H "$DS_ROOT" >/dev/null 2>&1; then
     info "Dataset $DS_ROOT already exists — existing data will not be touched."
@@ -256,7 +273,7 @@ SUMMARY="Software:     $INSTALL_DIR  (system disk)
 App data:     $DATA_DIR
 Config:       $CONF_FILE
 
-ZFS pool:     $POOL  ($POOL_HEALTH)
+ZFS pool:     $POOL  ($POOL_HEALTH, ashift $POOL_ASHIFT, autotrim $POOL_AUTOTRIM$([[ $SET_AUTOTRIM -eq 1 ]] && echo " -> on"))
 Datasets:     $DS_ROOT/{images,writebacks,snapshots,iscsi_targets}
 
 Service IF:   $IFACE  ($SERVICE_CIDR)
@@ -284,6 +301,9 @@ apt-get install -y -qq python3 python3-venv python3-pip targetcli-fb python3-rts
     shim-signed sbsigntool openssl >/dev/null
 
 # ---------- 8. ZFS datasets ----------
+if [[ $SET_AUTOTRIM -eq 1 ]]; then
+    zpool set autotrim=on "$POOL" && info "Autotrim turned on for $POOL."
+fi
 info "Preparing ZFS datasets on $POOL..."
 if ! zfs list -H "$DS_ROOT" >/dev/null 2>&1; then
     zfs create -o compression=lz4 -o atime=off "$DS_ROOT"

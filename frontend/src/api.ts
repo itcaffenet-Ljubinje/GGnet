@@ -177,6 +177,7 @@ export interface Pool {
   errors: number;
   scan: PoolScan | null;
   last_trim: string | null;
+  autotrim: boolean | null;
   groups: { name: string; type: string; state: string; disks: string[] }[];
   disks: PoolDisk[];
 }
