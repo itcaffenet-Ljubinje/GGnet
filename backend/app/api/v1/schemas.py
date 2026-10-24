@@ -65,18 +65,27 @@ def _mac(v: str | None) -> str | None:
 
 # ── Game disk ─────────────────────────────────────────────────────────
 
+def _disk_name(v: str) -> str:
+    v = v.strip().lower()
+    if not _DISK_NAME_RE.match(v):
+        raise ValueError("name: 1-32 characters [a-z0-9-]")
+    return v
+
+
 class GameDiskCreate(BaseModel):
     name: str
     size_gb: int = Field(gt=0, le=16384)
     kind: DiskKind = DiskKind.GAME     # `os`: a Boot Mode Windows image
 
-    @field_validator("name")
-    @classmethod
-    def _name(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not _DISK_NAME_RE.match(v):
-            raise ValueError("name: 1-32 characters [a-z0-9-]")
-        return v
+    check_name = field_validator("name")(_disk_name)
+
+
+class GameDiskRename(BaseModel):
+    """A new name for the console; the zvol on the host keeps its path."""
+
+    name: str
+
+    check_name = field_validator("name")(_disk_name)
 
 
 class GameDiskOut(BaseModel):
@@ -426,7 +435,7 @@ class AgentSecureBoot(BaseModel):
 # ── Settings: retention and storage ───────────────────────────────────
 
 class RetentionIn(BaseModel):
-    """Automated snapshot and writeback removal (ggRock Settings → Array and Images)."""
+    """Automated snapshot and writeback removal (Settings → Storage)."""
 
     enabled: bool = False
     dry_run: bool = True
@@ -504,7 +513,7 @@ BulkKind = Literal["on", "shutdown", "reboot", "assign", "pin", "drive_letter", 
 
 
 class BulkAction(BaseModel):
-    """One action on several machines (ggRock's bulk operations / Edit Selected)."""
+    """One action on several machines (bulk operations / Edit Selected)."""
 
     machine_ids: list[int] = Field(min_length=1, max_length=500)
     action: BulkKind

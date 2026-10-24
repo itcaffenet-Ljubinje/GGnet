@@ -66,7 +66,12 @@ function stub(s: ServerStatus) {
   return mock;
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  window.localStorage.clear();
+});
+
+const openSection = (name: RegExp) => userEvent.click(screen.getByRole("tab", { name }));
 
 describe("ServerPage", () => {
   it("shows the pool, the RAM cache and the writebacks", async () => {
@@ -84,6 +89,7 @@ describe("ServerPage", () => {
     render(<ServerPage />);
     expect(await screen.findByText(/skips pools that are not all NVMe: start it here/)).toBeInTheDocument();
     expect(screen.getByText("2 disks, 1 need a look")).toBeInTheDocument();
+    await openSection(/Disks/);
     const row = screen.getByText("SN-a2", { exact: false }).closest("tr")!;
     expect(row).toHaveClass("row-warn");
     expect(within(row).getByText("0/0/2")).toBeInTheDocument();
@@ -110,13 +116,14 @@ describe("ServerPage", () => {
     const mock = stub(s);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<ServerPage />);
-    expect(await screen.findByText(/SMART not read yet/)).toBeInTheDocument();
-    expect(screen.getByText("Running: 50%")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Read SMART/ }));
+    expect(await screen.findByText("Running: 50%")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Stop TRIM/ }));
+    await openSection(/Disks/);
+    expect(screen.getByText(/SMART not read yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Read SMART/ }));
     expect(calls(mock).filter((c) => c.method === "POST")).toEqual([
-      { url: "/api/v1/server/smart", method: "POST", body: undefined },
       { url: "/api/v1/server/trim", method: "POST", body: { action: "stop" } },
+      { url: "/api/v1/server/smart", method: "POST", body: undefined },
     ]);
   });
 
@@ -133,6 +140,19 @@ describe("ServerPage", () => {
     stub(status({ pool: null }));
     render(<ServerPage />);
     expect(await screen.findByText("The ZFS pool could not be read.")).toBeInTheDocument();
+  });
+
+  it("shows one section at a time and remembers the last one", async () => {
+    stub(status());
+    const { unmount } = render(<ServerPage />);
+    expect(await screen.findByText("Pool STORAGE-01")).toBeInTheDocument();
+    expect(screen.queryByText(/SMART not read yet|SMART read/)).toBeNull();
+    await openSection(/RAM cache/);
+    expect(screen.getByRole("tab", { name: /RAM cache/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("Pool STORAGE-01")).toBeNull();
+    unmount();
+    render(<ServerPage />);
+    expect(await screen.findByRole("tab", { name: /RAM cache/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("lists a disk's problems", () => {

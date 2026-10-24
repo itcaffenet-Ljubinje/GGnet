@@ -182,11 +182,11 @@ class Machine(Base):
     clone_snapshot: Mapped[str | None] = mapped_column(String(320), default=None)
     iscsi_target_iqn: Mapped[str | None] = mapped_column(String(223), default=None)
 
-    # Snapshot pin (ggRock Advanced → Game Image Snapshot): the version of the
+    # Snapshot pin (machine settings → version): the version of the
     # game disk this machine runs instead of the active one; None follows it.
     pinned_snapshot: Mapped[str | None] = mapped_column(String(64), default=None)
 
-    # Writeback lifecycle (ggRock model): the server discards the writeback
+    # Writeback lifecycle: the server discards the writeback
     # after every disconnect unless keep_writeback is set.
     keep_writeback: Mapped[bool] = mapped_column(Boolean, default=False)
     # The client wrote (was connected) since the clone was made; a clean
@@ -223,7 +223,7 @@ class Machine(Base):
     agent_stopped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     reported_drive_letter: Mapped[str | None] = mapped_column(String(1), default=None)
     # Inventory from the agent: the network it reaches the server on and the
-    # hardware (ggRock's IP and Link Speed columns, Hardware tab). JSON text.
+    # hardware (IP and Link Speed columns, Hardware tab). JSON text.
     # Shutdown / reboot for the agent: handed out once in the next heartbeat
     # answer, and dropped when older than POWER_COMMAND_TTL (app.services.power).
     pending_command: Mapped[str | None] = mapped_column(String(16), default=None)

@@ -4,8 +4,7 @@ once per image version) and each PC's OS writeback its own (personalize,
 before it boots).
 
 Every Boot Mode PC boots the same Windows image, so on its own every PC would
-have the image's computer name. Like ggRock (its Rename.PC and
-Inject.EnvVariables registry templates), the server edits the PC's fresh OS
+have the image's computer name. The server edits the PC's fresh OS
 clone offline, before iPXE boots it, so Windows comes up as that PC without
 an extra reboot:
 

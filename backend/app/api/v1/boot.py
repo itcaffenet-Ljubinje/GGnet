@@ -11,7 +11,7 @@ boot falls through to its next boot device instead of stopping in iPXE:
   Boot Mode PC without disks    message, then exit
   Disk Mode PC                  exit (boot from the local disk)
   unknown MAC                   listed in Discovery (Machines → New PCs) and,
-                                like ggRock, waits on screen until the admin
+                                waits on screen until the admin
                                 registers it, asking iPXE again every 10 s; a
                                 key press boots the local disk instead.
                                 `[boot] unregistered = "local"` exits at once
@@ -87,7 +87,7 @@ def wait_script(mac: str, again_url: str) -> PlainTextResponse:
 
 
 def unregistered_mode(cfg: dict | None = None) -> str:
-    """`[boot] unregistered`: "wait" (the default, as ggRock) or "local"."""
+    """`[boot] unregistered`: "wait" (the default) or "local"."""
     value = str(((cfg if cfg is not None else get_config()).get("boot") or {}).get("unregistered") or "wait")
     if value not in ("wait", "local"):
         logger.error("Ignoring invalid [boot] unregistered %r; using wait", value)
@@ -108,7 +108,7 @@ def boot_gateway(cfg: dict | None = None) -> str | None:
     Windows still gets its default route and internet afterwards.
     `[boot] gateway` in config.toml: "none" (the default), "dhcp" (the
     router's gateway), or an IP (e.g. the ggNet server with IP forwarding,
-    as ggRock does). An invalid value falls back to the default.
+    the usual setup). An invalid value falls back to the default.
     """
     value = str(((cfg if cfg is not None else get_config()).get("boot") or {}).get("gateway") or "").strip()
     if value in ("", "none"):

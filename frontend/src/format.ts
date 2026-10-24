@@ -25,7 +25,7 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(h / 24)} d ${h % 24} h`;
 }
 
-/** ggRock flags links below 1 Gbit/s ("Connectivity issue"). */
+/** Links below 1 Gbit/s are flagged ("Connectivity issue"). */
 export const SLOW_LINK_MBPS = 1000;
 
 /** Bytes per second → "12.0 MB/s". */

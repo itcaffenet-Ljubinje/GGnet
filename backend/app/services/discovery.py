@@ -1,5 +1,5 @@
 """
-Discovery: PCs that knock but are not registered (ggRock adds them to the
+Discovery: PCs that knock but are not registered (they are added to the
 Machines list on their first PXE boot). Two sources:
 
   pxe     an unknown MAC asked GET /boot/ipxe (Boot Mode, before Windows)

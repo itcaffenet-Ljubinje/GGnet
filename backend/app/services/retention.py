@@ -1,5 +1,5 @@
 """
-Automated snapshot and writeback removal (ggRock "Array and Images").
+Automated snapshot and writeback removal (Settings → Storage).
 
 Without it, every Apply Writebacks leaves another held version of a game
 disk, and kept writebacks of PCs that stay off keep their space, until the

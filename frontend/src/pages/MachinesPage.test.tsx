@@ -291,7 +291,7 @@ describe("MachinesPage", () => {
     expect(screen.getByText(/dataset is busy/)).toBeInTheDocument();
   });
 
-  it("shows the image status like ggRock", () => {
+  it("shows the image status", () => {
     const disks = [disk({ snapshot: "v2" })];
     const on = (overrides: Partial<Machine>) =>
       machine({ game_disk_id: 1, status: "provisioned", clone_snapshot: "tank/ggnet/images/cs2@v2", ...overrides });

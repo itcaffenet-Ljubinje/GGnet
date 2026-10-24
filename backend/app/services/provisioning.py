@@ -612,7 +612,7 @@ class Provisioner:
         clone_zvol: str, os_clone_zvol: str | None = None, os_prep: ImagePrep | None = None,
     ) -> list[str]:
         """
-        Make each clone's content the next version of its master (ggRock
+        Make each clone's content the next version of its master (
         "Apply Writebacks"); Boot Mode applies the OS writeback, the game
         writeback or both. Returns the new snapshot names, in the order of
         `applies`. The machine must be powered off. A clone becomes its

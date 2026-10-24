@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Cpu, Database, HardDrive, MemoryStick, Play, RefreshCw, Square } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Cpu,
+  Database,
+  HardDrive,
+  MemoryStick,
+  Play,
+  RefreshCw,
+  Square,
+} from "lucide-react";
 
 import { api, type Pool, type PoolDisk, type ServerStatus, type User } from "../api";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { MaintenanceSchedule } from "../components/MaintenanceSchedule";
+import { SubNav, useSection, type SubNavItem } from "../components/SubNav";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 
@@ -36,6 +48,7 @@ export function ServerPage({ user }: { user?: User | null }) {
   const { busy, error, setError, run } = useAsyncAction();
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const admin = !user || user.role === "admin";
+  const [section, setSection] = useSection("server", SERVER_SECTIONS);
 
   const load = useCallback(() => run("load", async () => setStatus(await api.getServer())), [run]);
   useEffect(() => {
@@ -74,20 +87,37 @@ export function ServerPage({ user }: { user?: User | null }) {
     <section aria-label="Server">
       <ErrorBanner message={error} onClose={() => setError(null)} />
       {status && <ServerKpis status={status} />}
-      {status && !pool && (
+      <SubNav label="Server sections" items={SERVER_SECTIONS} active={section} onSelect={setSection} />
+      {status && !pool && section !== "cache" && (
         <div className="card">
           <p className="error-text">The ZFS pool could not be read.</p>
         </div>
       )}
-      {pool && <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />}
-      {pool && <MaintenanceSchedule admin={admin} />}
-      {pool && status && (
+      {section === "pool" && pool && (
+        <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />
+      )}
+      {section === "maintenance" && pool && <MaintenanceSchedule admin={admin} />}
+      {section === "disks" && pool && status && (
         <DisksCard pool={pool} readAt={status.smart_read_at} admin={admin} busy={busy} onRead={readSmart} />
       )}
-      {status?.arc && <CacheCard status={status} />}
+      {section === "cache" &&
+        (status?.arc ? (
+          <CacheCard status={status} />
+        ) : (
+          status && <p className="empty">The RAM cache could not be read.</p>
+        ))}
     </section>
   );
 }
+
+type ServerSection = "pool" | "maintenance" | "disks" | "cache";
+
+const SERVER_SECTIONS: SubNavItem<ServerSection>[] = [
+  { id: "pool", label: "Pool", icon: Database },
+  { id: "maintenance", label: "Maintenance", icon: CalendarClock },
+  { id: "disks", label: "Disks", icon: HardDrive },
+  { id: "cache", label: "RAM cache", icon: MemoryStick },
+];
 
 function ServerKpis({ status }: { status: ServerStatus }) {
   const pool = status.pool;

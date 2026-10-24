@@ -26,6 +26,7 @@ from app.api.v1.schemas import (
     GameDiskCreate,
     GameDiskEdit,
     GameDiskOut,
+    GameDiskRename,
     SnapshotComment,
     SnapshotOut,
     WritebackOut,
@@ -66,6 +67,10 @@ def create_disk(
 ):
     if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
         conflict(f"Game disk '{body.name}' already exists")
+    # A renamed disk keeps its zvol, so its old name stays taken on the host.
+    owner = db.scalar(select(GameDisk).where(GameDisk.zvol_path == prov.image_path(body.name)))
+    if owner is not None:
+        conflict(f"'{body.name}' is still the zvol name of '{owner.name}' (renamed); choose another name")
     try:
         path = prov.create_disk(body.name, body.size_gb, os_image=body.kind is DiskKind.OS)
     except ProvisioningError as e:
@@ -83,6 +88,27 @@ def create_disk(
         except ProvisioningError:
             logger.error("Zvol %s left on the host without a database record", path)
         conflict(f"Game disk '{body.name}' already exists")
+    return disk
+
+
+@router.patch("/{disk_id}", response_model=GameDiskOut)
+def rename_disk(disk_id: int, body: GameDiskRename, db: Session = Depends(get_db)):
+    """
+    Rename a disk in ggNet. Only the name changes: the zvol, its versions and
+    every PC's writeback stay where they are, so this is safe while PCs run.
+    """
+    disk = _get(db, disk_id)
+    if body.name == disk.name:
+        return disk
+    if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
+        conflict(f"Game disk '{body.name}' already exists")
+    old, disk.name = disk.name, body.name
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        conflict(f"Game disk '{body.name}' already exists")
+    logger.info("Disk '%s' renamed to '%s' (zvol %s unchanged)", old, disk.name, disk.zvol_path)
     return disk
 
 

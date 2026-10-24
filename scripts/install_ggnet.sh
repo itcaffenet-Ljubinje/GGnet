@@ -379,7 +379,7 @@ http_port = 80
 # iBFT gateway for Windows: "none" (0.0.0.0, the default), "dhcp" or an IP.
 gateway = "none"
 # A PC whose MAC is not registered: "wait" on screen until it is added in the
-# web UI (Machines -> New PCs), as ggRock does, or "local" to boot its own disk.
+# web UI (Machines -> New PCs), or "local" to boot its own disk.
 unregistered = "wait"
 # Both are defaults: once saved in the web UI (Settings -> Network boot), the
 # saved values win. The PXE service the web UI shows and can restart:

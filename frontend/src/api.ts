@@ -214,7 +214,7 @@ export interface Maintenance extends MaintenanceSettings {
   last_run: { window_start: string; window_end: string; closed: boolean; steps: MaintenanceStep[] } | null;
 }
 
-/** Hardware the agent reports (ggRock's Hardware tab). */
+/** Hardware the agent reports (the Hardware tab). */
 export interface MachineHardware {
   nic: string | null;
   cpu: string | null;
@@ -441,6 +441,7 @@ export const api = {
     request<GameDisk>("POST", `/v1/game-disks/${id}/edit`, { machine_id }),
   finishEdit: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/finish-edit`),
   deleteDisk: (id: number) => request<void>("DELETE", `/v1/game-disks/${id}`),
+  renameDisk: (id: number, name: string) => request<GameDisk>("PATCH", `/v1/game-disks/${id}`, { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),
   setActiveSnapshot: (id: number, snapshot: string) =>
     request<GameDisk>("PUT", `/v1/game-disks/${id}/active-snapshot`, { snapshot }),

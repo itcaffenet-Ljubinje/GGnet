@@ -23,6 +23,21 @@ describe("GameDisksPage", () => {
     expect(screen.getAllByRole("button", { name: "Publish" })).toHaveLength(1);
   });
 
+  it("sums up images, kinds and PCs that use them", () => {
+    render(
+      <GameDisksPage
+        disks={[disk(), disk({ id: 3, name: "win11", kind: "os", size_gb: 100, published: false, snapshot: null })]}
+        machines={[machine({ game_disk_id: 1 }), machine({ id: 2, name: "pc02", game_disk_id: null })]}
+        reload={vi.fn()}
+      />,
+    );
+    const card = (title: string) => screen.getByText(title, { selector: ".kpi-title" }).closest(".kpi-card")!;
+    expect(card("Images")).toHaveTextContent("2");
+    expect(card("Images")).toHaveTextContent("1 draft");
+    expect(card("OS images")).toHaveTextContent("1");
+    expect(card("In use")).toHaveTextContent("of 2 PCs");
+  });
+
   it("creates a disk and reloads", async () => {
     const fetchMock = stubFetch(201, disk());
     const reload = vi.fn().mockResolvedValue(undefined);
@@ -54,12 +69,35 @@ describe("GameDisksPage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("renames a disk after asking for the new name", async () => {
+    const fetchMock = stubFetch(200, disk({ name: "steam-main" }));
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue(" Steam-Main ");
+    const reload = vi.fn().mockResolvedValue(undefined);
+    render(<GameDisksPage disks={[disk()]} machines={[]} reload={reload} />);
+    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
+    expect(prompt).toHaveBeenCalledWith(expect.stringContaining('"cs2"'), "cs2");
+    expect(calls(fetchMock)).toEqual([
+      { url: "/api/v1/game-disks/1", method: "PATCH", body: { name: "steam-main" } },
+    ]);
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it("does not rename when the prompt is cancelled or unchanged", async () => {
+    const fetchMock = stubFetch();
+    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce(null).mockReturnValueOnce("cs2");
+    render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
+    expect(prompt).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("shows the backend error when delete fails", async () => {
     stubFetch(409, { detail: { error: "Game disk 'cs2' is assigned to 1 machine(s); move them first" } });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete cs2" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("assigned to 1 machine(s)");
   });
 
@@ -139,7 +177,7 @@ describe("GameDisksPage", () => {
       />,
     );
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(["OS images", "Game disks"]);
+    expect(headings).toEqual(["OS images1", "Game disks1"]);
     const [osTable, gameTable] = screen.getAllByRole("table");
     expect(osTable).toHaveTextContent("win11");
     expect(osTable).not.toHaveTextContent("cs2");

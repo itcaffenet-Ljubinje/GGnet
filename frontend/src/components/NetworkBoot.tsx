@@ -143,7 +143,7 @@ export function NetworkBoot() {
                 value={unregistered}
                 onChange={(e) => setUnregistered(e.target.value as BootSettings["unregistered"])}
               >
-                <option value="wait">Wait on screen until added (as ggRock)</option>
+                <option value="wait">Wait on screen until added</option>
                 <option value="local">Boot from their own disk</option>
               </select>
               <span className="muted small">A waiting PC boots as soon as it is added in Machines → New PCs.</span>

@@ -757,7 +757,7 @@ function AddMachine({ disks, busy, run, reload, onClose }: AddMachineProps) {
   );
 }
 
-/** ggRock's Sent / Received / Speed for one machine. */
+/** Sent / Received / Speed for one machine. */
 function TrafficCell({ traffic: t }: { traffic: MachineTraffic | undefined }) {
   if (!t) return <span className="muted">Idle</span>;
   return (
@@ -789,7 +789,7 @@ interface BulkDockProps {
   clear: () => void;
 }
 
-/** ggRock's bulk operations on the selected machines, as a dock at the bottom of the screen. */
+/** Bulk operations on the selected machines, as a dock at the bottom of the screen. */
 function BulkDock({ machines, total, disks, versions, busy, run, all, select, clear }: BulkDockProps) {
   const [disk, setDisk] = useState("");
   const [version, setVersion] = useState("");

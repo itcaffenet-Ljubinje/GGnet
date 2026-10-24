@@ -1,4 +1,19 @@
 import { Fragment, useState, type FormEvent } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Gamepad2,
+  HardDrive,
+  Layers,
+  Monitor,
+  Pencil,
+  Plus,
+  Trash2,
+  Type,
+  Wand2,
+  type LucideIcon,
+} from "lucide-react";
 
 import { api, type DiskKind, type GameDisk, type Machine } from "../api";
 import { DiskDetails } from "../components/DiskDetails";
@@ -80,6 +95,19 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
+  async function rename(disk: GameDisk) {
+    const what = disk.kind === "os" ? "OS image" : "game disk";
+    const next = window.prompt(
+      `New name for ${what} "${disk.name}" (a-z, 0-9 and -, up to 32 characters).\n\n` +
+        "Only the name in ggNet changes; the zvol, its versions and the PCs' writebacks stay as they are.",
+      disk.name,
+    );
+    const name = next?.trim().toLowerCase();
+    if (!name || name === disk.name) return;
+    await run(`rename-${disk.id}`, () => api.renameDisk(disk.id, name));
+    await reload();
+  }
+
   async function remove(disk: GameDisk) {
     const what = disk.kind === "os" ? "OS image" : "game disk";
     if (!window.confirm(`Delete ${what} "${disk.name}" and its zvol on the host?`)) return;
@@ -87,126 +115,160 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
-  function section(title: string, list: GameDisk[], empty: string) {
+  function section(title: string, Icon: LucideIcon, list: GameDisk[], empty: string) {
     return (
       <>
-        <h2 className="section-title">{title}</h2>
+        <h2 className="section-title title-with-icon">
+          <Icon size={16} aria-hidden />
+          {title}
+          <span className="tab-badge" aria-label={`${list.length} in all`}>
+            {list.length}
+          </span>
+        </h2>
         {list.length === 0 ? (
           <p className="empty">{empty}</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Size</th>
-                <th>State</th>
-                <th>Machines</th>
-                <th>ZFS path</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((d) => (
-                <Fragment key={d.id}>
-                  <tr>
-                    <td className="strong">{d.name}</td>
-                    <td>{d.size_gb} GB</td>
-                    <td>
-                      {d.published ? (
-                        <span className="badge badge-provisioned">Published @{d.snapshot}</span>
-                      ) : d.editor_id !== null ? (
-                        <span className="badge badge-editing">
-                          Editing on {machine(d.editor_id)?.name ?? `#${d.editor_id}`}
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>State</th>
+                  <th>Machines</th>
+                  <th>ZFS path</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((d) => (
+                  <Fragment key={d.id}>
+                    <tr>
+                      <td className="strong">
+                        <span className="name-with-icon">
+                          {d.kind === "os" ? (
+                            <Monitor size={15} className="kind-icon kind-os" aria-hidden />
+                          ) : (
+                            <Gamepad2 size={15} className="kind-icon kind-game" aria-hidden />
+                          )}
+                          {d.name}
                         </span>
-                      ) : (
-                        <span className="badge badge-idle">Draft</span>
-                      )}
-                    </td>
-                    <td>{assigned(d.id)}</td>
-                    <td className="mono muted">{d.zvol_path}</td>
-                    <td className="actions">
-                      {d.published && (
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-expanded={open === d.id}
-                          onClick={() => setOpen(open === d.id ? null : d.id)}
-                        >
-                          {open === d.id ? "Hide details" : "Details"}
-                        </button>
-                      )}
-                      {d.published && d.kind === "os" && (
-                        <button
-                          type="button"
-                          onClick={() => prepare(d)}
-                          disabled={busy !== null}
-                          title="New version with the server's agent and the settings every PC needs"
-                        >
-                          {busy === `prepare-${d.id}` ? "Preparing…" : "Prepare image"}
-                        </button>
-                      )}
-                      {!d.published && d.editor_id === null && (
-                        <>
-                          <select
-                            aria-label={`PC to edit ${d.name} on`}
-                            value={editOn[d.id] ?? ""}
-                            onChange={(e) => setEditOn({ ...editOn, [d.id]: e.target.value })}
-                            disabled={busy !== null}
-                          >
-                            <option value="">PC…</option>
-                            {free.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name}
-                              </option>
-                            ))}
-                          </select>
+                      </td>
+                      <td>{d.size_gb} GB</td>
+                      <td>
+                        {d.published ? (
+                          <span className="badge badge-provisioned">Published @{d.snapshot}</span>
+                        ) : d.editor_id !== null ? (
+                          <span className="badge badge-editing">
+                            Editing on {machine(d.editor_id)?.name ?? `#${d.editor_id}`}
+                          </span>
+                        ) : (
+                          <span className="badge badge-idle">Draft</span>
+                        )}
+                      </td>
+                      <td>{assigned(d.id)}</td>
+                      <td className="mono muted">{d.zvol_path}</td>
+                      <td className="actions">
+                        {d.published && (
                           <button
                             type="button"
-                            onClick={() => startEdit(d)}
-                            disabled={busy !== null || !editOn[d.id]}
+                            className="secondary"
+                            aria-expanded={open === d.id}
+                            onClick={() => setOpen(open === d.id ? null : d.id)}
                           >
-                            {busy === `edit-${d.id}` ? "Starting…" : "Edit on PC"}
+                            {open === d.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {open === d.id ? "Hide details" : "Details"}
                           </button>
-                          <button type="button" onClick={() => publish(d)} disabled={busy !== null}>
-                            {busy === `publish-${d.id}` ? "Publishing…" : "Publish"}
+                        )}
+                        {d.published && d.kind === "os" && (
+                          <button
+                            type="button"
+                            onClick={() => prepare(d)}
+                            disabled={busy !== null}
+                            title="New version with the server's agent and the settings every PC needs"
+                          >
+                            <Wand2 size={14} />
+                            {busy === `prepare-${d.id}` ? "Preparing…" : "Prepare image"}
                           </button>
-                        </>
-                      )}
-                      {d.editor_id !== null && (
+                        )}
+                        {!d.published && d.editor_id === null && (
+                          <>
+                            <select
+                              aria-label={`PC to edit ${d.name} on`}
+                              value={editOn[d.id] ?? ""}
+                              onChange={(e) => setEditOn({ ...editOn, [d.id]: e.target.value })}
+                              disabled={busy !== null}
+                            >
+                              <option value="">PC…</option>
+                              {free.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => startEdit(d)}
+                              disabled={busy !== null || !editOn[d.id]}
+                            >
+                              <Pencil size={14} />
+                              {busy === `edit-${d.id}` ? "Starting…" : "Edit on PC"}
+                            </button>
+                            <button type="button" onClick={() => publish(d)} disabled={busy !== null}>
+                              <CheckCircle2 size={14} />
+                              {busy === `publish-${d.id}` ? "Publishing…" : "Publish"}
+                            </button>
+                          </>
+                        )}
+                        {d.editor_id !== null && (
+                          <button
+                            type="button"
+                            onClick={() => finishEdit(d)}
+                            disabled={busy !== null || machine(d.editor_id)?.session_active === true}
+                            title={
+                              machine(d.editor_id)?.session_active
+                                ? `Shut down ${machine(d.editor_id)?.name} first`
+                                : undefined
+                            }
+                          >
+                            <CheckCircle2 size={14} />
+                            {busy === `finish-${d.id}` ? "Finishing…" : "Finish editing"}
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => finishEdit(d)}
-                          disabled={busy !== null || machine(d.editor_id)?.session_active === true}
-                          title={
-                            machine(d.editor_id)?.session_active
-                              ? `Shut down ${machine(d.editor_id)?.name} first`
-                              : undefined
-                          }
+                          className="icon-btn"
+                          onClick={() => rename(d)}
+                          disabled={busy !== null}
+                          aria-label={`Rename ${d.name}`}
+                          title="Rename"
                         >
-                          {busy === `finish-${d.id}` ? "Finishing…" : "Finish editing"}
+                          <Type size={14} />
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => remove(d)}
-                        disabled={busy !== null}
-                      >
-                        {busy === `delete-${d.id}` ? "Deleting…" : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                  {open === d.id && (
-                    <tr>
-                      <td colSpan={6}>
-                        <DiskDetails disk={d} onChanged={reload} refreshKey={machines} />
+                        <button
+                          type="button"
+                          className="icon-btn icon-btn-danger"
+                          onClick={() => remove(d)}
+                          disabled={busy !== null}
+                          aria-label={`Delete ${d.name}`}
+                          title={busy === `delete-${d.id}` ? "Deleting…" : "Delete"}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {open === d.id && (
+                      <tr>
+                        <td colSpan={6}>
+                          <DiskDetails disk={d} onChanged={reload} refreshKey={machines} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </>
     );
@@ -216,7 +278,9 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     <section>
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
-      <form className="card form-row" onSubmit={create}>
+      <ImageKpis disks={disks} machines={machines} />
+
+      <form className="card form-row" onSubmit={create} aria-label="New image">
         <label>
           Name
           <input
@@ -246,12 +310,43 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
           />
         </label>
         <button type="submit" disabled={busy !== null}>
+          <Plus size={14} />
           {busy === "create" ? "Creating…" : "Create"}
         </button>
       </form>
 
-      {section("OS images", disks.filter((d) => d.kind === "os"), "No OS images yet.")}
-      {section("Game disks", disks.filter((d) => d.kind !== "os"), "No game disks yet.")}
+      {section("OS images", Monitor, disks.filter((d) => d.kind === "os"), "No OS images yet.")}
+      {section("Game disks", Gamepad2, disks.filter((d) => d.kind !== "os"), "No game disks yet.")}
     </section>
+  );
+}
+
+function ImageKpis({ disks, machines }: { disks: GameDisk[]; machines: Machine[] }) {
+  const os = disks.filter((d) => d.kind === "os");
+  const games = disks.filter((d) => d.kind !== "os");
+  const drafts = disks.filter((d) => !d.published).length;
+  const using = machines.filter((m) => m.game_disk_id !== null || m.os_disk_id !== null).length;
+  const totalGb = disks.reduce((sum, d) => sum + d.size_gb, 0);
+  const cards = [
+    { title: "Images", value: disks.length, sub: `${totalGb} GB in all${drafts ? ` · ${drafts} draft` : ""}`, icon: Layers, tone: "blue" },
+    { title: "OS images", value: os.length, sub: "Windows for Boot Mode PCs", icon: Monitor, tone: "purple" },
+    { title: "Game disks", value: games.length, sub: "shared D: for every PC", icon: Gamepad2, tone: "green" },
+    { title: "In use", value: using, sub: `of ${machines.length} PCs have an image`, icon: HardDrive, tone: "amber" },
+  ];
+  return (
+    <div className="kpi-grid">
+      {cards.map(({ title, value, sub, icon: Icon, tone }) => (
+        <div key={title} className="kpi-card">
+          <div className="kpi-info">
+            <span className="kpi-title">{title}</span>
+            <span className="kpi-value">{value}</span>
+            <span className="kpi-subtitle">{sub}</span>
+          </div>
+          <div className={`kpi-icon-box ${tone}`}>
+            <Icon size={22} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

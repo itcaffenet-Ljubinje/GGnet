@@ -392,7 +392,7 @@ class ZFSManager:
     def apply_clone(self, clone: str, master: str, base_snap: str, new_snap: str) -> bool:
         """
         Turn a client's writeback into a new version of its master
-        (ggRock "Apply Writebacks"), without copying any data:
+        (Apply Writebacks), without copying any data:
 
             clone: readonly=on → @new_snap → hold
             zfs promote clone      master's snapshots up to base_snap move to
@@ -520,7 +520,7 @@ class ZFSManager:
 
     def set_reserved(self, nbytes: int) -> bool:
         """
-        Keep `nbytes` of the pool free for nobody (ggRock "Reserved disk space"):
+        Keep `nbytes` of the pool free for nobody ("Reserved disk space"):
         SSDs slow down when they are nearly full, and writebacks must never
         fill the pool. 0 removes the reservation (the empty dataset stays).
         """

@@ -1,5 +1,5 @@
 """
-Per-machine iSCSI traffic (ggRock's Sent, Received and Speed columns).
+Per-machine iSCSI traffic (the Sent, Received and Speed columns).
 
 LIO counts the megabytes each initiator reads (Sent: server → PC) and writes
 (Received: the PC's writeback) on its game disk. The counters live as long

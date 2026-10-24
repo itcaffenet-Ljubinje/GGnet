@@ -374,7 +374,7 @@ def test_ipxe_without_a_valid_mac_boots_locally(client, disks, mac):
 
 
 def test_ipxe_unknown_pc_waits_for_registration(client, disks):
-    """Like ggRock: an unregistered PC stays on screen until the admin adds it."""
+    """An unregistered PC stays on screen until the admin adds it."""
     _boot_machine(client, disks)
     script = _ipxe(client, "aa-bb-cc-dd-ee-99")
     assert "not registered (MAC aa:bb:cc:dd:ee:99)" in script
