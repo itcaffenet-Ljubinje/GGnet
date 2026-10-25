@@ -75,26 +75,55 @@ describe("GameDisksPage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("renames a disk after asking for the new name", async () => {
+  it("renames a disk in the Edit dialog", async () => {
     const fetchMock = stubFetch(200, disk({ name: "steam-main" }));
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue(" Steam-Main ");
     const reload = vi.fn().mockResolvedValue(undefined);
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={reload} />);
     await menu("cs2", "Edit");
-    expect(prompt).toHaveBeenCalledWith(expect.stringContaining('"cs2"'), "cs2");
+    const dialog = screen.getByRole("dialog", { name: "Edit cs2" });
+    await userEvent.clear(within(dialog).getByLabelText(/^Name/));
+    await userEvent.type(within(dialog).getByLabelText(/^Name/), " Steam-Main ");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Save/ }));
     expect(calls(fetchMock)).toEqual([
       { url: "/api/v1/game-disks/1", method: "PATCH", body: { name: "steam-main" } },
     ]);
     expect(reload).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("does not rename when the prompt is cancelled or unchanged", async () => {
+  it("grows a disk by +50/+100/+200 GB after confirmation and shows what to do", async () => {
+    const fetchMock = stubFetch(200, {
+      disk: disk({ size_gb: 250 }),
+      version: "v2",
+      extended: true,
+      note: "The data partition was extended too.",
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn().mockResolvedValue(undefined)} />);
+    await menu("cs2", "Edit");
+    const dialog = screen.getByRole("dialog", { name: "Edit cs2" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "+50 GB" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "+100 GB" }));
+    expect(within(dialog).getByLabelText("Size (GB)")).toHaveValue(250);
+    await userEvent.click(within(dialog).getByLabelText(/Extend the data partition/));
+    await userEvent.click(within(dialog).getByRole("button", { name: /Save/ }));
+    expect(confirm.mock.calls[0][0]).toContain("from 100 GB to 250 GB");
+    expect(calls(fetchMock)).toEqual([
+      { url: "/api/v1/game-disks/1/grow", method: "POST", body: { size_gb: 250, extend: false } },
+    ]);
+    expect(await screen.findByRole("status")).toHaveTextContent("The data partition was extended too.");
+  });
+
+  it("does nothing when the size or the name did not change, or growing is not confirmed", async () => {
     const fetchMock = stubFetch();
-    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce(null).mockReturnValueOnce("cs2");
+    vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn()} />);
     await menu("cs2", "Edit");
+    await userEvent.click(screen.getByRole("button", { name: /Save/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
     await menu("cs2", "Edit");
-    expect(prompt).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "+200 GB" }));
+    await userEvent.click(screen.getByRole("button", { name: /Save/ }));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -25,6 +25,8 @@ from app.api.v1.schemas import (
     ActiveSnapshot,
     GameDiskCopy,
     GameDiskCreate,
+    GameDiskGrow,
+    GameDiskGrown,
     GameDiskEdit,
     GameDiskOut,
     GameDiskRename,
@@ -152,6 +154,60 @@ def copy_disk(
     copier.start(disk.id)
     db.refresh(disk)
     return disk
+
+
+@router.post("/{disk_id}/grow", response_model=GameDiskGrown)
+def grow_disk(
+    disk_id: int,
+    body: GameDiskGrow,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """
+    Make a disk bigger (never smaller). A published disk gets a new active
+    version with the bigger size; PCs move to it at their next reboot. Its
+    last data partition is grown too (`extend`) when it is the last one on
+    the disk, as on a game disk; otherwise (an OS image, Recovery behind C:)
+    the volume is extended in Windows and the writeback applied.
+    """
+    disk = _get(db, disk_id)
+    _not_copying(disk)
+    _not_edited(disk)
+    if body.size_gb <= disk.size_gb:
+        conflict(f"'{disk.name}' is already {disk.size_gb} GB; a disk can only grow")
+    if disk.published:
+        names = [v["name"] for v in _versions(prov, disk)]
+        if names and names[-1] != disk.snapshot:
+            conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
+                     f"make @{names[-1]} active first (a new version always follows the newest)")
+    old = disk.size_gb
+    try:
+        version, result = prov.grow_disk(disk.zvol_path, body.size_gb, disk.published, body.extend)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    disk.size_gb = body.size_gb
+    if version:
+        disk.snapshot = version
+    db.commit()
+
+    if result is not None and result.extended:
+        note = "The data partition was extended too: Windows sees the new space at the next reboot."
+    elif not disk.published:
+        note = "The draft is bigger; the new space shows in Disk Management while it is filled."
+    else:
+        why = f" ({result.note})" if result is not None else ""
+        note = ("Windows shows the new space as unallocated" + why + ". On one PC with Keep Writeback: "
+                "Disk Management → Extend Volume, shut down, then Apply Writebacks.")
+    if version:
+        comment = f"ggNet: grown from {old} to {body.size_gb} GB" + (
+            ", data partition extended" if result is not None and result.extended else "")
+        try:
+            prov.set_comment(disk.zvol_path, version, comment)
+        except ProvisioningError as e:   # the version exists; only its comment is missing
+            logger.warning("%s", e)
+    logger.info("'%s' grown from %s to %s GB%s", disk.name, old, body.size_gb, f" as @{version}" if version else "")
+    return GameDiskGrown(disk=GameDiskOut.model_validate(disk), version=version,
+                         extended=bool(result and result.extended), note=note)
 
 
 def _not_copying(disk: GameDisk) -> None:

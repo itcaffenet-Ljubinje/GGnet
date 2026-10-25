@@ -27,6 +27,7 @@ import threading
 import time
 from dataclasses import dataclass
 
+from app.disk_grow import GrowResult, PartitionGrower
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
 from app.windows_setup import ImagePrep, OsSetup, WindowsSetup
 from app.zfs_manager import ZFSManager
@@ -99,6 +100,8 @@ class Provisioner:
         self.iscsi = iscsi
         # Boot Mode: writes the PC's identity into its fresh OS writeback.
         self.windows = windows
+        # Grows a disk's data partition after its zvol got bigger (grow_disk).
+        self.grower = PartitionGrower(zfs.runner)
         self.lock = threading.Lock()
         # Per machine: a reset and the making of its spares never overlap.
         self._machine_locks: dict[str, threading.Lock] = {}
@@ -261,6 +264,45 @@ class Provisioner:
             if not self.zfs.create_zvol(path, size_gb, **props):
                 raise self._fail(f"Creating zvol {path} failed")
         return path
+
+    def grow_disk(self, master: str, size_gb: int, published: bool, extend: bool = True
+                  ) -> tuple[str | None, GrowResult | None]:
+        """
+        Make a disk bigger. A draft grows in place. A published master gets a
+        new version, as Prepare image does: its newest version is cloned, the
+        clone grown (and its last data partition with it, `extend`) and made
+        the next version. Returns (the new version or None, what was done to
+        the partition or None). Nothing changes on failure.
+        """
+        size = f"{size_gb}G"
+        if not published:
+            with self.lock:
+                self._clear()
+                if not self.zfs.set_property(master, "volsize", size):
+                    raise self._fail(f"Growing {master} to {size} failed")
+            return None, None
+        tmp = f"{self.zfs.layout.writebacks}/{master.rsplit('/', 1)[-1]}_ggnet_grow"   # '_': never a PC
+        with self.lock:
+            self._clear()
+            snaps = self.zfs.list_snapshots(master)
+            if not snaps:
+                raise self._fail(f"Listing versions of {master} failed")
+            base, new = snaps[-1], next_version(snaps)
+            if self.zfs.dataset_exists(tmp) and not self.zfs.destroy(tmp):
+                raise self._fail(f"{tmp} is left over from an earlier resize and cannot be removed")
+            if not self.zfs.clone(f"{master}@{base}", tmp):
+                raise self._fail(f"Cloning {master}@{base} failed")
+            result: GrowResult | None = None
+            ok = self.zfs.set_property(tmp, "volsize", size)
+            if ok and extend:
+                self.zfs.runner.run(["udevadm", "settle"])
+                result = self.grower.extend_last(self.zfs.zvol_device_path(tmp))
+            if ok and self.zfs.apply_clone(tmp, master, base, new):
+                return new, result
+            err = self._fail(f"Growing {master} to {size} failed")
+            if not self.zfs.destroy(tmp):
+                logger.error("Could not remove %s after a failed resize", tmp)
+            raise err
 
     def copy_disk(self, snapshot: str, target: str, progress=None) -> bool:
         """

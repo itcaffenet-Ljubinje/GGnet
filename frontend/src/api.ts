@@ -448,6 +448,12 @@ export const api = {
   finishEdit: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/finish-edit`),
   deleteDisk: (id: number) => request<void>("DELETE", `/v1/game-disks/${id}`),
   renameDisk: (id: number, name: string) => request<GameDisk>("PATCH", `/v1/game-disks/${id}`, { name }),
+  growDisk: (id: number, size_gb: number, extend = true) =>
+    request<{ disk: GameDisk; version: string | null; extended: boolean; note: string }>(
+      "POST",
+      `/v1/game-disks/${id}/grow`,
+      { size_gb, extend },
+    ),
   copyDisk: (id: number, name: string, snapshot?: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),

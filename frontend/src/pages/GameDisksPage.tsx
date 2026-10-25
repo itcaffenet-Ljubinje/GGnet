@@ -16,6 +16,7 @@ import {
 
 import { api, type DiskKind, type GameDisk, type Machine } from "../api";
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
+import { EditImage } from "../components/EditImage";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
 import { ImageDetailsPage } from "./ImageDetailsPage";
@@ -38,6 +39,9 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   const [editOn, setEditOn] = useState<Record<number, string>>({});
   // The image shown on its own details page.
   const [open, setOpen] = useState<number | null>(null);
+  // The image in the Edit dialog, and what the last edit asks to do in Windows.
+  const [editing, setEditing] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const assigned = (id: number) =>
     machines.filter((m) => m.game_disk_id === id || m.os_disk_id === id).length;
@@ -98,19 +102,6 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
-  async function rename(disk: GameDisk) {
-    const what = disk.kind === "os" ? "OS image" : "game disk";
-    const next = window.prompt(
-      `New name for ${what} "${disk.name}" (a-z, 0-9 and -, up to 32 characters).\n\n` +
-        "Only the name in ggNet changes; the zvol, its versions and the PCs' writebacks stay as they are.",
-      disk.name,
-    );
-    const name = next?.trim().toLowerCase();
-    if (!name || name === disk.name) return;
-    await run(`rename-${disk.id}`, () => api.renameDisk(disk.id, name));
-    await reload();
-  }
-
   async function copy(disk: GameDisk) {
     const what = disk.kind === "os" ? "OS image" : "game disk";
     const next = window.prompt(
@@ -136,7 +127,13 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     const users = assigned(d.id);
     return [
       { label: "Details", icon: Info, onSelect: () => setOpen(d.id) },
-      { label: "Edit", icon: Pencil, onSelect: () => rename(d), disabled: busy !== null, title: "Rename" },
+      {
+        label: "Edit",
+        icon: Pencil,
+        onSelect: () => setEditing(d.id),
+        disabled: busy !== null || copying(d) || d.editor_id !== null,
+        title: "Name and size",
+      },
       ...(d.published
         ? [
             {
@@ -176,11 +173,34 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     ];
   }
 
+  const editedDisk = disks.find((d) => d.id === editing);
+  const editDialog = editedDisk && (
+    <EditImage
+      disk={editedDisk}
+      onClose={() => setEditing(null)}
+      onSaved={async (note) => {
+        setEditing(null);
+        setNotice(note);
+        await reload();
+      }}
+    />
+  );
+  const noticeBanner = notice && (
+    <div className="banner banner-info" role="status">
+      <span>{notice}</span>
+      <button type="button" className="icon-btn" onClick={() => setNotice(null)} aria-label="Dismiss">
+        ×
+      </button>
+    </div>
+  );
+
   const shown = disks.find((d) => d.id === open);
   if (shown) {
     return (
       <>
         <ErrorBanner message={error} onClose={() => setError(null)} />
+        {noticeBanner}
+        {editDialog}
         <ImageDetailsPage
           disk={shown}
           machines={machines}
@@ -319,6 +339,8 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   return (
     <section>
       <ErrorBanner message={error} onClose={() => setError(null)} />
+      {noticeBanner}
+      {editDialog}
 
       <ImageKpis disks={disks} machines={machines} />
 

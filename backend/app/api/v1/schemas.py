@@ -89,6 +89,20 @@ class GameDiskCopy(BaseModel):
     check_name = field_validator("name")(_disk_name)
 
 
+class GameDiskGrow(BaseModel):
+    """A bigger size for a disk; `extend` also grows its last data partition."""
+
+    size_gb: int = Field(gt=0, le=16384)
+    extend: bool = True
+
+
+class GameDiskGrown(BaseModel):
+    disk: GameDiskOut
+    version: str | None        # the new version (None for a draft, grown in place)
+    extended: bool             # the data partition was grown on the server too
+    note: str                  # what to do in Windows, if anything
+
+
 class GameDiskRename(BaseModel):
     """A new name for the console; the zvol on the host keeps its path."""
 

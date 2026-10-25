@@ -810,6 +810,13 @@ td.td-select {
   color: #f87171;
 }
 
+.banner-info {
+  border: 1px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  color: #7dd3fc;
+  align-items: center;
+}
+
 .banner-warn {
   border: 1px solid var(--warn);
   background: rgba(245, 158, 11, 0.12);
