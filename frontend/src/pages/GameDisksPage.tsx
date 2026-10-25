@@ -1,24 +1,23 @@
 import { Fragment, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Gamepad2,
   HardDrive,
+  Info,
   Layers,
   Monitor,
   Pencil,
   Plus,
   Trash2,
-  Type,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
 
 import { api, type DiskKind, type GameDisk, type Machine } from "../api";
-import { DiskDetails } from "../components/DiskDetails";
+import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
+import { ImageDetailsPage } from "./ImageDetailsPage";
 
 interface Props {
   disks: GameDisk[];
@@ -33,7 +32,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   const [kind, setKind] = useState<DiskKind>("game");
   // Per draft disk: the machine picked to fill it on.
   const [editOn, setEditOn] = useState<Record<number, string>>({});
-  // The disk whose versions and writebacks are shown.
+  // The image shown on its own details page.
   const [open, setOpen] = useState<number | null>(null);
 
   const assigned = (id: number) =>
@@ -115,6 +114,54 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
+  function menuFor(d: GameDisk): MenuAction[] {
+    const users = assigned(d.id);
+    return [
+      { label: "Details", icon: Info, onSelect: () => setOpen(d.id) },
+      { label: "Edit", icon: Pencil, onSelect: () => rename(d), disabled: busy !== null, title: "Rename" },
+      ...(d.published && d.kind === "os"
+        ? [
+            {
+              label: "Prepare image",
+              icon: Wand2,
+              onSelect: () => prepare(d),
+              disabled: busy !== null,
+              title: "New version with the server's agent and the settings every PC needs",
+            },
+          ]
+        : []),
+      {
+        label: "Remove",
+        icon: Trash2,
+        onSelect: () => remove(d),
+        danger: true,
+        disabled: busy !== null || users > 0 || d.editor_id !== null,
+        title:
+          users > 0
+            ? `Used by ${users} PC(s); move them to another image first`
+            : d.editor_id !== null
+              ? "Finish editing first"
+              : undefined,
+      },
+    ];
+  }
+
+  const shown = disks.find((d) => d.id === open);
+  if (shown) {
+    return (
+      <>
+        <ErrorBanner message={error} onClose={() => setError(null)} />
+        <ImageDetailsPage
+          disk={shown}
+          machines={machines}
+          reload={reload}
+          onBack={() => setOpen(null)}
+          menu={<ActionMenu label={`Actions for ${shown.name}`} actions={menuFor(shown).filter((a) => a.label !== "Details")} />}
+        />
+      </>
+    );
+  }
+
   function section(title: string, Icon: LucideIcon, list: GameDisk[], empty: string) {
     return (
       <>
@@ -145,14 +192,19 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                   <Fragment key={d.id}>
                     <tr>
                       <td className="strong">
-                        <span className="name-with-icon">
+                        <button
+                          type="button"
+                          className="link-btn name-with-icon"
+                          onClick={() => setOpen(d.id)}
+                          title="Details: snapshots and writebacks"
+                        >
                           {d.kind === "os" ? (
                             <Monitor size={15} className="kind-icon kind-os" aria-hidden />
                           ) : (
                             <Gamepad2 size={15} className="kind-icon kind-game" aria-hidden />
                           )}
                           {d.name}
-                        </span>
+                        </button>
                       </td>
                       <td>{d.size_gb} GB</td>
                       <td>
@@ -169,28 +221,6 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                       <td>{assigned(d.id)}</td>
                       <td className="mono muted">{d.zvol_path}</td>
                       <td className="actions">
-                        {d.published && (
-                          <button
-                            type="button"
-                            className="secondary"
-                            aria-expanded={open === d.id}
-                            onClick={() => setOpen(open === d.id ? null : d.id)}
-                          >
-                            {open === d.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            {open === d.id ? "Hide details" : "Details"}
-                          </button>
-                        )}
-                        {d.published && d.kind === "os" && (
-                          <button
-                            type="button"
-                            onClick={() => prepare(d)}
-                            disabled={busy !== null}
-                            title="New version with the server's agent and the settings every PC needs"
-                          >
-                            <Wand2 size={14} />
-                            {busy === `prepare-${d.id}` ? "Preparing…" : "Prepare image"}
-                          </button>
-                        )}
                         {!d.published && d.editor_id === null && (
                           <>
                             <select
@@ -235,35 +265,9 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                             {busy === `finish-${d.id}` ? "Finishing…" : "Finish editing"}
                           </button>
                         )}
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => rename(d)}
-                          disabled={busy !== null}
-                          aria-label={`Rename ${d.name}`}
-                          title="Rename"
-                        >
-                          <Type size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn icon-btn-danger"
-                          onClick={() => remove(d)}
-                          disabled={busy !== null}
-                          aria-label={`Delete ${d.name}`}
-                          title={busy === `delete-${d.id}` ? "Deleting…" : "Delete"}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <ActionMenu label={`Actions for ${d.name}`} actions={menuFor(d)} />
                       </td>
                     </tr>
-                    {open === d.id && (
-                      <tr>
-                        <td colSpan={6}>
-                          <DiskDetails disk={d} onChanged={reload} refreshKey={machines} />
-                        </td>
-                      </tr>
-                    )}
                   </Fragment>
                 ))}
               </tbody>

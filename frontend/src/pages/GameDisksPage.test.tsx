@@ -3,6 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { calls, disk, machine, stubFetch } from "../test/fixtures";
+
+/** Opens the ⋮ menu of `name` and picks `item`. */
+async function menu(name: string, item: string) {
+  await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+  await userEvent.click(screen.getByRole("menuitem", { name: item }));
+}
 import { GameDisksPage } from "./GameDisksPage";
 
 describe("GameDisksPage", () => {
@@ -74,7 +80,7 @@ describe("GameDisksPage", () => {
     const prompt = vi.spyOn(window, "prompt").mockReturnValue(" Steam-Main ");
     const reload = vi.fn().mockResolvedValue(undefined);
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={reload} />);
-    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
+    await menu("cs2", "Edit");
     expect(prompt).toHaveBeenCalledWith(expect.stringContaining('"cs2"'), "cs2");
     expect(calls(fetchMock)).toEqual([
       { url: "/api/v1/game-disks/1", method: "PATCH", body: { name: "steam-main" } },
@@ -86,8 +92,8 @@ describe("GameDisksPage", () => {
     const fetchMock = stubFetch();
     const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce(null).mockReturnValueOnce("cs2");
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
-    await userEvent.click(screen.getByRole("button", { name: "Rename cs2" }));
+    await menu("cs2", "Edit");
+    await menu("cs2", "Edit");
     expect(prompt).toHaveBeenCalledTimes(2);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -97,7 +103,7 @@ describe("GameDisksPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<GameDisksPage disks={[disk()]} machines={[]} reload={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete cs2" }));
+    await menu("cs2", "Remove");
     expect(await screen.findByRole("alert")).toHaveTextContent("assigned to 1 machine(s)");
   });
 
@@ -154,7 +160,8 @@ describe("GameDisksPage", () => {
     ]);
   });
 
-  it("offers details only for published disks", () => {
+  it("opens an image's details page from its name or the menu, and goes back", async () => {
+    stubFetch(200, []);
     render(
       <GameDisksPage
         disks={[disk(), disk({ id: 2, name: "draft", published: false, snapshot: null })]}
@@ -162,9 +169,19 @@ describe("GameDisksPage", () => {
         reload={vi.fn()}
       />,
     );
-    const buttons = screen.getAllByRole("button", { name: "Details" });
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(screen.getByRole("button", { name: "cs2" }));
+    expect(screen.getByRole("heading", { level: 2, name: "cs2" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Snapshots" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Writebacks" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Images" }));
+    await menu("draft", "Details");
+    expect(screen.getByText(/A draft has no snapshots or writebacks yet/)).toBeInTheDocument();
+  });
+
+  it("offers Remove only for an image no PC uses", async () => {
+    render(<GameDisksPage disks={[disk()]} machines={[machine({ game_disk_id: 1 })]} reload={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for cs2" }));
+    expect(screen.getByRole("menuitem", { name: "Remove" })).toBeDisabled();
   });
 
   it("lists OS images and game disks apart and creates an OS image", async () => {
@@ -200,9 +217,10 @@ describe("GameDisksPage", () => {
         reload={reload}
       />,
     );
-    const buttons = screen.getAllByRole("button", { name: "Prepare image" });
-    expect(buttons).toHaveLength(1);
-    await userEvent.click(buttons[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for cs2" }));
+    expect(screen.queryByRole("menuitem", { name: "Prepare image" })).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    await menu("win11", "Prepare image");
     expect(calls(fetchMock).filter((c) => c.method !== "GET")).toEqual([
       { url: "/api/v1/game-disks/3/prepare", method: "POST", body: undefined },
     ]);

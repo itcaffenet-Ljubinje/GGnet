@@ -681,6 +681,28 @@ def test_the_comment_stays_when_the_version_is_merged_into_base(client, host, di
     assert _by_name(client, disk)["base"]["comment"] == "v2 notes"
 
 
+# ── Locked versions ───────────────────────────────────────────────────
+
+def test_a_locked_version_cannot_be_deleted_or_merged_away(client, host, disk):
+    m = _keeper(client, disk)
+    client.post(f"/api/v1/machines/{m['id']}/apply-writebacks", json={})
+    client.put(f"/api/v1/machines/{m['id']}/keep-writeback", json={"enabled": False})
+    client.put(f"/api/v1/game-disks/{disk['id']}/active-snapshot", json={"snapshot": "v2"})
+    base = f"/api/v1/game-disks/{disk['id']}/snapshots"
+    r = client.put(f"{base}/base/lock", json={"locked": True})
+    assert (r.status_code, r.json()["locked"]) == (200, True)
+    assert _by_name(client, disk)["v2"]["locked"] is False
+
+    r = client.delete(f"{base}/base")
+    assert r.status_code == 409 and "locked" in r.json()["detail"]["error"]
+    r = client.post(f"{base}/v2/merge-into-base")
+    assert r.status_code == 409 and "locked" in r.json()["detail"]["error"]
+    assert f"{MASTER}@base" in host.snapshots
+
+    assert client.put(f"{base}/base/lock", json={"locked": False}).json()["locked"] is False
+    assert client.put(f"{base}/v9/lock", json={"locked": True}).status_code == 404
+
+
 # ── Writeback sizes ───────────────────────────────────────────────────
 
 def test_writeback_sizes_and_the_warning(client, prov, disk, make_session, monkeypatch, caplog):

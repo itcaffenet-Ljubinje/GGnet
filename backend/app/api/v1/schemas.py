@@ -117,6 +117,7 @@ class SnapshotOut(BaseModel):
     machines: list[str]       # PCs whose writeback was cloned from it
     pinned: list[str]         # PCs pinned to it (they move to it at their next reboot)
     comment: str | None = None   # who, when, what changed
+    locked: bool = False         # never deleted (retention or by hand) until unlocked
 
 
 def _comment(v: str | None) -> str | None:
@@ -126,6 +127,10 @@ def _comment(v: str | None) -> str | None:
     if not valid_comment(v):
         raise ValueError(f"comment: one line of at most {COMMENT_MAX} printable characters")
     return v
+
+
+class SnapshotLock(BaseModel):
+    locked: bool
 
 
 class SnapshotComment(BaseModel):

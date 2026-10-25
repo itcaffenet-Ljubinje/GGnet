@@ -28,6 +28,7 @@ from app.api.v1.schemas import (
     GameDiskOut,
     GameDiskRename,
     SnapshotComment,
+    SnapshotLock,
     SnapshotOut,
     WritebackOut,
 )
@@ -254,6 +255,7 @@ def list_snapshots(
                             for c in v["clones"]),
             pinned=sorted(m.name for m in disk.machines if m.pinned_snapshot == v["name"]),
             comment=v.get("comment"),
+            locked=bool(v.get("locked")),
         )
         for v in _versions(prov, disk)
     ]
@@ -273,6 +275,25 @@ def set_snapshot_comment(
         not_found("Version", name)
     try:
         prov.set_comment(disk.zvol_path, name, body.comment)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    return next(v for v in list_snapshots(disk_id, db, prov) if v.name == name)
+
+
+@router.put("/{disk_id}/snapshots/{name}/lock", response_model=SnapshotOut)
+def set_snapshot_lock(
+    disk_id: int,
+    name: str,
+    body: SnapshotLock,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """Lock a version (never deleted, by retention or by hand) or unlock it."""
+    disk = _get(db, disk_id)
+    if not disk.published or name not in {v["name"] for v in _versions(prov, disk)}:
+        not_found("Version", name)
+    try:
+        prov.set_locked(disk.zvol_path, name, body.locked)
     except ProvisioningError as e:
         host_failed(str(e))
     return next(v for v in list_snapshots(disk_id, db, prov) if v.name == name)
@@ -312,6 +333,8 @@ def delete_snapshot(
     version = next((v for v in _versions(prov, disk) if v["name"] == name), None)
     if version is None:
         not_found("Snapshot", f"{disk.name}@{name}")
+    if version.get("locked"):
+        conflict(f"{disk.name}@{name} is locked; unlock it first")
     if name == disk.snapshot:
         conflict(f"{disk.name}@{name} is the active version; make another one active first")
     pinned = sorted(m.name for m in disk.machines if m.pinned_snapshot == name)
@@ -394,6 +417,9 @@ def merge_into_base(
                     if m.pinned_snapshot in older_names)
     if pinned:
         conflict(f"Older versions are pinned on {', '.join(pinned)}; unpin them first")
+    locked = [v["name"] for v in older if v.get("locked")]
+    if locked:
+        conflict(f"Older versions are locked ({', '.join('@' + n for n in locked)}); unlock them first")
     if any(v["clones"] for v in older):
         by_clone = _machines_by_clone(db)
         users = sorted({by_clone[c].name if c in by_clone else c

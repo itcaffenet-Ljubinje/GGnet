@@ -31,6 +31,8 @@ _COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
 # its snapshot so it travels with the snapshot (rename, promote, zfs send).
 COMMENT_PROP = "ggnet:comment"
 COMMENT_MAX = 200
+# A locked version is never deleted, by retention or by hand, until unlocked.
+LOCK_PROP = "ggnet:locked"
 
 # Datasets under root_dataset that ggNet creates and manages.
 _CHILD_KEYS = ("images", "writebacks", "snapshots", "iscsi_targets")
@@ -597,13 +599,14 @@ class ZFSManager:
         """
         Snapshots of one master, oldest first: name (after '@'), creation
         (Unix time), used and referenced (bytes), the clones made from it and
-        its comment (None when unset). None if they cannot be listed.
+        its comment (None when unset) and whether it is locked. None if they
+        cannot be listed.
         """
         if not self._is_managed(dataset, allow_snapshot=False):
             return None
         ok, out, _ = self._run([
             "zfs", "list", "-H", "-p", "-t", "snapshot",
-            "-o", f"name,creation,used,refer,clones,{COMMENT_PROP}",
+            "-o", f"name,creation,used,refer,clones,{COMMENT_PROP},{LOCK_PROP}",
             "-s", "createtxg", "-d", "1", dataset,
         ])
         if not ok:
@@ -611,7 +614,7 @@ class ZFSManager:
         snaps = []
         for line in out.splitlines():
             parts = line.split("\t")
-            if len(parts) != 6 or "@" not in parts[0]:
+            if len(parts) != 7 or "@" not in parts[0]:
                 continue
             snaps.append({
                 "name": parts[0].partition("@")[2],
@@ -620,6 +623,7 @@ class ZFSManager:
                 "referenced": _int(parts[3]),
                 "clones": [c for c in parts[4].split(",") if c and c != "-"],
                 "comment": None if parts[5] in ("", "-") else parts[5],
+                "locked": parts[6] == "on",
             })
         return snaps
 
@@ -632,6 +636,17 @@ class ZFSManager:
         ok, _, err = self._run(cmd)
         if not ok:
             logger.error("Setting the comment of %s failed: %s", snapshot, err)
+        return ok
+
+    def set_snapshot_lock(self, snapshot: str, locked: bool) -> bool:
+        """Lock a version against deletion, or unlock it."""
+        if "@" not in snapshot or not self._is_managed(snapshot):
+            return False
+        cmd = (["zfs", "set", f"{LOCK_PROP}=on", snapshot] if locked
+               else ["zfs", "inherit", LOCK_PROP, snapshot])
+        ok, _, err = self._run(cmd)
+        if not ok:
+            logger.error("%s %s failed: %s", "Locking" if locked else "Unlocking", snapshot, err)
         return ok
 
     def destroy_snapshot(self, snapshot: str, tag: str = "ggnet:protected") -> bool:

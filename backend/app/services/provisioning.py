@@ -297,6 +297,13 @@ class Provisioner:
             if not self.zfs.set_snapshot_comment(f"{zvol_path}@{name}", comment):
                 raise self._fail(f"Setting the comment of {zvol_path}@{name} failed")
 
+    def set_locked(self, zvol_path: str, name: str, locked: bool) -> None:
+        """Lock one version against deletion, or unlock it."""
+        with self.lock:
+            self._clear()
+            if not self.zfs.set_snapshot_lock(f"{zvol_path}@{name}", locked):
+                raise self._fail(f"{'Locking' if locked else 'Unlocking'} {zvol_path}@{name} failed")
+
     def delete_snapshot(self, zvol_path: str, name: str) -> None:
         with self.lock:
             self._clear()

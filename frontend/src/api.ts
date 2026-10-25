@@ -41,6 +41,8 @@ export interface Snapshot {
   pinned: string[];
   /** Who, when, what changed; null when unset. */
   comment?: string | null;
+  /** Never deleted (automatically or by hand) until unlocked. */
+  locked?: boolean;
 }
 
 /** A PC's writeback (clone) of a game disk. */
@@ -449,6 +451,8 @@ export const api = {
     request<void>("DELETE", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}`),
   setSnapshotComment: (id: number, name: string, comment: string) =>
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
+  setSnapshotLock: (id: number, name: string, locked: boolean) =>
+    request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/lock`, { locked }),
   prepareImage: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),

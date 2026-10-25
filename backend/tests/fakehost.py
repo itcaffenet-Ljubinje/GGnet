@@ -104,6 +104,7 @@ class FakeHost:
             "clones": ",".join(self.clones_of(name)) or "-",
             "origin": self.datasets.get(name, {}).get("origin") or "-",
             "ggnet:comment": self.snap_props.get(name, {}).get("ggnet:comment", "-"),
+            "ggnet:locked": self.snap_props.get(name, {}).get("ggnet:locked", "-"),
         }
         return "\t".join(values[f] for f in fields)
 
