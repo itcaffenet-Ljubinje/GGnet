@@ -262,6 +262,13 @@ class Provisioner:
                 raise self._fail(f"Creating zvol {path} failed")
         return path
 
+    def copy_disk(self, snapshot: str, target: str, progress=None) -> bool:
+        """
+        A full, independent copy of one version as the master `target`, at
+        @base (ZFSManager.copy_snapshot). Without the lock: it can take hours.
+        """
+        return self.zfs.copy_snapshot(snapshot, target, progress)
+
     def publish_disk(self, zvol_path: str, snap_name: str = "base") -> str:
         """publish_master(): snapshot → hold → readonly."""
         with self.lock:

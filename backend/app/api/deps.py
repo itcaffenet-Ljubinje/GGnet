@@ -25,6 +25,15 @@ def get_provisioner() -> Provisioner:
     return Provisioner(ZFSManager(), ISCSIManager(), WindowsSetup())
 
 
+def get_disk_copier(db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
+    """Runs image copies in the background, on the request's database."""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.copies import DiskCopier
+
+    return DiskCopier(sessionmaker(bind=db.get_bind(), expire_on_commit=False), prov)
+
+
 def get_writeback_settings() -> WritebackSettings:
     return WritebackSettings.from_config(get_config())
 

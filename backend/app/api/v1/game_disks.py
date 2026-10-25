@@ -19,10 +19,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner
+from app.api.deps import get_disk_copier, get_provisioner
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     ActiveSnapshot,
+    GameDiskCopy,
     GameDiskCreate,
     GameDiskEdit,
     GameDiskOut,
@@ -113,6 +114,51 @@ def rename_disk(disk_id: int, body: GameDiskRename, db: Session = Depends(get_db
     return disk
 
 
+@router.post("/{disk_id}/copy", response_model=GameDiskOut, status_code=status.HTTP_201_CREATED)
+def copy_disk(
+    disk_id: int,
+    body: GameDiskCopy,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+    copier=Depends(get_disk_copier),
+):
+    """
+    Copy one version of this image (default: the active one) into a new,
+    independent image of the same kind. The copy runs in the background;
+    the new disk shows its progress and is published at @base when done.
+    """
+    src = _get(db, disk_id)
+    _published(src)
+    snap = body.snapshot or src.snapshot
+    if snap not in {v["name"] for v in _versions(prov, src)}:
+        not_found("Snapshot", f"{src.name}@{snap}")
+    if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
+        conflict(f"Game disk '{body.name}' already exists")
+    path = prov.image_path(body.name)
+    owner = db.scalar(select(GameDisk).where(GameDisk.zvol_path == path))
+    if owner is not None:
+        conflict(f"'{body.name}' is still the zvol name of '{owner.name}' (renamed); choose another name")
+    if prov.zfs.dataset_exists(path):
+        conflict(f"Zvol {path} already exists on the host")
+    disk = GameDisk(name=body.name, zvol_path=path, size_gb=src.size_gb, kind=src.kind,
+                    copy_source=f"{src.zvol_path}@{snap}", copy_percent=0)
+    db.add(disk)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        conflict(f"Game disk '{body.name}' already exists")
+    logger.info("Copy of %s@%s to '%s' started", src.name, snap, disk.name)
+    copier.start(disk.id)
+    db.refresh(disk)
+    return disk
+
+
+def _not_copying(disk: GameDisk) -> None:
+    if disk.copying:
+        conflict(f"'{disk.name}' is still being copied ({disk.copy_percent or 0}%); wait until it is done")
+
+
 def _not_edited(disk: GameDisk) -> None:
     if disk.editor is not None:
         conflict(f"Game disk '{disk.name}' is being edited on '{disk.editor.name}'; finish editing first")
@@ -131,6 +177,7 @@ def start_edit(
     A published disk is changed with Keep Writeback + Apply Writebacks instead.
     """
     disk = _get(db, disk_id)
+    _not_copying(disk)
     if disk.kind is DiskKind.OS:
         conflict(f"'{disk.name}' is an OS image; it cannot be edited on a Disk Mode PC")
     if disk.published:
@@ -202,6 +249,8 @@ def publish_disk(
     if disk.published:
         conflict(f"Game disk '{disk.name}' is already published (@{disk.snapshot})")
     _not_edited(disk)
+    if disk.copy_source is not None:
+        conflict(f"'{disk.name}' is a copy; it is published by itself when the copy ends")
     try:
         disk.snapshot = prov.publish_disk(disk.zvol_path)
     except ProvisioningError as e:
@@ -487,6 +536,7 @@ def delete_disk(
 ):
     disk = _get(db, disk_id)
     _not_edited(disk)
+    _not_copying(disk)
     assigned = db.scalar(
         select(func.count()).select_from(Machine).where(
             or_(Machine.game_disk_id == disk.id, Machine.os_disk_id == disk.id))

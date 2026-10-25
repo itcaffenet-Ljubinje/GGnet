@@ -93,6 +93,11 @@ class GameDisk(Base):
     )
     snapshot: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    # Copy: while set, the zvol is being filled from that version (master@v)
+    # and the disk is neither a draft to fill nor published yet.
+    copy_source: Mapped[str | None] = mapped_column(String(255), default=None)
+    copy_percent: Mapped[int | None] = mapped_column(Integer, default=None)
+    copy_error: Mapped[str | None] = mapped_column(String(500), default=None)
 
     machines: Mapped[list["Machine"]] = relationship(
         back_populates="game_disk", foreign_keys="Machine.game_disk_id"
@@ -108,6 +113,10 @@ class GameDisk(Base):
     @property
     def published(self) -> bool:
         return self.snapshot is not None
+
+    @property
+    def copying(self) -> bool:
+        return self.copy_source is not None and self.copy_error is None
 
     @property
     def snapshot_path(self) -> str | None:

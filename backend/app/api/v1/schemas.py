@@ -80,6 +80,15 @@ class GameDiskCreate(BaseModel):
     check_name = field_validator("name")(_disk_name)
 
 
+class GameDiskCopy(BaseModel):
+    """A new image from one version of this one (default: the active version)."""
+
+    name: str
+    snapshot: str | None = None
+
+    check_name = field_validator("name")(_disk_name)
+
+
 class GameDiskRename(BaseModel):
     """A new name for the console; the zvol on the host keeps its path."""
 
@@ -100,6 +109,9 @@ class GameDiskOut(BaseModel):
     published: bool
     editor_id: int | None
     created_at: datetime
+    copy_source: str | None = None    # being copied (or failed) from this master@version
+    copy_percent: int | None = None
+    copy_error: str | None = None
 
 
 class GameDiskEdit(BaseModel):

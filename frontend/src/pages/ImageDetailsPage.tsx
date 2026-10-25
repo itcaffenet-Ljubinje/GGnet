@@ -29,7 +29,11 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props
         <KindIcon size={22} className={`kind-icon ${disk.kind === "os" ? "kind-os" : "kind-game"}`} aria-hidden />
         <h2>{disk.name}</h2>
         <span className="badge">{disk.kind === "os" ? "OS image" : "Game disk"}</span>
-        {disk.published ? (
+        {disk.copy_source && !disk.copy_error ? (
+          <span className="badge badge-editing">Copying {disk.copy_percent ?? 0}%</span>
+        ) : disk.copy_error ? (
+          <span className="badge badge-error">Copy failed</span>
+        ) : disk.published ? (
           <span className="badge badge-provisioned">Active @{disk.snapshot}</span>
         ) : editor ? (
           <span className="badge badge-editing">Editing on {editor.name}</span>
@@ -40,7 +44,13 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props
         {menu}
       </div>
 
-      {disk.published ? (
+      {disk.copy_source ? (
+        <p className={disk.copy_error ? "error-text" : "empty"}>
+          {disk.copy_error
+            ? `The copy from ${disk.copy_source} failed: ${disk.copy_error}`
+            : `Copying from ${disk.copy_source}: ${disk.copy_percent ?? 0}% done. It is published by itself when the copy ends.`}
+        </p>
+      ) : disk.published ? (
         <DiskDetails
           disk={disk}
           onChanged={reload}

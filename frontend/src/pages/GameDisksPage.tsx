@@ -1,6 +1,7 @@
 import { Fragment, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
+  Copy,
   Gamepad2,
   HardDrive,
   Info,
@@ -18,6 +19,9 @@ import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
 import { ImageDetailsPage } from "./ImageDetailsPage";
+
+/** A copy that is still running (a failed one keeps its error instead). */
+const copying = (d: GameDisk) => !!d.copy_source && !d.copy_error;
 
 interface Props {
   disks: GameDisk[];
@@ -107,6 +111,20 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
+  async function copy(disk: GameDisk) {
+    const what = disk.kind === "os" ? "OS image" : "game disk";
+    const next = window.prompt(
+      `Copy version @${disk.snapshot} of ${what} "${disk.name}" into a new ${what}.\n\n` +
+        "The copy is independent: it has its own data and either can be deleted later. It takes " +
+        "a few minutes per 100 GB and runs in the background. Name of the copy:",
+      `${disk.name}-copy`.slice(0, 32),
+    );
+    const name = next?.trim().toLowerCase();
+    if (!name) return;
+    await run(`copy-${disk.id}`, () => api.copyDisk(disk.id, name));
+    await reload();
+  }
+
   async function remove(disk: GameDisk) {
     const what = disk.kind === "os" ? "OS image" : "game disk";
     if (!window.confirm(`Delete ${what} "${disk.name}" and its zvol on the host?`)) return;
@@ -119,6 +137,17 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     return [
       { label: "Details", icon: Info, onSelect: () => setOpen(d.id) },
       { label: "Edit", icon: Pencil, onSelect: () => rename(d), disabled: busy !== null, title: "Rename" },
+      ...(d.published
+        ? [
+            {
+              label: "Copy",
+              icon: Copy,
+              onSelect: () => copy(d),
+              disabled: busy !== null,
+              title: `New independent image from @${d.snapshot}`,
+            },
+          ]
+        : []),
       ...(d.published && d.kind === "os"
         ? [
             {
@@ -135,9 +164,10 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
         icon: Trash2,
         onSelect: () => remove(d),
         danger: true,
-        disabled: busy !== null || users > 0 || d.editor_id !== null,
-        title:
-          users > 0
+        disabled: busy !== null || users > 0 || d.editor_id !== null || copying(d),
+        title: copying(d)
+          ? "Wait until the copy is done"
+          : users > 0
             ? `Used by ${users} PC(s); move them to another image first`
             : d.editor_id !== null
               ? "Finish editing first"
@@ -208,7 +238,15 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                       </td>
                       <td>{d.size_gb} GB</td>
                       <td>
-                        {d.published ? (
+                        {copying(d) ? (
+                          <span className="badge badge-editing" title={`From ${d.copy_source}`}>
+                            Copying {d.copy_percent ?? 0}%
+                          </span>
+                        ) : d.copy_error ? (
+                          <span className="badge badge-error" title={d.copy_error}>
+                            Copy failed
+                          </span>
+                        ) : d.published ? (
                           <span className="badge badge-provisioned">Published @{d.snapshot}</span>
                         ) : d.editor_id !== null ? (
                           <span className="badge badge-editing">
@@ -221,7 +259,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                       <td>{assigned(d.id)}</td>
                       <td className="mono muted">{d.zvol_path}</td>
                       <td className="actions">
-                        {!d.published && d.editor_id === null && (
+                        {!d.published && d.editor_id === null && !d.copy_source && (
                           <>
                             <select
                               aria-label={`PC to edit ${d.name} on`}

@@ -18,6 +18,10 @@ export interface GameDisk {
   created_at: string;
   /** "os": a Boot Mode Windows image; "game": a game disk. Older servers send none (game). */
   kind?: DiskKind;
+  /** A copy in progress (or failed): the master@version it is copied from. */
+  copy_source?: string | null;
+  copy_percent?: number | null;
+  copy_error?: string | null;
 }
 
 export type DiskKind = "game" | "os";
@@ -444,6 +448,8 @@ export const api = {
   finishEdit: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/finish-edit`),
   deleteDisk: (id: number) => request<void>("DELETE", `/v1/game-disks/${id}`),
   renameDisk: (id: number, name: string) => request<GameDisk>("PATCH", `/v1/game-disks/${id}`, { name }),
+  copyDisk: (id: number, name: string, snapshot?: string) =>
+    request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),
   setActiveSnapshot: (id: number, snapshot: string) =>
     request<GameDisk>("PUT", `/v1/game-disks/${id}/active-snapshot`, { snapshot }),

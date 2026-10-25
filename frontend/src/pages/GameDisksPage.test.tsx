@@ -178,6 +178,37 @@ describe("GameDisksPage", () => {
     expect(screen.getByText(/A draft has no snapshots or writebacks yet/)).toBeInTheDocument();
   });
 
+  it("copies an image under a new name", async () => {
+    const fetchMock = stubFetch(201, disk({ id: 5, name: "cs2-b", copy_source: "tank/ggnet/images/cs2@base" }));
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue(" CS2-B ");
+    const reload = vi.fn().mockResolvedValue(undefined);
+    render(<GameDisksPage disks={[disk()]} machines={[]} reload={reload} />);
+    await menu("cs2", "Copy");
+    expect(prompt.mock.calls[0][1]).toBe("cs2-copy");
+    expect(calls(fetchMock)).toEqual([{ url: "/api/v1/game-disks/1/copy", method: "POST", body: { name: "cs2-b" } }]);
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it("shows a running and a failed copy with their limits", async () => {
+    render(
+      <GameDisksPage
+        disks={[
+          disk({ id: 2, name: "busy", published: false, snapshot: null, copy_source: "x@base", copy_percent: 42 }),
+          disk({ id: 3, name: "broken", published: false, snapshot: null, copy_source: "x@base", copy_error: "out of space" }),
+        ]}
+        machines={[]}
+        reload={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Copying 42%")).toBeInTheDocument();
+    expect(screen.getByText("Copy failed")).toHaveAttribute("title", "out of space");
+    // A copy is no draft: no Edit on PC or Publish.
+    expect(screen.queryByRole("button", { name: /Publish/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Actions for busy" }));
+    expect(screen.getByRole("menuitem", { name: "Remove" })).toBeDisabled();
+    expect(screen.queryByRole("menuitem", { name: "Copy" })).toBeNull();
+  });
+
   it("offers Remove only for an image no PC uses", async () => {
     render(<GameDisksPage disks={[disk()]} machines={[machine({ game_disk_id: 1 })]} reload={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "Actions for cs2" }));
