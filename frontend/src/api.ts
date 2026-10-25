@@ -18,6 +18,10 @@ export interface GameDisk {
   created_at: string;
   /** "os": a Boot Mode Windows image; "game": a game disk. Older servers send none (game). */
   kind?: DiskKind;
+  /** A copy in progress (or failed): the master@version it is copied from. */
+  copy_source?: string | null;
+  copy_percent?: number | null;
+  copy_error?: string | null;
 }
 
 export type DiskKind = "game" | "os";
@@ -41,6 +45,8 @@ export interface Snapshot {
   pinned: string[];
   /** Who, when, what changed; null when unset. */
   comment?: string | null;
+  /** Never deleted (automatically or by hand) until unlocked. */
+  locked?: boolean;
 }
 
 /** A PC's writeback (clone) of a game disk. */
@@ -184,7 +190,15 @@ export interface Pool {
 
 export interface ServerStatus {
   pool: Pool | null;
-  arc: { size_bytes: number; max_bytes: number; min_bytes: number; hit_percent: number | null } | null;
+  arc: {
+    size_bytes: number;
+    max_bytes: number;
+    min_bytes: number;
+    hit_percent: number | null;
+    /** What the maximum may be set to on this server. */
+    allowed_min_bytes?: number | null;
+    allowed_max_bytes?: number | null;
+  } | null;
   memory: { total_bytes: number; available_bytes: number } | null;
   writebacks_bytes: number;
   writebacks_count: number;
@@ -214,7 +228,7 @@ export interface Maintenance extends MaintenanceSettings {
   last_run: { window_start: string; window_end: string; closed: boolean; steps: MaintenanceStep[] } | null;
 }
 
-/** Hardware the agent reports (ggRock's Hardware tab). */
+/** Hardware the agent reports (the Hardware tab). */
 export interface MachineHardware {
   nic: string | null;
   cpu: string | null;
@@ -441,6 +455,15 @@ export const api = {
     request<GameDisk>("POST", `/v1/game-disks/${id}/edit`, { machine_id }),
   finishEdit: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/finish-edit`),
   deleteDisk: (id: number) => request<void>("DELETE", `/v1/game-disks/${id}`),
+  renameDisk: (id: number, name: string) => request<GameDisk>("PATCH", `/v1/game-disks/${id}`, { name }),
+  growDisk: (id: number, size_gb: number, extend = true) =>
+    request<{ disk: GameDisk; version: string | null; extended: boolean; note: string }>(
+      "POST",
+      `/v1/game-disks/${id}/grow`,
+      { size_gb, extend },
+    ),
+  copyDisk: (id: number, name: string, snapshot?: string) =>
+    request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),
   setActiveSnapshot: (id: number, snapshot: string) =>
     request<GameDisk>("PUT", `/v1/game-disks/${id}/active-snapshot`, { snapshot }),
@@ -448,7 +471,10 @@ export const api = {
     request<void>("DELETE", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}`),
   setSnapshotComment: (id: number, name: string, comment: string) =>
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
-  prepareImage: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`),
+  setSnapshotLock: (id: number, name: string, locked: boolean) =>
+    request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/lock`, { locked }),
+  prepareImage: (id: number, options?: { defender_off: boolean }) =>
+    request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`, options),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),
   listWritebacks: (id: number) => request<Writeback[]>("GET", `/v1/game-disks/${id}/writebacks`),
@@ -459,6 +485,7 @@ export const api = {
   scrub: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/scrub", { action }),
   trim: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/trim", { action }),
   readSmart: () => request<ServerStatus>("POST", "/v1/server/smart"),
+  setArcMax: (max_gb: number) => request<ServerStatus>("PUT", "/v1/server/arc", { max_gb }),
   getSchedule: () => request<Maintenance>("GET", "/v1/server/schedule"),
   saveSchedule: (body: MaintenanceSettings) => request<Maintenance>("PUT", "/v1/server/schedule", body),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),

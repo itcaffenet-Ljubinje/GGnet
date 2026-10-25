@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PxeStatus, Retention, RetentionAction, Storage } from "../api";
 import { calls } from "../test/fixtures";
@@ -61,6 +61,8 @@ function stubHost(retention: Retention = DEFAULTS) {
   vi.stubGlobal("fetch", mock);
   return mock;
 }
+
+afterEach(() => window.localStorage.clear());
 
 const actions = (mock: ReturnType<typeof vi.fn>) => calls(mock).filter((c) => c.method !== "GET");
 
@@ -149,5 +151,21 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("Account")).toHaveTextContent("ana (staff)");
     expect(screen.queryByLabelText("Retention")).toBeNull();
     expect(screen.queryByLabelText("Users")).toBeNull();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Account", "Client app"]);
+  });
+
+  it("shows one section at a time from the sub-menu", async () => {
+    stubHost();
+    render(<SettingsPage storage={STORAGE} reload={vi.fn()} />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Storage",
+      "Network boot",
+      "Client app",
+      "Users",
+    ]);
+    expect(await screen.findByLabelText("Retention")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Network boot/ }));
+    expect(screen.queryByLabelText("Retention")).toBeNull();
+    expect(screen.getByRole("tab", { name: /Network boot/ })).toHaveAttribute("aria-selected", "true");
   });
 });

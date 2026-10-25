@@ -4,7 +4,7 @@ namespace GgnetAgent;
 /// Boot Mode: the PC runs Windows from the server, so its own disks must not
 /// be used. Left online, a game library (Steam, Warzone) lands on the local
 /// NVMe instead of the game disk, only on that PC and out of the server's
-/// reach. ggRock tells centers to pull the drives; the agent takes them offline.
+/// reach. Instead of pulling the drives, the agent takes them offline.
 /// </summary>
 public interface ILocalDisks
 {

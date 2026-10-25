@@ -65,18 +65,56 @@ def _mac(v: str | None) -> str | None:
 
 # ── Game disk ─────────────────────────────────────────────────────────
 
+def _disk_name(v: str) -> str:
+    v = v.strip().lower()
+    if not _DISK_NAME_RE.match(v):
+        raise ValueError("name: 1-32 characters [a-z0-9-]")
+    return v
+
+
 class GameDiskCreate(BaseModel):
     name: str
     size_gb: int = Field(gt=0, le=16384)
     kind: DiskKind = DiskKind.GAME     # `os`: a Boot Mode Windows image
 
-    @field_validator("name")
-    @classmethod
-    def _name(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not _DISK_NAME_RE.match(v):
-            raise ValueError("name: 1-32 characters [a-z0-9-]")
-        return v
+    check_name = field_validator("name")(_disk_name)
+
+
+class GameDiskCopy(BaseModel):
+    """A new image from one version of this one (default: the active version)."""
+
+    name: str
+    snapshot: str | None = None
+
+    check_name = field_validator("name")(_disk_name)
+
+
+class PrepareImage(BaseModel):
+    """Options of Prepare image beyond what every image gets."""
+
+    defender_off: bool = False     # Microsoft Defender's services and drivers disabled
+
+
+class GameDiskGrow(BaseModel):
+    """A bigger size for a disk; `extend` also grows its last data partition."""
+
+    size_gb: int = Field(gt=0, le=16384)
+    extend: bool = True
+
+
+class GameDiskGrown(BaseModel):
+    disk: GameDiskOut
+    version: str | None        # the new version (None for a draft, grown in place)
+    extended: bool             # the data partition was grown on the server too
+    note: str                  # what to do in Windows, if anything
+
+
+class GameDiskRename(BaseModel):
+    """A new name for the console; the zvol on the host keeps its path."""
+
+    name: str
+
+    check_name = field_validator("name")(_disk_name)
 
 
 class GameDiskOut(BaseModel):
@@ -91,6 +129,9 @@ class GameDiskOut(BaseModel):
     published: bool
     editor_id: int | None
     created_at: datetime
+    copy_source: str | None = None    # being copied (or failed) from this master@version
+    copy_percent: int | None = None
+    copy_error: str | None = None
 
 
 class GameDiskEdit(BaseModel):
@@ -108,6 +149,7 @@ class SnapshotOut(BaseModel):
     machines: list[str]       # PCs whose writeback was cloned from it
     pinned: list[str]         # PCs pinned to it (they move to it at their next reboot)
     comment: str | None = None   # who, when, what changed
+    locked: bool = False         # never deleted (retention or by hand) until unlocked
 
 
 def _comment(v: str | None) -> str | None:
@@ -117,6 +159,10 @@ def _comment(v: str | None) -> str | None:
     if not valid_comment(v):
         raise ValueError(f"comment: one line of at most {COMMENT_MAX} printable characters")
     return v
+
+
+class SnapshotLock(BaseModel):
+    locked: bool
 
 
 class SnapshotComment(BaseModel):
@@ -426,7 +472,7 @@ class AgentSecureBoot(BaseModel):
 # ── Settings: retention and storage ───────────────────────────────────
 
 class RetentionIn(BaseModel):
-    """Automated snapshot and writeback removal (ggRock Settings → Array and Images)."""
+    """Automated snapshot and writeback removal (Settings → Storage)."""
 
     enabled: bool = False
     dry_run: bool = True
@@ -504,7 +550,7 @@ BulkKind = Literal["on", "shutdown", "reboot", "assign", "pin", "drive_letter", 
 
 
 class BulkAction(BaseModel):
-    """One action on several machines (ggRock's bulk operations / Edit Selected)."""
+    """One action on several machines (bulk operations / Edit Selected)."""
 
     machine_ids: list[int] = Field(min_length=1, max_length=500)
     action: BulkKind
@@ -780,6 +826,13 @@ class ArcOut(BaseModel):
     max_bytes: int
     min_bytes: int
     hit_percent: float | None                # since boot
+    # What the maximum may be set to (Server → RAM cache), from the RAM and zfs_arc_min.
+    allowed_min_bytes: int | None = None
+    allowed_max_bytes: int | None = None
+
+
+class ArcIn(BaseModel):
+    max_gb: int = Field(gt=0, le=65536)
 
 
 class MemoryOut(BaseModel):

@@ -68,6 +68,32 @@ def test_create_disk_existing_zvol_on_host(client, host):
     assert "already exists" in r.json()["detail"]["error"]
 
 
+def test_rename_disk_keeps_zvol(client, host):
+    d = _disk(client)
+    r = client.patch(f"/api/v1/game-disks/{d['id']}", json={"name": " Steam-Main "})
+    assert r.status_code == 200, r.text
+    assert (r.json()["name"], r.json()["zvol_path"]) == ("steam-main", MASTER)
+    assert host.datasets[MASTER]["readonly"] is True
+    assert client.get(f"/api/v1/game-disks/{d['id']}").json()["name"] == "steam-main"
+
+
+def test_rename_disk_refuses_taken_or_invalid_name(client):
+    a = _disk(client, "cs2", publish=False)
+    _disk(client, "valorant", publish=False)
+    assert client.patch(f"/api/v1/game-disks/{a['id']}", json={"name": "valorant"}).status_code == 409
+    assert client.patch(f"/api/v1/game-disks/{a['id']}", json={"name": "a b"}).status_code == 422
+    assert client.patch(f"/api/v1/game-disks/{a['id'] + 100}", json={"name": "x"}).status_code == 404
+    assert client.patch(f"/api/v1/game-disks/{a['id']}", json={"name": "cs2"}).status_code == 200
+
+
+def test_create_disk_refuses_old_name_of_renamed_disk(client):
+    d = _disk(client, "cs2", publish=False)
+    client.patch(f"/api/v1/game-disks/{d['id']}", json={"name": "cs2-old"})
+    r = client.post("/api/v1/game-disks", json={"name": "cs2", "size_gb": 10})
+    assert r.status_code == 409
+    assert "cs2-old" in r.json()["detail"]["error"]
+
+
 @pytest.mark.parametrize("body", [
     {"name": "../x", "size_gb": 10},
     {"name": "-r", "size_gb": 10},

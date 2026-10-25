@@ -20,12 +20,12 @@ type Tab = "general" | "disks" | "network" | "hardware";
 const LETTERS = "DEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 /**
- * Everything about one PC in one place (ggRock's machine settings). Save
+ * Everything about one PC in one place (machine settings). Save
  * sends only what changed: name (a PC with disks is renamed on the server
  * too, so it asks first) and drive letter; the mode (with disks: they are
  * taken away and given again, after a confirmation); the disks (which
  * re-clones the writebacks, so it asks first); Keep Writeback; the pinned
- * version. The MAC is the PC's identity and only shown, as in ggRock.
+ * version. The MAC is the PC's identity and only shown.
  */
 export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
@@ -267,7 +267,7 @@ export function MachineSettings({ machine: m, disks, onClose, reload }: Props) {
                   <div className="muted small">MAC (the PC's identity)</div>
                   <div className="mono">{m.mac ?? "—"}</div>
                   <div className="muted small">
-                    Fixed, as in ggRock. A PC with a new network card is deleted and added again from New PCs.
+                    Fixed. A PC with a new network card is deleted and added again from New PCs.
                   </div>
                 </div>
                 <div>

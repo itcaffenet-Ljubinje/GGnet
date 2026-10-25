@@ -8,12 +8,15 @@ object with the same `run()` signature, which is how tests inject a fake.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
-from typing import Optional
+import threading
+from typing import Callable, Optional
 
 logger = logging.getLogger("ggnet.exec")
 
 DEFAULT_TIMEOUT = 60
+_PROGRESS_LINE = re.compile(r"^(\d|full\t|size\t|incremental\t)")
 
 
 class CommandRunner:
@@ -67,11 +70,13 @@ class CommandRunner:
         producer: list[str],
         consumer: list[str],
         timeout: Optional[int] = None,
+        on_producer_line: Optional[Callable[[str], None]] = None,
     ) -> tuple[bool, str, str]:
         """
         Run `producer | consumer` without a shell (e.g. zfs send | zfs recv).
         Succeeds only if BOTH commands exit 0. Returns (success, stdout of the
-        consumer, stderr of whichever failed).
+        consumer, stderr of whichever failed). `on_producer_line` gets each
+        stderr line of the producer as it comes (progress of `zfs send -v`).
         """
         timeout = timeout or self.timeout
         p_cmd = [str(c) for c in producer]
@@ -82,6 +87,21 @@ class CommandRunner:
         except FileNotFoundError as e:
             self.last_error = str(e)
             return False, "", str(e)
+        prod_lines: list[str] = []
+
+        def read_stderr() -> None:
+            for raw in prod.stderr:
+                line = raw.decode(errors="replace").rstrip("\n")
+                prod_lines.append(line)
+                if on_producer_line is not None:
+                    try:
+                        on_producer_line(line)
+                    except Exception:     # a progress callback never breaks the copy
+                        logger.exception("Progress callback failed")
+
+        reader = threading.Thread(target=read_stderr, daemon=True) if prod.stderr else None
+        if reader:
+            reader.start()
         try:
             cons = subprocess.run(
                 c_cmd, stdin=prod.stdout, capture_output=True, text=True, timeout=timeout
@@ -96,8 +116,12 @@ class CommandRunner:
         finally:
             if prod.stdout:
                 prod.stdout.close()
-        prod_err = prod.stderr.read().decode(errors="replace").strip() if prod.stderr else ""
         prod.wait()
+        if reader:
+            reader.join(timeout=10)
+        # `zfs send -Pv` size and progress lines are noise in an error message.
+        prod_err = "\n".join(line for line in prod_lines
+                             if line and not _PROGRESS_LINE.match(line)).strip()
 
         if prod.returncode != 0 or cons.returncode != 0:
             # When the consumer fails first, the producer dies of SIGPIPE with

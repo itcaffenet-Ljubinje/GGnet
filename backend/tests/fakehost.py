@@ -34,6 +34,7 @@ class FakeHost:
         self.calls: list[list[str]] = []
         self.last_error = ""
         self.lio_batch_missing = False                  # rtslib-fb not installed
+        self.copy_bytes = 1000                          # size of a `zfs send` stream
 
     # ── Runner interface ──────────────────────────────────────────────
 
@@ -57,10 +58,14 @@ class FakeHost:
             return self._cat(cmd[1])
         raise AssertionError(f"FakeHost does not know command: {cmd}")
 
-    def run_pipe(self, producer: list[str], consumer: list[str], timeout: Optional[int] = None):
+    def run_pipe(self, producer: list[str], consumer: list[str], timeout: Optional[int] = None,
+                 on_producer_line=None):
         """
         `zfs send -i <origin> <clone>@x | zfs recv <existing>` fails like on a
         real host: an incremental from a clone's origin is a clone stream.
+        A full `zfs send ... <ds>@<v> | zfs recv -u <new>` makes <new> with
+        the one snapshot @<v> (no holds, no user properties: no -p) and
+        reports `zfs send -P -v` progress for `copy_bytes` bytes.
         """
         producer, consumer = [str(c) for c in producer], [str(c) for c in consumer]
         self.calls.append(producer + ["|"] + consumer)
@@ -70,6 +75,17 @@ class FakeHost:
         dst = consumer[-1]
         if dst in self.datasets:
             return self._err(f"cannot receive new filesystem stream: destination '{dst}' exists")
+        if producer[:2] == ["zfs", "send"] and "-i" not in producer and consumer[:2] == ["zfs", "recv"]:
+            src = producer[-1]
+            if src not in self.snapshots:
+                return self._err(f"cannot open '{src}': dataset does not exist")
+            if on_producer_line:
+                on_producer_line(f"full\t{src}\t{self.copy_bytes}")
+                on_producer_line(f"size\t{self.copy_bytes}")
+                on_producer_line(f"00:00:01\t{self.copy_bytes // 2}\t{src}")
+            self.add_dataset(dst)
+            self.snapshots[f"{dst}@{src.partition('@')[2]}"] = set()
+            return self._ok()
         raise AssertionError(f"FakeHost does not simulate this pipe: {producer} | {consumer}")
 
     def _ok(self, out: str = ""):
@@ -104,6 +120,7 @@ class FakeHost:
             "clones": ",".join(self.clones_of(name)) or "-",
             "origin": self.datasets.get(name, {}).get("origin") or "-",
             "ggnet:comment": self.snap_props.get(name, {}).get("ggnet:comment", "-"),
+            "ggnet:locked": self.snap_props.get(name, {}).get("ggnet:locked", "-"),
         }
         return "\t".join(values[f] for f in fields)
 

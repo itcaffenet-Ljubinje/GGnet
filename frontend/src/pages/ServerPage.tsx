@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Cpu, Database, HardDrive, MemoryStick, Play, RefreshCw, Square } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Cpu,
+  Database,
+  HardDrive,
+  MemoryStick,
+  Play,
+  RefreshCw,
+  Square,
+} from "lucide-react";
 
 import { api, type Pool, type PoolDisk, type ServerStatus, type User } from "../api";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { MaintenanceSchedule } from "../components/MaintenanceSchedule";
+import { SubNav, useSection, type SubNavItem } from "../components/SubNav";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 
@@ -32,10 +44,18 @@ export function diskProblems(d: PoolDisk): string[] {
 }
 
 /** Server: the ZFS pool, its disks, scrub and TRIM, the RAM cache. */
-export function ServerPage({ user }: { user?: User | null }) {
+export function ServerPage({
+  user,
+  pcs,
+}: {
+  user?: User | null;
+  /** PCs registered, for the RAM cache advice. */
+  pcs?: number;
+}) {
   const { busy, error, setError, run } = useAsyncAction();
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const admin = !user || user.role === "admin";
+  const [section, setSection] = useSection("server", SERVER_SECTIONS);
 
   const load = useCallback(() => run("load", async () => setStatus(await api.getServer())), [run]);
   useEffect(() => {
@@ -65,6 +85,15 @@ export function ServerPage({ user }: { user?: User | null }) {
     await run(`trim-${action}`, async () => setStatus(await api.trim(action)));
   }
 
+  async function setArcMax(gb: number) {
+    const msg =
+      `Set the RAM cache to at most ${gb} GB?\n\n` +
+      "It applies now (the cache grows or shrinks over the next minutes) and stays after a restart " +
+      "(/etc/modprobe.d/zfs.conf).";
+    if (!window.confirm(msg)) return;
+    await run("arc", async () => setStatus(await api.setArcMax(gb)));
+  }
+
   async function readSmart() {
     await run("smart", async () => setStatus(await api.readSmart()));
   }
@@ -74,20 +103,37 @@ export function ServerPage({ user }: { user?: User | null }) {
     <section aria-label="Server">
       <ErrorBanner message={error} onClose={() => setError(null)} />
       {status && <ServerKpis status={status} />}
-      {status && !pool && (
+      <SubNav label="Server sections" items={SERVER_SECTIONS} active={section} onSelect={setSection} />
+      {status && !pool && section !== "cache" && (
         <div className="card">
           <p className="error-text">The ZFS pool could not be read.</p>
         </div>
       )}
-      {pool && <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />}
-      {pool && <MaintenanceSchedule admin={admin} />}
-      {pool && status && (
+      {section === "pool" && pool && (
+        <PoolCard pool={pool} admin={admin} busy={busy} onScrub={scrub} onTrim={trim} />
+      )}
+      {section === "maintenance" && pool && <MaintenanceSchedule admin={admin} />}
+      {section === "disks" && pool && status && (
         <DisksCard pool={pool} readAt={status.smart_read_at} admin={admin} busy={busy} onRead={readSmart} />
       )}
-      {status?.arc && <CacheCard status={status} />}
+      {section === "cache" &&
+        (status?.arc ? (
+          <CacheCard status={status} pcs={pcs} admin={admin} busy={busy} onSet={setArcMax} />
+        ) : (
+          status && <p className="empty">The RAM cache could not be read.</p>
+        ))}
     </section>
   );
 }
+
+type ServerSection = "pool" | "maintenance" | "disks" | "cache";
+
+const SERVER_SECTIONS: SubNavItem<ServerSection>[] = [
+  { id: "pool", label: "Pool", icon: Database },
+  { id: "maintenance", label: "Maintenance", icon: CalendarClock },
+  { id: "disks", label: "Disks", icon: HardDrive },
+  { id: "cache", label: "RAM cache", icon: MemoryStick },
+];
 
 function ServerKpis({ status }: { status: ServerStatus }) {
   const pool = status.pool;
@@ -351,10 +397,37 @@ function DisksCard({
   );
 }
 
-function CacheCard({ status }: { status: ServerStatus }) {
+const GiB = 1024 ** 3;
+
+/** RAM cache for this many PCs (20 → 32 GB, 40 → 64 GB, 100 → 128 GB, then +128 GB per 100). */
+export function recommendedCacheGb(pcs: number): number {
+  if (pcs <= 20) return 32;
+  if (pcs <= 40) return 64;
+  if (pcs <= 100) return 128;
+  return 128 + Math.ceil((pcs - 100) / 100) * 128;
+}
+
+function CacheCard({
+  status,
+  pcs,
+  admin,
+  busy,
+  onSet,
+}: {
+  status: ServerStatus;
+  pcs?: number;
+  admin: boolean;
+  busy: string | null;
+  onSet: (gb: number) => void;
+}) {
   const arc = status.arc!;
   const mem = status.memory;
   const fill = arc.max_bytes ? Math.round((100 * arc.size_bytes) / arc.max_bytes) : 0;
+  const current = Math.round(arc.max_bytes / GiB);
+  const [gb, setGb] = useState(current);
+  const low = arc.allowed_min_bytes ? Math.ceil(arc.allowed_min_bytes / GiB) : 1;
+  const high = arc.allowed_max_bytes ? Math.floor(arc.allowed_max_bytes / GiB) : null;
+  const advice = pcs !== undefined ? recommendedCacheGb(pcs) : null;
   return (
     <div className="card" aria-label="RAM cache">
       <h3 className="card-title section-title">
@@ -376,6 +449,35 @@ function CacheCard({ status }: { status: ServerStatus }) {
         Every PC reads the same image blocks, so a block read once is served to the others from RAM. Writes of
         writebacks are gathered in RAM and written to the SSDs every few seconds.
       </p>
+      {admin && high !== null && (
+        <form
+          className="form-row"
+          aria-label="RAM cache size"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSet(gb);
+          }}
+        >
+          <label>
+            Maximum (GB)
+            <input
+              type="number"
+              min={low}
+              max={high}
+              value={gb}
+              onChange={(e) => setGb(Number(e.target.value))}
+              required
+            />
+          </label>
+          <button type="submit" disabled={busy !== null || gb === current}>
+            {busy === "arc" ? "Saving…" : "Save"}
+          </button>
+          <span className="muted small">
+            {low}–{high} GB on this server; the rest stays for Proxmox and its VMs.
+            {advice !== null && ` For ${pcs} PCs about ${Math.min(advice, high)} GB is enough.`}
+          </span>
+        </form>
+      )}
     </div>
   );
 }

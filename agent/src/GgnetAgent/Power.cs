@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace GgnetAgent;
 
-/// <summary>Shuts the PC down or restarts it when the server asks (ggRock's Shutdown / Reboot).</summary>
+/// <summary>Shuts the PC down or restarts it when the server asks (Shutdown / Reboot).</summary>
 public interface IPowerControl
 {
     Task RunAsync(string command, CancellationToken ct);

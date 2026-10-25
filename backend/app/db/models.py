@@ -93,6 +93,11 @@ class GameDisk(Base):
     )
     snapshot: Mapped[str | None] = mapped_column(String(64), default=None)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    # Copy: while set, the zvol is being filled from that version (master@v)
+    # and the disk is neither a draft to fill nor published yet.
+    copy_source: Mapped[str | None] = mapped_column(String(255), default=None)
+    copy_percent: Mapped[int | None] = mapped_column(Integer, default=None)
+    copy_error: Mapped[str | None] = mapped_column(String(500), default=None)
 
     machines: Mapped[list["Machine"]] = relationship(
         back_populates="game_disk", foreign_keys="Machine.game_disk_id"
@@ -108,6 +113,10 @@ class GameDisk(Base):
     @property
     def published(self) -> bool:
         return self.snapshot is not None
+
+    @property
+    def copying(self) -> bool:
+        return self.copy_source is not None and self.copy_error is None
 
     @property
     def snapshot_path(self) -> str | None:
@@ -182,11 +191,11 @@ class Machine(Base):
     clone_snapshot: Mapped[str | None] = mapped_column(String(320), default=None)
     iscsi_target_iqn: Mapped[str | None] = mapped_column(String(223), default=None)
 
-    # Snapshot pin (ggRock Advanced → Game Image Snapshot): the version of the
+    # Snapshot pin (machine settings → version): the version of the
     # game disk this machine runs instead of the active one; None follows it.
     pinned_snapshot: Mapped[str | None] = mapped_column(String(64), default=None)
 
-    # Writeback lifecycle (ggRock model): the server discards the writeback
+    # Writeback lifecycle: the server discards the writeback
     # after every disconnect unless keep_writeback is set.
     keep_writeback: Mapped[bool] = mapped_column(Boolean, default=False)
     # The client wrote (was connected) since the clone was made; a clean
@@ -223,7 +232,7 @@ class Machine(Base):
     agent_stopped: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     reported_drive_letter: Mapped[str | None] = mapped_column(String(1), default=None)
     # Inventory from the agent: the network it reaches the server on and the
-    # hardware (ggRock's IP and Link Speed columns, Hardware tab). JSON text.
+    # hardware (IP and Link Speed columns, Hardware tab). JSON text.
     # Shutdown / reboot for the agent: handed out once in the next heartbeat
     # answer, and dropped when older than POWER_COMMAND_TTL (app.services.power).
     pending_command: Mapped[str | None] = mapped_column(String(16), default=None)

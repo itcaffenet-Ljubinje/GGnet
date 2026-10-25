@@ -4,7 +4,7 @@ namespace GgnetAgent;
 
 /// <summary>
 /// What the PC reports about itself: the network it reaches the server on
-/// (ggRock's IP and Link Speed columns), its hardware (the Hardware tab) and
+/// (the IP and Link Speed columns), its hardware (the Hardware tab) and
 /// whether Windows booted with UEFI Secure Boot on (anti-cheats need it).
 /// </summary>
 public sealed record Inventory(

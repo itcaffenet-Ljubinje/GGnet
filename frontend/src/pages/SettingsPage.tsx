@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Download, HardDrive, Network, UserRound, Users } from "lucide-react";
 
 import {
   api,
@@ -11,6 +12,7 @@ import {
 import { ClientApp } from "../components/ClientApp";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { NetworkBoot } from "../components/NetworkBoot";
+import { SubNav, useSection, type SubNavItem } from "../components/SubNav";
 import { AccountCard, ActivityCard, UsersCard } from "../components/Users";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
@@ -30,7 +32,7 @@ const NUMBERS: { key: keyof RetentionSettings; label: string; min: number; max: 
     label: "Reserved disk space (%)",
     min: 0,
     max: 50,
-    hint: "Kept free on the whole pool, so SSDs never run full (ggRock recommends at least 15 %).",
+    hint: "Kept free on the whole pool, so SSDs never run full (at least 15 % is recommended).",
   },
   {
     key: "warning_percent",
@@ -74,19 +76,43 @@ function settingsOf(r: Retention): RetentionSettings {
   return s;
 }
 
+type SettingsSection = "storage" | "boot" | "client" | "users" | "account";
+
+const ADMIN_SECTIONS: SubNavItem<SettingsSection>[] = [
+  { id: "storage", label: "Storage", icon: HardDrive },
+  { id: "boot", label: "Network boot", icon: Network },
+  { id: "client", label: "Client app", icon: Download },
+  { id: "users", label: "Users", icon: Users },
+];
+
+const STAFF_SECTIONS: SubNavItem<SettingsSection>[] = [
+  { id: "account", label: "Account", icon: UserRound },
+  { id: "client", label: "Client app", icon: Download },
+];
+
 export function SettingsPage({ storage, reload, user, onPasswordChanged = () => undefined }: Props) {
-  if (user && user.role !== "admin") {
-    return (
-      <section>
-        <AccountCard me={user} onPasswordChanged={onPasswordChanged} />
-        <ClientApp />
-      </section>
-    );
-  }
-  return <AdminSettings storage={storage} reload={reload} user={user} onPasswordChanged={onPasswordChanged} />;
+  const admin = !user || user.role === "admin";
+  const items = admin ? ADMIN_SECTIONS : STAFF_SECTIONS;
+  const [section, setSection] = useSection("settings", items);
+  return (
+    <section>
+      <SubNav label="Settings sections" items={items} active={section} onSelect={setSection} />
+      {section === "storage" && <StorageSettings storage={storage} reload={reload} />}
+      {section === "boot" && <NetworkBoot />}
+      {section === "client" && <ClientApp />}
+      {section === "users" && user && (
+        <>
+          <UsersCard me={user} />
+          <AccountCard me={user} onPasswordChanged={onPasswordChanged} />
+          <ActivityCard />
+        </>
+      )}
+      {section === "account" && user && <AccountCard me={user} onPasswordChanged={onPasswordChanged} />}
+    </section>
+  );
 }
 
-function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { onPasswordChanged: () => void }) {
+function StorageSettings({ storage, reload }: Pick<Props, "storage" | "reload">) {
   const { busy, error, setError, run } = useAsyncAction();
   const [retention, setRetention] = useState<Retention | null>(null);
   const [form, setForm] = useState<RetentionSettings | null>(null);
@@ -104,10 +130,10 @@ function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { o
 
   if (!form || !retention) {
     return (
-      <section>
+      <>
         <ErrorBanner message={error} onClose={() => setError(null)} />
         <p className="empty">Loading…</p>
-      </section>
+      </>
     );
   }
 
@@ -156,7 +182,7 @@ function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { o
   const last = retention.last_run;
 
   return (
-    <section>
+    <>
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
       {storage && (
@@ -230,14 +256,6 @@ function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { o
         </div>
       </form>
 
-      <NetworkBoot />
-
-      <ClientApp />
-
-      {user && <UsersCard me={user} />}
-      {user && <AccountCard me={user} onPasswordChanged={onPasswordChanged} />}
-      {user && <ActivityCard />}
-
       {preview && (
         <div className="card" aria-label="Preview">
           <h3 className="card-title">Preview: these settings would delete now</h3>
@@ -254,7 +272,7 @@ function AdminSettings({ storage, reload, user, onPasswordChanged }: Props & { o
           <ActionList actions={last.actions} />
         </div>
       )}
-    </section>
+    </>
   );
 }
 

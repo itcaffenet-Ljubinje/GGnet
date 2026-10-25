@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
 
 from app.api.deps import require_user
 from app.api.v1 import agent, auth, boot, discovery, game_disks, machines, server, settings
@@ -75,7 +76,16 @@ async def lifespan(_app: FastAPI):
     from app.services.retention import JobSettings, RetentionJob
     from app.services.writebacks import SpareMaker, WritebackSettings, WritebackSizer, WritebackWatcher
 
+    from app.services.copies import recover as recover_copies
+
     cfg = get_config()
+    # A copy that ran when ggNet stopped cannot go on: mark it failed.
+    try:
+        recover_copies(get_sessionmaker(), get_provisioner())
+    except OperationalError as e:      # no schema yet (a fresh install before its first start)
+        logging.getLogger("ggnet.copies").warning("Checking for interrupted copies skipped: %s", e.orig)
+    except Exception:                  # never keeps the API from starting
+        logging.getLogger("ggnet.copies").exception("Checking for interrupted copies failed")
     settings = WritebackSettings.from_config(cfg)
     workers = [WritebackSizer(get_sessionmaker(), get_provisioner()),
                MaintenanceJob(get_sessionmaker(), get_server_monitor())]

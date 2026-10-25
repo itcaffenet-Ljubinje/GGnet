@@ -1,5 +1,5 @@
 """
-Automatic writeback discard (ggRock model).
+Automatic writeback discard.
 
 A machine's writeback is thrown away by the SERVER whenever the client goes
 away, so every boot starts from a clean copy of the game disk's active

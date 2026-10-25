@@ -1,7 +1,7 @@
 """
 ISCSIManager: manages the LIO iSCSI target through targetcli.
 
-ggNet uses ONE shared target for all clients (like ggRock), not a target per
+ggNet uses ONE shared target for all clients, not a target per
 client:
 
     <iqn_prefix>:<target_name>            e.g. iqn.2025-05.net.ggnet:storage

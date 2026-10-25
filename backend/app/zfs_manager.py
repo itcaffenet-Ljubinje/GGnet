@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from app.config import get_config
 from app.runner import CommandRunner
@@ -29,8 +29,12 @@ logger = logging.getLogger("ggnet.zfs")
 _COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
 # A version's comment (who, when, what changed), kept as a user property on
 # its snapshot so it travels with the snapshot (rename, promote, zfs send).
+# A copy of a large game disk can take hours.
+COPY_TIMEOUT = 24 * 3600
 COMMENT_PROP = "ggnet:comment"
 COMMENT_MAX = 200
+# A locked version is never deleted, by retention or by hand, until unlocked.
+LOCK_PROP = "ggnet:locked"
 
 # Datasets under root_dataset that ggNet creates and manages.
 _CHILD_KEYS = ("images", "writebacks", "snapshots", "iscsi_targets")
@@ -389,10 +393,66 @@ class ZFSManager:
         logger.info("Snapshot %s@%s renamed to @%s", dataset, old, new)
         return True
 
+    def copy_snapshot(
+        self,
+        snapshot: str,
+        target: str,
+        progress: Callable[[int, int], None] | None = None,
+        timeout: int = COPY_TIMEOUT,
+    ) -> bool:
+        """
+        A full, independent copy of one version as a new master:
+
+            zfs send -c -P -v <master>@<v> | zfs recv -u <target>
+
+        The target shares no blocks with the source, so either can be deleted
+        later. Its only version is renamed to @base, held and made read-only,
+        as publish_master() leaves a master. `progress(done, total)` follows
+        the bytes sent. On failure nothing is left behind.
+        """
+        if "@" not in snapshot or not self._is_managed(snapshot):
+            return False
+        if not self._is_managed(target, allow_snapshot=False) or self.dataset_exists(target):
+            return False
+        total = 0
+
+        def line(text: str) -> None:
+            nonlocal total
+            parts = text.split("\t")
+            if parts[0] == "size" and len(parts) > 1:
+                total = _int(parts[1])
+            elif progress and total and len(parts) > 1 and parts[0][:1].isdigit():
+                progress(min(_int(parts[1]), total), total)
+
+        ok, _, err = self.runner.run_pipe(
+            ["zfs", "send", "-c", "-P", "-v", snapshot],
+            ["zfs", "recv", "-u", target],
+            timeout=timeout,
+            on_producer_line=line,
+        )
+        if not ok:
+            logger.error("Copying %s to %s failed: %s", snapshot, target, err)
+            if self.dataset_exists(target) and not self.destroy(target, recursive=True):
+                logger.error("Could not remove the partial copy %s", target)
+            self.runner.last_error = err     # the copy's reason, not the cleanup's
+            return False
+        name = snapshot.partition("@")[2]
+        if not ((name == "base" or self.rename_snapshot(target, name, "base"))
+                and self.protect_snapshot(f"{target}@base")
+                and self.set_readonly(target, True)):
+            err = self.runner.last_error
+            self.destroy(target, recursive=True)
+            self.runner.last_error = err
+            return False
+        if progress and total:
+            progress(total, total)
+        logger.info("Copied %s to %s@base", snapshot, target)
+        return True
+
     def apply_clone(self, clone: str, master: str, base_snap: str, new_snap: str) -> bool:
         """
         Turn a client's writeback into a new version of its master
-        (ggRock "Apply Writebacks"), without copying any data:
+        (Apply Writebacks), without copying any data:
 
             clone: readonly=on → @new_snap → hold
             zfs promote clone      master's snapshots up to base_snap move to
@@ -520,7 +580,7 @@ class ZFSManager:
 
     def set_reserved(self, nbytes: int) -> bool:
         """
-        Keep `nbytes` of the pool free for nobody (ggRock "Reserved disk space"):
+        Keep `nbytes` of the pool free for nobody ("Reserved disk space"):
         SSDs slow down when they are nearly full, and writebacks must never
         fill the pool. 0 removes the reservation (the empty dataset stays).
         """
@@ -597,13 +657,14 @@ class ZFSManager:
         """
         Snapshots of one master, oldest first: name (after '@'), creation
         (Unix time), used and referenced (bytes), the clones made from it and
-        its comment (None when unset). None if they cannot be listed.
+        its comment (None when unset) and whether it is locked. None if they
+        cannot be listed.
         """
         if not self._is_managed(dataset, allow_snapshot=False):
             return None
         ok, out, _ = self._run([
             "zfs", "list", "-H", "-p", "-t", "snapshot",
-            "-o", f"name,creation,used,refer,clones,{COMMENT_PROP}",
+            "-o", f"name,creation,used,refer,clones,{COMMENT_PROP},{LOCK_PROP}",
             "-s", "createtxg", "-d", "1", dataset,
         ])
         if not ok:
@@ -611,7 +672,7 @@ class ZFSManager:
         snaps = []
         for line in out.splitlines():
             parts = line.split("\t")
-            if len(parts) != 6 or "@" not in parts[0]:
+            if len(parts) != 7 or "@" not in parts[0]:
                 continue
             snaps.append({
                 "name": parts[0].partition("@")[2],
@@ -620,6 +681,7 @@ class ZFSManager:
                 "referenced": _int(parts[3]),
                 "clones": [c for c in parts[4].split(",") if c and c != "-"],
                 "comment": None if parts[5] in ("", "-") else parts[5],
+                "locked": parts[6] == "on",
             })
         return snaps
 
@@ -632,6 +694,17 @@ class ZFSManager:
         ok, _, err = self._run(cmd)
         if not ok:
             logger.error("Setting the comment of %s failed: %s", snapshot, err)
+        return ok
+
+    def set_snapshot_lock(self, snapshot: str, locked: bool) -> bool:
+        """Lock a version against deletion, or unlock it."""
+        if "@" not in snapshot or not self._is_managed(snapshot):
+            return False
+        cmd = (["zfs", "set", f"{LOCK_PROP}=on", snapshot] if locked
+               else ["zfs", "inherit", LOCK_PROP, snapshot])
+        ok, _, err = self._run(cmd)
+        if not ok:
+            logger.error("%s %s failed: %s", "Locking" if locked else "Unlocking", snapshot, err)
         return ok
 
     def destroy_snapshot(self, snapshot: str, tag: str = "ggnet:protected") -> bool:

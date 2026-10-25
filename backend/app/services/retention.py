@@ -1,5 +1,5 @@
 """
-Automated snapshot and writeback removal (ggRock "Array and Images").
+Automated snapshot and writeback removal (Settings → Storage).
 
 Without it, every Apply Writebacks leaves another held version of a game
 disk, and kept writebacks of PCs that stay off keep their space, until the
@@ -7,7 +7,7 @@ pool is full. Settings come from the web UI (the `settings` table):
 
   reserved_percent         part of the pool kept free (a refreservation)
   warning_percent          the UI warns when the pool is fuller than this
-  unused_snapshot_days     a version not active, not pinned, not the origin
+  unused_snapshot_days     a version not active, not pinned, not locked, not the origin
                            of any PC's writeback and older than this ...
   keep_newest_snapshots    ... is deleted, except the newest N of each disk
   inactive_writeback_hours a Keep Writeback PC that has been off this long
@@ -124,7 +124,8 @@ def plan(db: Session, prov: Provisioner, s: RetentionSettings, now: datetime | N
         pinned = {m.pinned_snapshot for m in disk.machines if m.pinned_snapshot}
         newest = {v["name"] for v in versions[-s.keep_newest_snapshots:]} if s.keep_newest_snapshots else set()
         for v in versions:
-            if v["name"] == disk.snapshot or v["name"] in pinned or v["clones"] or v["name"] in newest:
+            if (v["name"] == disk.snapshot or v["name"] in pinned or v["clones"] or v["name"] in newest
+                    or v.get("locked")):
                 continue
             age = now - datetime.fromtimestamp(v["creation"], timezone.utc)
             if age >= timedelta(days=s.unused_snapshot_days):

@@ -586,7 +586,7 @@ def apply_writebacks(
     prov: Provisioner = Depends(get_provisioner),
 ):
     """
-    ggRock "Apply Writebacks": the machine's kept writeback becomes the next
+    Apply Writebacks: the machine's kept writeback becomes the next
     version of its game disk (base → v2 → v3 ...) and that version becomes
     active. Every other machine moves to it at its next discard, i.e. its
     next reboot. The machine must keep its writeback and be powered off.

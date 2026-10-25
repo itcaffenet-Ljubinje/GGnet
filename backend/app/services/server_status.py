@@ -150,11 +150,42 @@ def disk_device(path: str | None) -> str | None:
     return _PART_RE.sub("", path) if path else None
 
 
+GiB = 1024 ** 3
+ARC_MAX_PARAM = Path("/sys/module/zfs/parameters/zfs_arc_max")
+ZFS_MODPROBE = Path("/etc/modprobe.d/zfs.conf")
+_ARC_MAX_RE = re.compile(r"\bzfs_arc_max=\d+")
+
+
+def arc_limits(total_ram: int, arc_min: int) -> tuple[int, int]:
+    """
+    The RAM cache's allowed maximum, in bytes: at least 1 GiB and not under
+    zfs_arc_min; at most the RAM minus what Proxmox and its VMs keep (16 GiB
+    or a quarter of the RAM, whichever is more).
+    """
+    return max(GiB, arc_min), total_ram - max(16 * GiB, total_ram // 4)
+
+
+def modprobe_with_arc_max(text: str, nbytes: int) -> str:
+    """zfs.conf with zfs_arc_max set: changed on its active line(s), else added; other lines kept."""
+    lines = text.splitlines()
+    done = False
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("options zfs") and _ARC_MAX_RE.search(line):
+            lines[i] = _ARC_MAX_RE.sub(f"zfs_arc_max={nbytes}", line)
+            done = True
+    if not done:
+        lines.append(f"options zfs zfs_arc_max={nbytes}")
+    return "\n".join(lines) + "\n"
+
+
 class ServerMonitor:
     def __init__(self, pool: str, runner: Optional[CommandRunner] = None, proc: Path = Path("/proc"),
-                 clock: Callable[[], float] = time.time):
+                 clock: Callable[[], float] = time.time, arc_param: Path = ARC_MAX_PARAM,
+                 modprobe: Path = ZFS_MODPROBE):
         self.pool_name = pool
         self.runner = runner or CommandRunner(timeout=30)
+        self.arc_param = arc_param
+        self.modprobe = modprobe
         self.proc = proc
         self.clock = clock
         self._smart: dict[str, dict[str, Any]] = {}
@@ -184,6 +215,29 @@ class ServerMonitor:
     def arc(self) -> dict[str, int] | None:
         text = self._read("spl", "kstat", "zfs", "arcstats")
         return parse_arcstats(text) if text else None
+
+    def set_arc_max(self, nbytes: int) -> str | None:
+        """
+        Set the RAM cache's maximum now (the module parameter) and for the next
+        boot (zfs.conf; the initramfs too when / is on ZFS). Returns why not,
+        or None. The cache shrinks or grows to it over the next minutes.
+        """
+        try:
+            self.arc_param.write_text(f"{nbytes}\n")
+        except OSError as e:
+            return f"the ZFS module refused the new maximum: {e}"
+        try:
+            old = self.modprobe.read_text() if self.modprobe.exists() else ""
+            self.modprobe.write_text(modprobe_with_arc_max(old, nbytes))
+        except OSError as e:
+            return f"set for now, but {self.modprobe} could not be saved: {e}"
+        ok, fstype, _ = self.runner.run(["findmnt", "-n", "-o", "FSTYPE", "/"], quiet=True)
+        if ok and fstype.strip() == "zfs":
+            ok, _, err = self.runner.run(["update-initramfs", "-u", "-k", "all"], timeout=600)
+            if not ok:
+                return f"set and saved, but the initramfs could not be updated: {err}"
+        logger.info("RAM cache maximum set to %d bytes", nbytes)
+        return None
 
     def memory(self) -> dict[str, int] | None:
         text = self._read("meminfo")

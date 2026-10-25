@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { GitBranch, HardDrive, Lock, LockOpen } from "lucide-react";
 
-import { api, type GameDisk, type Snapshot, type Writeback } from "../api";
+import { api, type ApplyChoice, type GameDisk, type Snapshot, type Writeback } from "../api";
 import { formatBytes } from "../format";
 import { useAsyncAction } from "../useAsyncAction";
 import { ErrorBanner } from "./ErrorBanner";
@@ -11,10 +12,12 @@ interface Props {
   onChanged: () => Promise<void>;
   /** Changes on every parent reload, so the lists follow the host. */
   refreshKey?: unknown;
+  /** Shown above the lists once they are read (the details page's summary). */
+  summary?: (snapshots: Snapshot[], writebacks: Writeback[]) => ReactNode;
 }
 
 /** Versions (snapshots) and PC writebacks of one game disk, read live from ZFS. */
-export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
+export function DiskDetails({ disk, onChanged, refreshKey, summary }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
   const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
   const [writebacks, setWritebacks] = useState<Writeback[] | null>(null);
@@ -54,6 +57,13 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     if (window.confirm(msg)) act(`active-${s.name}`, () => api.setActiveSnapshot(disk.id, s.name));
   }
 
+  function toggleLock(s: Snapshot) {
+    const msg = s.locked
+      ? `Unlock version ${s.name} of "${disk.name}"?\n\nAutomatic cleanup may delete it again once it is old and unused.`
+      : `Lock version ${s.name} of "${disk.name}"?\n\nIt is kept until it is unlocked: automatic cleanup skips it and it cannot be deleted.`;
+    if (window.confirm(msg)) act(`lock-${s.name}`, () => api.setSnapshotLock(disk.id, s.name, !s.locked));
+  }
+
   function remove(s: Snapshot) {
     if (window.confirm(`Delete version ${s.name} of "${disk.name}"? This cannot be undone.`)) {
       act(`delete-${s.name}`, () => api.deleteSnapshot(disk.id, s.name));
@@ -65,6 +75,8 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     const older = snapshots!.slice(0, index);
     const active = older.find((o) => o.active);
     if (active) return `@${active.name} is active; make this or a newer version active first`;
+    const locked = older.filter((o) => o.locked).map((o) => `@${o.name}`);
+    if (locked.length > 0) return `Older versions are locked (${locked.join(", ")}); unlock them first`;
     const pinned = older.flatMap((o) => o.pinned);
     if (pinned.length > 0) return `Older versions are pinned on ${pinned.join(", ")}; unpin them first`;
     const users = [...new Set(older.flatMap((o) => o.machines))];
@@ -83,6 +95,27 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     if (window.confirm(msg)) act(`merge-${s.name}`, () => api.mergeIntoBase(disk.id, s.name));
   }
 
+  // Only a writeback of the newest version can be applied (the backend refuses others).
+  const latest = snapshots && snapshots.length > 0 ? snapshots[snapshots.length - 1].name : null;
+
+  function apply(w: Writeback) {
+    if (w.machine_id === null) return;
+    const msg =
+      `Apply the writeback of ${w.machine_name} to "${disk.name}"?\n\n` +
+      "It becomes a new version. Every other PC gets it at its next reboot.";
+    if (!window.confirm(msg)) return;
+    const comment = window.prompt("Comment for the new version (who, what changed). Optional.", "");
+    if (comment === null) return;
+    // Only this disk's writeback; the PC's other one (Boot Mode) stays kept.
+    const choice: ApplyChoice = {
+      os: disk.kind === "os",
+      game: disk.kind !== "os",
+      ...(comment.trim() ? { comment: comment.trim() } : {}),
+    };
+    const id = w.machine_id;
+    act(`apply-${id}`, () => api.applyWritebacks(id, choice));
+  }
+
   function discard(w: Writeback) {
     const lost = w.keep_writeback
       ? "It keeps its writeback, so changes not applied yet are lost too."
@@ -98,7 +131,12 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
     <div className="details">
       <ErrorBanner message={error} onClose={() => setError(null)} />
 
-      <h3>Versions</h3>
+      {summary && snapshots !== null && writebacks !== null && summary(snapshots, writebacks)}
+
+      <h3 className="title-with-icon">
+        <GitBranch size={16} aria-hidden />
+        Snapshots
+      </h3>
       {snapshots === null ? (
         <p className="muted small">Loading…</p>
       ) : snapshots.length === 0 ? (
@@ -125,7 +163,17 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                 <tr key={s.name}>
                   <td className="strong">
                     @{s.name}
+                    {s.locked && (
+                      <span className="lock-mark" title="Locked: never deleted until unlocked">
+                        <Lock size={13} aria-label="Locked" />
+                      </span>
+                    )}
                     {s.active && <span className="badge badge-provisioned">Active</span>}
+                    {i === snapshots.length - 1 && (
+                      <span className="badge badge-idle" title="The newest version: only PCs on it can apply writebacks">
+                        Latest
+                      </span>
+                    )}
                   </td>
                   <td>{new Date(s.created_at).toLocaleString()}</td>
                   <td>{formatBytes(s.referenced_bytes)}</td>
@@ -141,6 +189,16 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                     {s.comment ? <span className="small">{s.comment}</span> : <span className="muted">—</span>}
                   </td>
                   <td className="actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => toggleLock(s)}
+                      disabled={busy !== null}
+                      aria-label={`${s.locked ? "Unlock" : "Lock"} @${s.name}`}
+                      title={s.locked ? "Unlock" : "Lock: keep this version until unlocked"}
+                    >
+                      {s.locked ? <LockOpen size={14} /> : <Lock size={14} />}
+                    </button>
                     <button
                       type="button"
                       className="secondary"
@@ -169,9 +227,11 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                       type="button"
                       className="danger"
                       onClick={() => remove(s)}
-                      disabled={busy !== null || s.active || used}
+                      disabled={busy !== null || s.active || used || s.locked === true}
                       title={
-                        s.active
+                        s.locked
+                          ? "Locked; unlock it first"
+                          : s.active
                           ? "The active version cannot be deleted"
                           : s.pinned.length > 0
                             ? "PCs are pinned to it; unpin them first"
@@ -190,7 +250,10 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
         </table>
       )}
 
-      <h3>Writebacks</h3>
+      <h3 className="title-with-icon">
+        <HardDrive size={16} aria-hidden />
+        Writebacks
+      </h3>
       {writebacks === null ? (
         <p className="muted small">Loading…</p>
       ) : writebacks.length === 0 ? (
@@ -230,6 +293,22 @@ export function DiskDetails({ disk, onChanged, refreshKey }: Props) {
                 <td>{formatBytes(w.used_bytes)}</td>
                 <td>{w.session_active === null ? "—" : w.session_active ? "Yes" : "No"}</td>
                 <td className="actions">
+                  {w.machine_id !== null && w.keep_writeback && (
+                    <button
+                      type="button"
+                      onClick={() => apply(w)}
+                      disabled={busy !== null || w.session_active === true || w.snapshot !== latest}
+                      title={
+                        w.session_active
+                          ? `Shut down ${w.machine_name} first`
+                          : w.snapshot !== latest
+                            ? `Only a writeback of the newest version (@${latest}) can be applied`
+                            : "Make this writeback the next version of the image"
+                      }
+                    >
+                      {busy === `apply-${w.machine_id}` ? "Applying…" : "Apply"}
+                    </button>
+                  )}
                   {w.machine_id !== null && (
                     <button
                       type="button"

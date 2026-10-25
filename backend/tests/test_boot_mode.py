@@ -374,7 +374,7 @@ def test_ipxe_without_a_valid_mac_boots_locally(client, disks, mac):
 
 
 def test_ipxe_unknown_pc_waits_for_registration(client, disks):
-    """Like ggRock: an unregistered PC stays on screen until the admin adds it."""
+    """An unregistered PC stays on screen until the admin adds it."""
     _boot_machine(client, disks)
     script = _ipxe(client, "aa-bb-cc-dd-ee-99")
     assert "not registered (MAC aa:bb:cc:dd:ee:99)" in script
@@ -669,6 +669,18 @@ def test_prepare_image_makes_a_new_active_version(client, host, disks, windows):
     assert versions[-1]["comment"].startswith("ggNet: prepared for all PCs")
     # Game disks are not Windows images.
     assert client.post(f"/api/v1/game-disks/{game['id']}/prepare").status_code == 409
+
+
+def test_prepare_image_can_turn_defender_off(client, host, disks, windows):
+    os_disk, _ = disks
+    r = client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare", json={"defender_off": True})
+    assert r.status_code == 200, r.text
+    [(_, prep, _)] = windows.prepared
+    assert prep.defender_off is True
+    versions = client.get(f"/api/v1/game-disks/{os_disk['id']}/snapshots").json()
+    assert versions[-1]["comment"].endswith(", Defender off")
+    client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare")       # without a body: left as it is
+    assert windows.prepared[-1][1].defender_off is False
 
 
 def test_a_failed_prepare_changes_nothing(client, host, disks, windows):

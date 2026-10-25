@@ -810,6 +810,13 @@ td.td-select {
   color: #f87171;
 }
 
+.banner-info {
+  border: 1px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  color: #7dd3fc;
+  align-items: center;
+}
+
 .banner-warn {
   border: 1px solid var(--warn);
   background: rgba(245, 158, 11, 0.12);
@@ -1575,6 +1582,70 @@ td.td-select {
 }
 
 /* ==========================================================================
+   Page sub-menu (Server, Settings)
+   ========================================================================== */
+.subnav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 3px;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.subnav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.subnav-btn:hover:not(.active) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.subnav-btn.active {
+  background: var(--surface-3);
+  color: #fff;
+  font-weight: 600;
+  border-color: var(--border-light);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.subnav-btn.active svg {
+  color: #38bdf8;
+}
+
+@media (max-width: 640px) {
+  .subnav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .subnav-btn {
+    justify-content: center;
+    padding: 9px 8px;
+  }
+}
+
+/* ==========================================================================
    Mobile Bottom Navigation Bar
    ========================================================================== */
 .mobile-bottom-bar {
@@ -1595,7 +1666,8 @@ td.td-select {
 
   .mobile-bottom-bar {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -2077,6 +2149,29 @@ tr.selected td {
   background: var(--surface-2);
 }
 
+.title-with-icon,
+.name-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name-with-icon {
+  display: inline-flex;
+}
+
+.kind-icon {
+  flex-shrink: 0;
+}
+
+.kind-os {
+  color: #c084fc;
+}
+
+.kind-game {
+  color: #34d399;
+}
+
 .section-title {
   margin: 20px 0 8px;
   font-size: 15px;
@@ -2373,4 +2468,94 @@ a.button-link:hover {
 /* Server page: a disk that needs a look */
 tr.row-warn td {
   background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+/* ==========================================================================
+   Row action menu (⋮)
+   ========================================================================== */
+.action-menu {
+  display: inline-block;
+}
+
+.action-menu-list {
+  position: fixed;
+  z-index: 1000;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-menu-item:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.action-menu-item:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.action-menu-item.danger-item {
+  color: #f87171;
+}
+
+/* ==========================================================================
+   Image details page
+   ========================================================================== */
+.page-back {
+  margin-bottom: 12px;
+}
+
+.details-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.details-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.lock-mark {
+  display: inline-flex;
+  margin-left: 6px;
+  color: #fbbf24;
+  vertical-align: -2px;
 }

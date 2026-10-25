@@ -23,7 +23,7 @@ export function suggestName(hostname: string | null): string {
 }
 
 /**
- * PCs that asked the server for a disk but are not registered (ggRock adds a
+ * PCs that asked the server for a disk but are not registered (each gets a
  * PC to Machines on its first network boot). Adding one keeps its MAC, so
  * its IQN is derived from the MAC and the name here becomes its identity.
  */

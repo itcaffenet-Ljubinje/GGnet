@@ -297,8 +297,10 @@ apt-get update -qq
 # ggNet runs its own instance, ggnet-pxe. ipxe: snponly.efi / ipxe.efi for TFTP.
 # Secure Boot: shim-signed (shim signed by Microsoft, and its MokManager),
 # sbsigntool and openssl to sign iPXE with the ggNet key.
+# Windows images edited on the server: ntfs-3g (mount, ntfsresize), libwin-hivex-perl
+# (hivexregedit), gdisk and fdisk (sgdisk, sfdisk) to grow a disk's data partition.
 apt-get install -y -qq python3 python3-venv python3-pip targetcli-fb python3-rtslib-fb dnsmasq-base ipxe \
-    shim-signed sbsigntool openssl >/dev/null
+    shim-signed sbsigntool openssl ntfs-3g libwin-hivex-perl gdisk fdisk >/dev/null
 
 # ---------- 8. ZFS datasets ----------
 if [[ $SET_AUTOTRIM -eq 1 ]]; then
@@ -379,7 +381,7 @@ http_port = 80
 # iBFT gateway for Windows: "none" (0.0.0.0, the default), "dhcp" or an IP.
 gateway = "none"
 # A PC whose MAC is not registered: "wait" on screen until it is added in the
-# web UI (Machines -> New PCs), as ggRock does, or "local" to boot its own disk.
+# web UI (Machines -> New PCs), or "local" to boot its own disk.
 unregistered = "wait"
 # Both are defaults: once saved in the web UI (Settings -> Network boot), the
 # saved values win. The PXE service the web UI shows and can restart:

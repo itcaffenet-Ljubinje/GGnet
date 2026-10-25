@@ -3,9 +3,9 @@
 What the web UI (`frontend/`) should offer, screen by screen, and where each item stands. It is the target for the
 UI pull requests; `docs/architecture.md` describes what the backend actually does.
 
-Sources: ggRock's public knowledge base and UI (the model for the workflow), and the ggNet2 prototype
+Sources: the workflow of commercial diskless systems for gaming cafes, and the ggNet2 prototype
 (`itcaffenet-Ljubinje/ggNet2`, React UI on a simulated backend: its layout, components and feature list are reused,
-its backend is not). ggNet has its own code and look; nothing is copied from ggRock.
+its backend is not). ggNet has its own code and look.
 
 Status: **done** (backend and UI), **backend** (API exists, UI missing or partial), **todo** (neither).
 

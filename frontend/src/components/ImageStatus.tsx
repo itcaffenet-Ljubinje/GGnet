@@ -11,7 +11,7 @@ export function versionOf(snapshotPath: string | null): string | null {
 }
 
 /**
- * ggRock's image status: whether the PC runs the version it should, and
+ * Image status: whether the PC runs the version it should, and
  * where it goes at its next reboot.
  *   green  runs the active version and follows it
  *   red    custom: pinned to a version, or keeps its writeback

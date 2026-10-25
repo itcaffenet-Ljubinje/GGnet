@@ -211,6 +211,54 @@ describe("DiskDetails", () => {
     ]);
   });
 
+  it("marks the latest version and applies a kept writeback of it", async () => {
+    const mock = stubHost();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue(" Warzone patch ");
+    renderDetails();
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    expect(within(versions).getAllByRole("row")[4]).toHaveTextContent("Latest");
+    expect(within(versions).getAllByRole("row")[1]).not.toHaveTextContent("Latest");
+
+    const wb = screen.getByRole("table", { name: "Writebacks of cs2" });
+    // Only pc01 keeps its writeback; pc02 has no Apply.
+    const apply = within(wb).getAllByRole("button", { name: "Apply" });
+    expect(apply).toHaveLength(1);
+    await userEvent.click(apply[0]);
+    expect(actions(mock)).toEqual([
+      {
+        url: "/api/v1/machines/1/apply-writebacks",
+        method: "POST",
+        body: { os: false, game: true, comment: "Warzone patch" },
+      },
+    ]);
+  });
+
+  it("locks a version, and a locked one cannot be deleted", async () => {
+    const mock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      const snaps = SNAPSHOTS.map((x) => (x.name === "v1pin" ? { ...x, locked: true } : x));
+      const body = url.endsWith("/snapshots") ? snaps : url.endsWith("/writebacks") ? WRITEBACKS : {};
+      return new Response(method === "DELETE" ? null : JSON.stringify(body), { status: method === "DELETE" ? 204 : 200 });
+    });
+    vi.stubGlobal("fetch", mock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderDetails();
+    const versions = await screen.findByRole("table", { name: "Versions of cs2" });
+    const pinRow = within(versions).getAllByRole("row")[3];
+    expect(within(pinRow).getByLabelText("Locked")).toBeInTheDocument();
+    expect(within(pinRow).getByRole("button", { name: "Delete" })).toBeDisabled();
+    // Merging v2 into base would delete the locked v1pin.
+    expect(within(versions).getAllByRole("button", { name: "Merge into base" }).at(-1)).toBeDisabled();
+
+    await userEvent.click(within(versions).getByRole("button", { name: "Lock @v1old" }));
+    await userEvent.click(within(versions).getByRole("button", { name: "Unlock @v1pin" }));
+    expect(actions(mock)).toEqual([
+      { url: "/api/v1/game-disks/1/snapshots/v1old/lock", method: "PUT", body: { locked: true } },
+      { url: "/api/v1/game-disks/1/snapshots/v1pin/lock", method: "PUT", body: { locked: false } },
+    ]);
+  });
+
   it("leaves the comment alone when the prompt is cancelled", async () => {
     const fetchMock = stubHost();
     vi.spyOn(window, "prompt").mockReturnValue(null);

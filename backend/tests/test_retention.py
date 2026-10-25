@@ -132,6 +132,12 @@ def test_preview_and_run_delete_only_unused_old_versions(client, host, disk):
     assert client.get("/api/v1/settings/retention").json()["last_run"]["actions"][0]["target"] == "cs2@v2"
 
 
+def test_locked_versions_are_kept(client, disk):
+    _five_versions(client, disk)
+    client.put(f"/api/v1/game-disks/{disk['id']}/snapshots/v2/lock", json={"locked": True})
+    assert client.post("/api/v1/settings/retention/preview", json=SAVE).json() == []
+
+
 def test_pinned_and_young_versions_are_kept(client, disk):
     _five_versions(client, disk)
     pc02 = next(m for m in client.get("/api/v1/machines").json() if m["name"] == "pc02")

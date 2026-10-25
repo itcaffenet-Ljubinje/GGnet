@@ -1,5 +1,5 @@
 """
-Power control of client PCs (ggRock's Turn On, Shutdown and Reboot).
+Power control of client PCs (Turn On, Shutdown and Reboot).
 
 Turn On is Wake-on-LAN: a magic packet (6 × 0xFF, then the MAC 16 times) as a
 UDP broadcast on the clients' network, sent from the service IP so it leaves

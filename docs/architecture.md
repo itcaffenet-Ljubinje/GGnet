@@ -1,6 +1,6 @@
 # ggNet architecture
 
-ggNet is a storage and boot orchestrator for gaming cafes, in the style of ggRock. It runs directly on the
+ggNet is a storage and boot orchestrator for gaming cafes, in the style of commercial diskless systems. It runs directly on the
 Proxmox VE host (systemd service, no VM, no container) and drives ZFS and the LIO iSCSI target there.
 There is no billing, no timers and no user accounts for players: ggNet only manages disks and boot.
 
@@ -121,7 +121,7 @@ attach removes what it created and reports the real error.
 A PC with a MAC gets an initiator IQN derived from it, `<iscsi_iqn_prefix>:pc-<mac without separators>`
 (`iqn.2025-05.net.ggnet:pc-aabbccddee02`). It does not depend on the Windows computer name, so a renamed or
 cloned Windows keeps its own disk, and in Boot Mode, where every PC boots the same Windows, iPXE sets it from
-the server. ggRock does the same (`iqn.2019-08.com.ggrock:pc-100`, set by its iPXE). A machine without a MAC
+the server. A machine without a MAC
 keeps the Windows default `iqn.1991-05.com.microsoft:<name>`. `PATCH /machines/{id}` with `"initiator_iqn": ""`
 resets a machine to its default (only while it has no disk, like every ACL change); the agent renames the
 Windows initiator to the IQN in its heartbeat answer before it connects.
@@ -132,7 +132,7 @@ it is a different PC with the same Windows name, which must not get that machine
 
 ### Discovery
 
-A PC that knocks but is not registered is listed under Discovered PCs on the Machines page (ggRock adds a PC on
+A PC that knocks but is not registered is listed under Discovered PCs on the Machines page (a PC is added on
 its first network boot): an unknown MAC that asks for an iPXE script, or a ggnet-agent whose heartbeat matches no
 machine (with its Windows name, IP and agent version). The admin adds it with the name it should have (its MAC
 comes along, so its IQN is derived from it), ignores it (hidden also when it knocks again) or removes it from the
@@ -155,12 +155,12 @@ Exposing the master itself read-only to all PCs looks simpler but breaks in prac
 into the game folder on launch (logs, shader caches, update checks), and NTFS on a write-protected disk fails
 those writes. Each PC therefore gets a ZFS clone of the master as its game disk. The clone is created instantly,
 shares all blocks with the master, takes writes, and is discarded on reset. The master never changes. This is
-also how ggRock and CCBoot behave, and it gives the same read performance as a shared LUN because the blocks
+also how other diskless systems behave, and it gives the same read performance as a shared LUN because the blocks
 in ARC are the same.
 
 ---
 
-## 3. Writebacks and image versions (ggRock model, planned)
+## 3. Writebacks and image versions
 
 There is no Super Client mode and no manual Reset button. A PC's writeback is discarded **by the server** every
 time the PC disconnects, shuts down or restarts. The only exception is a PC with **Keep Writeback** ticked: its
@@ -238,13 +238,13 @@ Every snapshot keeps its name and hold, so the other PCs' clones of `@v3` (or ol
 `@v4` at their next reboot. Until the two renames succeed, a failure rolls everything back (promote the old master
 again, drop `@v4`) and pc17 is mapped again. `zfs send -i cs2@v3 pc17@x | zfs recv cs2` does not work: an
 incremental from a clone's origin is a clone stream, which `zfs recv` only accepts as a new dataset. Apply is
-refused when `@v3` is no longer the newest snapshot of the master (someone applied in between, as ggRock does);
+refused when `@v3` is no longer the newest snapshot of the master (someone applied in between);
 the admin then discards the PC's writeback and redoes the change.
 
 PCs that are running when a new version is applied keep their current snapshot until they reboot. The Machines
-page shows this as ggRock's image status, next to the game disk:
+page shows this as the image status, next to the game disk:
 
-| Badge | ggRock icon | Meaning |
+| Badge | Icon | Meaning |
 |---|---|---|
 | `@v2` (green) | green circle | runs the active version and follows it |
 | `→ @v2 at reboot` | red arrow → green circle | runs an older version, moves to the active one at its next reboot |
@@ -274,7 +274,7 @@ after some deletions, the chosen version keeps its old name and running the merg
 
 ### Retention (Settings → Retention)
 
-As in ggRock's "Automated Snapshot and Writeback Removal". The settings live in the database (`settings` table, set in
+Automated snapshot and writeback removal. The settings live in the database (`settings` table, set in
 the web UI); `app/services/retention.py` runs every hour.
 
 | Setting | Default | Effect |
@@ -330,7 +330,7 @@ and stopped with "No more network devices" (2026-10-18). What the PC gets depend
 
 - a registered Boot Mode PC boots its OS image;
 - a Disk Mode PC, or a PC without a valid MAC, leaves iPXE and boots its local disk;
-- an unregistered PC is listed under Machines → New PCs and, as with ggRock, waits on screen: every 10 s it
+- an unregistered PC is listed under Machines → New PCs and waits on screen: every 10 s it
   asks for its script again, so it boots as soon as it is registered; a key press boots the local disk.
   `[boot] unregistered = "local"` makes it boot the local disk at once instead.
 
@@ -398,7 +398,7 @@ reboot
 - No `--no-describe`: Windows needs the iBFT table iPXE writes to continue booting from iSCSI.
 - `initiator-iqn` must equal the PC's ACL IQN, otherwise LIO refuses the login.
 - Only LUN 0 is named in the root path. Windows sees LUN 1 (the game disk) through the same iSCSI session.
-- The iBFT gateway is 0.0.0.0 by default (`set netX/gateway 0.0.0.0` before `sanboot`). With the router's gateway in the iBFT, Windows lost its iSCSI disk as it took over from iPXE (0x7B on vip-05, A/B tested on the same image on 2026-10-16); with 0.0.0.0 it boots and still gets its default route and internet afterwards. `[boot] gateway` in config.toml: `"none"` (the default), `"dhcp"` (keep the router's gateway) or an IP (e.g. the server with IP forwarding, as ggRock does).
+- The iBFT gateway is 0.0.0.0 by default (`set netX/gateway 0.0.0.0` before `sanboot`). With the router's gateway in the iBFT, Windows lost its iSCSI disk as it took over from iPXE (0x7B on vip-05, A/B tested on the same image on 2026-10-16); with 0.0.0.0 it boots and still gets its default route and internet afterwards. `[boot] gateway` in config.toml: `"none"` (the default), `"dhcp"` (keep the router's gateway) or an IP (e.g. the server with IP forwarding).
 
 Unknown MAC (not registered, or registration window open):
 
@@ -417,7 +417,7 @@ Boot Mode PC without its disks (not provisioned, or in `error`): a message with 
 ### The PC's identity in its OS writeback
 
 Every Boot Mode PC boots the same Windows image, so on its own every PC would have the image's computer name.
-Like ggRock (its `Rename.PC` and `Inject.EnvVariables` registry templates), the server edits each fresh OS
+The server edits each fresh OS
 writeback offline before it is mapped, so Windows comes up as that PC without an extra reboot
 (`backend/app/windows_setup.py`):
 
@@ -451,7 +451,7 @@ Disk Mode PC that PXE-boots by mistake: the same `exit` script, so it falls thro
 
 ## 5. Web UI
 
-React + Vite, served by the backend on port 8088. Layout follows ggRock's Machines and Images tabs.
+React + Vite, served by the backend on port 8088. Layout: Machines, Images, Server and Settings tabs.
 
 **Machines**
 - Columns: Name, Status (online/off, Keep Writeback, agent missing, no image set, link below 1 Gbit/s),
@@ -479,7 +479,7 @@ React + Vite, served by the backend on port 8088. Layout follows ggRock's Machin
   cloned from, the space it has written, Keep Writeback and whether it is connected, with Discard for a PC that is
   off (also one that keeps its writeback). Read live from ZFS. *(done)*
 - Backup / restore: `zfs send` of the image with its snapshots to a file on a local disk or over SSH to another
-  ggNet server, and back. Same idea as ggRock's `ggrock-img send/receive`.
+  ggNet server, and back.
 
 **Server**: pool size/used/free/health and last scrub, ARC size and hit ratio, IOPS and throughput per zvol,
 network throughput of the iSCSI interface.
@@ -496,9 +496,9 @@ network throughput of the iSCSI interface.
 | One shared iSCSI target with per-PC ACLs and mapped LUNs | done |
 | Automatic writeback discard, Keep Writeback, Apply Writebacks (zfs promote), image versions | done |
 | Edit on PC for drafts, game disk drive letter per machine, Images page: versions and writebacks | done |
-| Snapshot pin per machine and the ggRock image status | done |
+| Snapshot pin per machine and the image status | done |
 | Retention job, reserved space and warning threshold | done |
-| Machines UI per the ggRock docs (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | done |
+| Machines UI (IP, uptime, link speed, hardware, Sent/Received), WoL / shutdown / reboot, bulk | done |
 | Settings → Client app: agent download and one-line install | done |
 | Boot Mode: OS images, OS + game writebacks per PC, per-MAC iPXE script | done |
 | PC identity by MAC: MAC-derived initiator IQN, heartbeat by MAC, Discovery | done |

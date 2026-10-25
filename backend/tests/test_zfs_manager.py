@@ -312,16 +312,27 @@ def test_list_clients_parses_output_and_skips_parent(zfs, runner):
 
 def test_snapshot_details_parses_bytes_clones_and_comment(zfs, runner):
     runner.on("zfs", "list", result=(True,
-        f"{MASTER}@base\t1760000000\t4096\t1073741824\t{CLIENT},tank/ggnet/writebacks/pc02\t-\n"
-        f"{MASTER}@v2\t1760003600\t0\t2147483648\t-\tAB 18.10. Warzone update", ""))
+        f"{MASTER}@base\t1760000000\t4096\t1073741824\t{CLIENT},tank/ggnet/writebacks/pc02\t-\ton\n"
+        f"{MASTER}@v2\t1760003600\t0\t2147483648\t-\tAB 18.10. Warzone update\t-", ""))
     assert zfs.snapshot_details(MASTER) == [
         {"name": "base", "creation": 1760000000, "used": 4096, "referenced": 1073741824,
-         "clones": [CLIENT, "tank/ggnet/writebacks/pc02"], "comment": None},
+         "clones": [CLIENT, "tank/ggnet/writebacks/pc02"], "comment": None, "locked": True},
         {"name": "v2", "creation": 1760003600, "used": 0, "referenced": 2147483648, "clones": [],
-         "comment": "AB 18.10. Warzone update"},
+         "comment": "AB 18.10. Warzone update", "locked": False},
     ]
     assert runner.calls[0][-3:] == ["-d", "1", MASTER]
-    assert "name,creation,used,refer,clones,ggnet:comment" in runner.calls[0]
+    assert "name,creation,used,refer,clones,ggnet:comment,ggnet:locked" in runner.calls[0]
+
+
+def test_snapshot_lock_set_and_removed(zfs, runner):
+    assert zfs.set_snapshot_lock(f"{MASTER}@v2", True)
+    assert zfs.set_snapshot_lock(f"{MASTER}@v2", False)
+    assert not zfs.set_snapshot_lock(MASTER, True)
+    assert not zfs.set_snapshot_lock("rpool/data@v2", True)
+    assert runner.calls == [
+        ["zfs", "set", "ggnet:locked=on", f"{MASTER}@v2"],
+        ["zfs", "inherit", "ggnet:locked", f"{MASTER}@v2"],
+    ]
 
 
 def test_snapshot_comment_set_and_removed(zfs, runner):

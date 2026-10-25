@@ -19,14 +19,20 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_provisioner
+from app.api.deps import get_disk_copier, get_provisioner
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     ActiveSnapshot,
+    GameDiskCopy,
     GameDiskCreate,
+    GameDiskGrow,
+    GameDiskGrown,
     GameDiskEdit,
     GameDiskOut,
+    GameDiskRename,
+    PrepareImage,
     SnapshotComment,
+    SnapshotLock,
     SnapshotOut,
     WritebackOut,
 )
@@ -66,6 +72,10 @@ def create_disk(
 ):
     if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
         conflict(f"Game disk '{body.name}' already exists")
+    # A renamed disk keeps its zvol, so its old name stays taken on the host.
+    owner = db.scalar(select(GameDisk).where(GameDisk.zvol_path == prov.image_path(body.name)))
+    if owner is not None:
+        conflict(f"'{body.name}' is still the zvol name of '{owner.name}' (renamed); choose another name")
     try:
         path = prov.create_disk(body.name, body.size_gb, os_image=body.kind is DiskKind.OS)
     except ProvisioningError as e:
@@ -86,6 +96,127 @@ def create_disk(
     return disk
 
 
+@router.patch("/{disk_id}", response_model=GameDiskOut)
+def rename_disk(disk_id: int, body: GameDiskRename, db: Session = Depends(get_db)):
+    """
+    Rename a disk in ggNet. Only the name changes: the zvol, its versions and
+    every PC's writeback stay where they are, so this is safe while PCs run.
+    """
+    disk = _get(db, disk_id)
+    if body.name == disk.name:
+        return disk
+    if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
+        conflict(f"Game disk '{body.name}' already exists")
+    old, disk.name = disk.name, body.name
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        conflict(f"Game disk '{body.name}' already exists")
+    logger.info("Disk '%s' renamed to '%s' (zvol %s unchanged)", old, disk.name, disk.zvol_path)
+    return disk
+
+
+@router.post("/{disk_id}/copy", response_model=GameDiskOut, status_code=status.HTTP_201_CREATED)
+def copy_disk(
+    disk_id: int,
+    body: GameDiskCopy,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+    copier=Depends(get_disk_copier),
+):
+    """
+    Copy one version of this image (default: the active one) into a new,
+    independent image of the same kind. The copy runs in the background;
+    the new disk shows its progress and is published at @base when done.
+    """
+    src = _get(db, disk_id)
+    _published(src)
+    snap = body.snapshot or src.snapshot
+    if snap not in {v["name"] for v in _versions(prov, src)}:
+        not_found("Snapshot", f"{src.name}@{snap}")
+    if db.scalar(select(GameDisk).where(GameDisk.name == body.name)):
+        conflict(f"Game disk '{body.name}' already exists")
+    path = prov.image_path(body.name)
+    owner = db.scalar(select(GameDisk).where(GameDisk.zvol_path == path))
+    if owner is not None:
+        conflict(f"'{body.name}' is still the zvol name of '{owner.name}' (renamed); choose another name")
+    if prov.zfs.dataset_exists(path):
+        conflict(f"Zvol {path} already exists on the host")
+    disk = GameDisk(name=body.name, zvol_path=path, size_gb=src.size_gb, kind=src.kind,
+                    copy_source=f"{src.zvol_path}@{snap}", copy_percent=0)
+    db.add(disk)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        conflict(f"Game disk '{body.name}' already exists")
+    logger.info("Copy of %s@%s to '%s' started", src.name, snap, disk.name)
+    copier.start(disk.id)
+    db.refresh(disk)
+    return disk
+
+
+@router.post("/{disk_id}/grow", response_model=GameDiskGrown)
+def grow_disk(
+    disk_id: int,
+    body: GameDiskGrow,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """
+    Make a disk bigger (never smaller). A published disk gets a new active
+    version with the bigger size; PCs move to it at their next reboot. Its
+    data partition is grown on the server too (`extend`, app.disk_grow): a
+    game disk's last partition, or an OS image's C: after its Recovery
+    partition was moved to the end. Any other layout is extended in Windows.
+    """
+    disk = _get(db, disk_id)
+    _not_copying(disk)
+    _not_edited(disk)
+    if body.size_gb <= disk.size_gb:
+        conflict(f"'{disk.name}' is already {disk.size_gb} GB; a disk can only grow")
+    if disk.published:
+        names = [v["name"] for v in _versions(prov, disk)]
+        if names and names[-1] != disk.snapshot:
+            conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
+                     f"make @{names[-1]} active first (a new version always follows the newest)")
+    old = disk.size_gb
+    try:
+        version, result = prov.grow_disk(disk.zvol_path, body.size_gb, disk.published, body.extend)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    disk.size_gb = body.size_gb
+    if version:
+        disk.snapshot = version
+    db.commit()
+
+    if result is not None and result.extended:
+        note = "The data partition was extended too: Windows sees the new space at the next reboot."
+    elif not disk.published:
+        note = "The draft is bigger; the new space shows in Disk Management while it is filled."
+    else:
+        why = f" ({result.note})" if result is not None else ""
+        note = ("Windows shows the new space as unallocated" + why + ". To use it, on one PC with Keep "
+                "Writeback: Disk Management → Extend Volume (it needs the free space right behind the "
+                "volume), shut down, then Apply Writebacks.")
+    if version:
+        comment = f"ggNet: grown from {old} to {body.size_gb} GB" + (
+            ", data partition extended" if result is not None and result.extended else "")
+        try:
+            prov.set_comment(disk.zvol_path, version, comment)
+        except ProvisioningError as e:   # the version exists; only its comment is missing
+            logger.warning("%s", e)
+    logger.info("'%s' grown from %s to %s GB%s", disk.name, old, body.size_gb, f" as @{version}" if version else "")
+    return GameDiskGrown(disk=GameDiskOut.model_validate(disk), version=version,
+                         extended=bool(result and result.extended), note=note)
+
+
+def _not_copying(disk: GameDisk) -> None:
+    if disk.copying:
+        conflict(f"'{disk.name}' is still being copied ({disk.copy_percent or 0}%); wait until it is done")
+
+
 def _not_edited(disk: GameDisk) -> None:
     if disk.editor is not None:
         conflict(f"Game disk '{disk.name}' is being edited on '{disk.editor.name}'; finish editing first")
@@ -104,6 +235,7 @@ def start_edit(
     A published disk is changed with Keep Writeback + Apply Writebacks instead.
     """
     disk = _get(db, disk_id)
+    _not_copying(disk)
     if disk.kind is DiskKind.OS:
         conflict(f"'{disk.name}' is an OS image; it cannot be edited on a Disk Mode PC")
     if disk.published:
@@ -175,6 +307,8 @@ def publish_disk(
     if disk.published:
         conflict(f"Game disk '{disk.name}' is already published (@{disk.snapshot})")
     _not_edited(disk)
+    if disk.copy_source is not None:
+        conflict(f"'{disk.name}' is a copy; it is published by itself when the copy ends")
     try:
         disk.snapshot = prov.publish_disk(disk.zvol_path)
     except ProvisioningError as e:
@@ -228,6 +362,7 @@ def list_snapshots(
                             for c in v["clones"]),
             pinned=sorted(m.name for m in disk.machines if m.pinned_snapshot == v["name"]),
             comment=v.get("comment"),
+            locked=bool(v.get("locked")),
         )
         for v in _versions(prov, disk)
     ]
@@ -247,6 +382,25 @@ def set_snapshot_comment(
         not_found("Version", name)
     try:
         prov.set_comment(disk.zvol_path, name, body.comment)
+    except ProvisioningError as e:
+        host_failed(str(e))
+    return next(v for v in list_snapshots(disk_id, db, prov) if v.name == name)
+
+
+@router.put("/{disk_id}/snapshots/{name}/lock", response_model=SnapshotOut)
+def set_snapshot_lock(
+    disk_id: int,
+    name: str,
+    body: SnapshotLock,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """Lock a version (never deleted, by retention or by hand) or unlock it."""
+    disk = _get(db, disk_id)
+    if not disk.published or name not in {v["name"] for v in _versions(prov, disk)}:
+        not_found("Version", name)
+    try:
+        prov.set_locked(disk.zvol_path, name, body.locked)
     except ProvisioningError as e:
         host_failed(str(e))
     return next(v for v in list_snapshots(disk_id, db, prov) if v.name == name)
@@ -286,6 +440,8 @@ def delete_snapshot(
     version = next((v for v in _versions(prov, disk) if v["name"] == name), None)
     if version is None:
         not_found("Snapshot", f"{disk.name}@{name}")
+    if version.get("locked"):
+        conflict(f"{disk.name}@{name} is locked; unlock it first")
     if name == disk.snapshot:
         conflict(f"{disk.name}@{name} is the active version; make another one active first")
     pinned = sorted(m.name for m in disk.machines if m.pinned_snapshot == name)
@@ -306,6 +462,7 @@ def delete_snapshot(
 @router.post("/{disk_id}/prepare", response_model=GameDiskOut)
 def prepare_image(
     disk_id: int,
+    body: PrepareImage | None = None,
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
 ):
@@ -323,7 +480,7 @@ def prepare_image(
     if names and names[-1] != disk.snapshot:
         conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
                  f"make @{names[-1]} active first (a new version always follows the newest)")
-    prep = image_prep()
+    prep = image_prep(defender_off=bool(body and body.defender_off))
     try:
         new = prov.prepare_image(disk.zvol_path, prep)
     except ProvisioningError as e:
@@ -333,7 +490,8 @@ def prepare_image(
     version = default_package().info()
     agent = f", agent {version.version}" if prep.agent and version and version.version else ""
     try:
-        prov.set_comment(disk.zvol_path, new, f"ggNet: prepared for all PCs{agent}")
+        defender = ", Defender off" if prep.defender_off else ""
+        prov.set_comment(disk.zvol_path, new, f"ggNet: prepared for all PCs{agent}{defender}")
     except ProvisioningError as e:   # the version exists; only its comment is missing
         logger.warning("%s", e)
     return disk
@@ -368,6 +526,9 @@ def merge_into_base(
                     if m.pinned_snapshot in older_names)
     if pinned:
         conflict(f"Older versions are pinned on {', '.join(pinned)}; unpin them first")
+    locked = [v["name"] for v in older if v.get("locked")]
+    if locked:
+        conflict(f"Older versions are locked ({', '.join('@' + n for n in locked)}); unlock them first")
     if any(v["clones"] for v in older):
         by_clone = _machines_by_clone(db)
         users = sorted({by_clone[c].name if c in by_clone else c
@@ -435,6 +596,7 @@ def delete_disk(
 ):
     disk = _get(db, disk_id)
     _not_edited(disk)
+    _not_copying(disk)
     assigned = db.scalar(
         select(func.count()).select_from(Machine).where(
             or_(Machine.game_disk_id == disk.id, Machine.os_disk_id == disk.id))
