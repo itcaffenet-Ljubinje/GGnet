@@ -89,6 +89,12 @@ class GameDiskCopy(BaseModel):
     check_name = field_validator("name")(_disk_name)
 
 
+class PrepareImage(BaseModel):
+    """Options of Prepare image beyond what every image gets."""
+
+    defender_off: bool = False     # Microsoft Defender's services and drivers disabled
+
+
 class GameDiskGrow(BaseModel):
     """A bigger size for a disk; `extend` also grows its last data partition."""
 

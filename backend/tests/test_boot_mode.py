@@ -671,6 +671,18 @@ def test_prepare_image_makes_a_new_active_version(client, host, disks, windows):
     assert client.post(f"/api/v1/game-disks/{game['id']}/prepare").status_code == 409
 
 
+def test_prepare_image_can_turn_defender_off(client, host, disks, windows):
+    os_disk, _ = disks
+    r = client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare", json={"defender_off": True})
+    assert r.status_code == 200, r.text
+    [(_, prep, _)] = windows.prepared
+    assert prep.defender_off is True
+    versions = client.get(f"/api/v1/game-disks/{os_disk['id']}/snapshots").json()
+    assert versions[-1]["comment"].endswith(", Defender off")
+    client.post(f"/api/v1/game-disks/{os_disk['id']}/prepare")       # without a body: left as it is
+    assert windows.prepared[-1][1].defender_off is False
+
+
 def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
     os_disk, _ = disks
     windows.prep_problem = "no Program Files folder in the image"

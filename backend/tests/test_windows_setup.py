@@ -619,6 +619,52 @@ def test_prepare_image_without_tuning_leaves_windows_as_it_is(windows, runner, t
     assert (root / "hiberfil.sys").exists()
 
 
+def test_defender_off_lines_and_policy():
+    from app.windows_setup import defender_off_lines, defender_policy_patch
+
+    reg = defender_off_lines(2, ["WinDefend", "WdFilter"])
+    assert "[\\ControlSet002\\Services\\WinDefend]\n\"Start\"=dword:00000004" in reg
+    assert "[\\ControlSet002\\Services\\WdFilter]" in reg and "WdBoot" not in reg
+    with pytest.raises(ValueError):
+        defender_off_lines(2, ["Tcpip"])
+    policy = defender_policy_patch()
+    assert '"DisableRealtimeMonitoring"=dword:00000001' in policy
+    assert '"DisableNotifications"=dword:00000001' in policy
+    # Each policy key's parent comes first: hivexregedit creates one level at a time.
+    assert policy.index("[\\Policies\\Microsoft]") < policy.index("[\\Policies\\Microsoft\\Windows Defender]")
+
+
+def test_prepare_image_turns_defender_off_only_when_asked(windows, runner, tmp_path):
+    from app.windows_setup import ImagePrep, defender_off_lines, defender_policy_patch
+
+    root = _image(windows)
+    (root / "Program Files").mkdir()
+    select = runner.responses[("hivexregedit", "--export")]
+    present = {"WinDefend", "WdBoot", "WdFilter"}             # no MDCoreSvc, Sense ... in this image
+
+    def export(cmd):
+        name = cmd[-1].rsplit("\\", 1)[-1]
+        if "\\Services\\" in cmd[-1] and name in ("WinDefend", "WdNisSvc", "WdNisDrv", "WdFilter",
+                                                       "WdBoot", "Sense", "MDCoreSvc"):
+            return (True, "x", "") if name in present else (False, "", "not found")
+        return select
+    runner.responses[("hivexregedit", "--export")] = export
+    merges = []
+
+    def merge(cmd):
+        merges.append((Path(cmd[2]).name, Path(cmd[3]).read_text(encoding="utf-8")))
+        return True, "", ""
+    runner.responses[("hivexregedit", "--merge")] = merge
+
+    assert windows.prepare_image(DEVICE, ImagePrep(agent=_agent(tmp_path), defender_off=True), label="win11") is None
+    assert ("SYSTEM", defender_off_lines(2, ["WinDefend", "WdFilter", "WdBoot"])) in merges
+    assert ("SOFTWARE", defender_policy_patch()) in merges
+
+    merges.clear()
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
+    assert not any("Windows Defender" in text or "WinDefend" in text for _, text in merges)
+
+
 def test_an_image_without_a_software_hive_is_reported(windows, runner, tmp_path):
     root = _windows_on(windows, "prepare-win11").parents[3]
     (root / "Program Files").mkdir()

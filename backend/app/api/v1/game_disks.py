@@ -30,6 +30,7 @@ from app.api.v1.schemas import (
     GameDiskEdit,
     GameDiskOut,
     GameDiskRename,
+    PrepareImage,
     SnapshotComment,
     SnapshotLock,
     SnapshotOut,
@@ -461,6 +462,7 @@ def delete_snapshot(
 @router.post("/{disk_id}/prepare", response_model=GameDiskOut)
 def prepare_image(
     disk_id: int,
+    body: PrepareImage | None = None,
     db: Session = Depends(get_db),
     prov: Provisioner = Depends(get_provisioner),
 ):
@@ -478,7 +480,7 @@ def prepare_image(
     if names and names[-1] != disk.snapshot:
         conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
                  f"make @{names[-1]} active first (a new version always follows the newest)")
-    prep = image_prep()
+    prep = image_prep(defender_off=bool(body and body.defender_off))
     try:
         new = prov.prepare_image(disk.zvol_path, prep)
     except ProvisioningError as e:
@@ -488,7 +490,8 @@ def prepare_image(
     version = default_package().info()
     agent = f", agent {version.version}" if prep.agent and version and version.version else ""
     try:
-        prov.set_comment(disk.zvol_path, new, f"ggNet: prepared for all PCs{agent}")
+        defender = ", Defender off" if prep.defender_off else ""
+        prov.set_comment(disk.zvol_path, new, f"ggNet: prepared for all PCs{agent}{defender}")
     except ProvisioningError as e:   # the version exists; only its comment is missing
         logger.warning("%s", e)
     return disk

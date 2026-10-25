@@ -127,6 +127,8 @@ class ImagePrep:
     agent: AgentInstall | None = None
     # Power, paging and background writes set for a diskless PC (tuning_patch()).
     tuning: bool = True
+    # Microsoft Defender's services and drivers off (defender_off_lines()).
+    defender_off: bool = False
 
 
 def _reg_string(value: str) -> str:
@@ -420,6 +422,48 @@ def software_patch() -> str:
     ]) + "\n"
 
 
+# Microsoft Defender's services and drivers: the engine, network inspection,
+# its file system filter, its early-launch driver, Defender for Endpoint and
+# the newer core service. Only those in the image are touched.
+DEFENDER_SERVICES = ("WinDefend", "WdNisSvc", "WdNisDrv", "WdFilter", "WdBoot", "Sense", "MDCoreSvc")
+
+
+def defender_off_lines(control_set: int, present: Sequence[str]) -> str:
+    """
+    SYSTEM hive .reg that keeps Defender from starting: its services and
+    drivers disabled. Written offline, so Tamper Protection (which guards
+    these keys while Windows runs) cannot undo it. A diskless PC loses
+    everything at restart anyway; nothing scans or rebuilds its cache at boot.
+    """
+    cs = f"\\ControlSet{control_set:03d}"
+    lines = ["Windows Registry Editor Version 5.00"]
+    for name in present:
+        if name not in DEFENDER_SERVICES:
+            raise ValueError(f"Not a Defender service: {name!r}")
+        lines += ["", f"[{cs}\\Services\\{name}]", '"Start"=dword:00000004']
+    return "\n".join(lines) + "\n"
+
+
+def defender_policy_patch() -> str:
+    """SOFTWARE hive .reg: Defender's policies off, and no "protection is off" notifications."""
+    return "\n".join([
+        "Windows Registry Editor Version 5.00",
+        "", "[\\Policies\\Microsoft]",
+        "", "[\\Policies\\Microsoft\\Windows Defender]",
+        '"DisableAntiSpyware"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection]",
+        '"DisableRealtimeMonitoring"=dword:00000001',
+        '"DisableOnAccessProtection"=dword:00000001',
+        '"DisableScanOnRealtimeEnable"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\Windows Defender\\Spynet]",
+        '"SpynetReporting"=dword:00000000',
+        '"SubmitSamplesConsent"=dword:00000002',
+        "", "[\\Policies\\Microsoft\\Windows Defender Security Center]",
+        "", "[\\Policies\\Microsoft\\Windows Defender Security Center\\Notifications]",
+        '"DisableNotifications"=dword:00000001',
+    ]) + "\n"
+
+
 def _cleanup_lines(cs: str, dhcp_interfaces: Sequence[str], forget_letters: Sequence[str]) -> list[str]:
     """Fixed addresses to DHCP, and every letter but C: forgotten."""
     lines: list[str] = []
@@ -650,11 +694,30 @@ class WindowsSetup:
         problem = self._merge_reg(hive, "prepare", image_patch(control_set, fixed, letters, agent_ok,
                                                                prep.tuning, nics, order))
         tuning_problem = self._tune_software(root) if prep.tuning and problem is None else None
+        defender_problem = self._defender_off(root, hive, control_set) \
+            if prep.defender_off and problem is None else None
         if problem is None:
-            logger.info("Image prepared (agent: %s, diskless tuning: %s, DHCP: %s, letters forgotten: %s)",
+            logger.info("Image prepared (agent: %s, diskless tuning: %s, Defender off: %s, DHCP: %s, "
+                        "letters forgotten: %s)",
                         "yes" if agent_ok else "no", "yes" if prep.tuning and not tuning_problem else "no",
+                        "yes" if prep.defender_off and not defender_problem else "no",
                         ", ".join(fixed) or "-", ", ".join(letters) or "-")
-        return "; ".join(p for p in (problem, agent_problem, tuning_problem) if p) or None
+        return "; ".join(p for p in (problem, agent_problem, tuning_problem, defender_problem) if p) or None
+
+    def _defender_off(self, root: Path, hive: Path, control_set: int) -> str | None:
+        """Defender's services and drivers disabled (SYSTEM), its policies off (SOFTWARE)."""
+        present = [name for name in DEFENDER_SERVICES
+                   if self._run(["hivexregedit", "--export", str(hive),
+                                 f"\\ControlSet{control_set:03d}\\Services\\{name}"], quiet=True)[0]]
+        problem = self._merge_reg(hive, "prepare-defender", defender_off_lines(control_set, present))
+        if problem:
+            return f"Defender: {problem}"
+        software = _find(root, SOFTWARE_HIVE)
+        if software is None:
+            return "Defender: no SOFTWARE hive in the image"
+        problem = self._merge_reg(software, "prepare-defender-policy", defender_policy_patch())
+        logger.info("Defender turned off in the image (%s)", ", ".join(present) or "no services found")
+        return f"Defender: {problem}" if problem else None
 
     def _tune_software(self, root: Path) -> str | None:
         """The SOFTWARE hive's part of the tuning, and the hibernation file gone."""

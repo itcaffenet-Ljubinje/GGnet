@@ -473,7 +473,8 @@ export const api = {
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
   setSnapshotLock: (id: number, name: string, locked: boolean) =>
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/lock`, { locked }),
-  prepareImage: (id: number) => request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`),
+  prepareImage: (id: number, options?: { defender_off: boolean }) =>
+    request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`, options),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),
   listWritebacks: (id: number) => request<Writeback[]>("GET", `/v1/game-disks/${id}/writebacks`),

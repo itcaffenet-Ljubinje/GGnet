@@ -17,6 +17,7 @@ import {
 import { api, type DiskKind, type GameDisk, type Machine } from "../api";
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { EditImage } from "../components/EditImage";
+import { PrepareImage } from "../components/PrepareImage";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
 import { ImageDetailsPage } from "./ImageDetailsPage";
@@ -42,6 +43,8 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   // The image in the Edit dialog, and what the last edit asks to do in Windows.
   const [editing, setEditing] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The OS image in the Prepare image dialog.
+  const [preparing, setPreparing] = useState<number | null>(null);
 
   const assigned = (id: number) =>
     machines.filter((m) => m.game_disk_id === id || m.os_disk_id === id).length;
@@ -87,18 +90,9 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
-  async function prepare(disk: GameDisk) {
-    const msg =
-      `Prepare "${disk.name}" for all PCs?\n\n` +
-      "A new version is made from the newest one, with the server's agent (Settings → Client app) and " +
-      "its service, Fast Startup off, fixed IP addresses switched to DHCP and old drive letters forgotten.\n\n" +
-      "Windows is also set up for diskless PCs: High performance, no sleep or hibernation (the display " +
-      "stays on), PCIe, USB and network card power saving off, a fixed 4 GB page file, no crash dumps, " +
-      "no automatic Windows Update, Store updates, maintenance (defragmentation), search index or SysMain, " +
-      "and the iSCSI driver loaded after the network, which saves about 25 s of every start.\n\n" +
-      "PCs move to it at their next reboot. Apply Writebacks of an OS image does this already.";
-    if (!window.confirm(msg)) return;
-    await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id));
+  async function prepare(disk: GameDisk, options: { defender_off: boolean }) {
+    const ok = await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id, options));
+    if (ok) setPreparing(null);
     await reload();
   }
 
@@ -150,7 +144,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
             {
               label: "Prepare image",
               icon: Wand2,
-              onSelect: () => prepare(d),
+              onSelect: () => setPreparing(d.id),
               disabled: busy !== null,
               title: "New version with the server's agent and the settings every PC needs",
             },
@@ -185,6 +179,15 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
       }}
     />
   );
+  const preparedDisk = disks.find((d) => d.id === preparing);
+  const prepareDialog = preparedDisk && (
+    <PrepareImage
+      disk={preparedDisk}
+      busy={busy === `prepare-${preparedDisk.id}`}
+      onClose={() => setPreparing(null)}
+      onPrepare={(options) => prepare(preparedDisk, options)}
+    />
+  );
   const noticeBanner = notice && (
     <div className="banner banner-info" role="status">
       <span>{notice}</span>
@@ -201,6 +204,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
         <ErrorBanner message={error} onClose={() => setError(null)} />
         {noticeBanner}
         {editDialog}
+        {prepareDialog}
         <ImageDetailsPage
           disk={shown}
           machines={machines}
@@ -341,6 +345,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
       <ErrorBanner message={error} onClose={() => setError(null)} />
       {noticeBanner}
       {editDialog}
+      {prepareDialog}
 
       <ImageKpis disks={disks} machines={machines} />
 

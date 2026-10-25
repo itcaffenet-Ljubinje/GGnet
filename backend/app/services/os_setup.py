@@ -42,6 +42,6 @@ def os_setup_for(m: Machine) -> OsSetup | None:
     }, boot_nic=m.boot_nic)
 
 
-def image_prep() -> ImagePrep:
+def image_prep(defender_off: bool = False) -> ImagePrep:
     """What prepare_image makes part of an OS image: the server's agent, if any."""
-    return ImagePrep(agent=agent_install())
+    return ImagePrep(agent=agent_install(), defender_off=defender_off)

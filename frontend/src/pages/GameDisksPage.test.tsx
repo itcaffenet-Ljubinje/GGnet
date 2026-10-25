@@ -266,9 +266,8 @@ describe("GameDisksPage", () => {
     expect(calls(fetchMock).filter((c) => c.method === "POST")[0].body).toMatchObject({ kind: "os" });
   });
 
-  it("prepares an OS image after confirmation; game disks have no such button", async () => {
+  it("prepares an OS image from its dialog, with Defender off on request; game disks have none", async () => {
     const fetchMock = stubFetch(200, disk({ id: 3, name: "win11", kind: "os", snapshot: "v2" }));
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const reload = vi.fn().mockResolvedValue(undefined);
     render(
       <GameDisksPage
@@ -281,9 +280,15 @@ describe("GameDisksPage", () => {
     expect(screen.queryByRole("menuitem", { name: "Prepare image" })).toBeNull();
     await userEvent.keyboard("{Escape}");
     await menu("win11", "Prepare image");
+    const dialog = screen.getByRole("dialog", { name: "Prepare win11" });
+    expect(calls(fetchMock)).toEqual([]);                      // nothing until confirmed
+    await userEvent.click(within(dialog).getByLabelText("Turn off Microsoft Defender"));
+    await userEvent.click(within(dialog).getByRole("button", { name: /Prepare image/ }));
     expect(calls(fetchMock).filter((c) => c.method !== "GET")).toEqual([
-      { url: "/api/v1/game-disks/3/prepare", method: "POST", body: undefined },
+      { url: "/api/v1/game-disks/3/prepare", method: "POST", body: { defender_off: true } },
     ]);
     expect(reload).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
+
 });
