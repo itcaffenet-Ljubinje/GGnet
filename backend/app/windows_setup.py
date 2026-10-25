@@ -350,6 +350,98 @@ def group_order_lines(cs: str, export: str) -> list[str]:
     ]
 
 
+# Drivers and services of other diskless systems. In an image made for one of
+# them they sit in the way of the disk and the network card (a CCBoot image
+# has its cache driver above every volume and its own filter on every network
+# card) and stop Windows booting over plain iSCSI (0x7B). Prepare image turns
+# them off and takes them out of the device classes' filter lists.
+FOREIGN_DISKLESS = (
+    "CCacheX", "CCBootPNPX", "CCBootPNP", "CCopyFile", "CCBootClient",     # CCBoot
+)
+_CLASS_KEY = re.compile(r"\\Control\\Class\\(\{[0-9A-Fa-f-]{36}\})$")
+
+
+def _multi_sz(line: str) -> list[str] | None:
+    """The strings of a .reg REG_MULTI_SZ line (hex(7)), or None."""
+    raw = line.partition("=")[2]
+    if not raw.startswith("hex(7):"):
+        return None
+    try:
+        return [s for s in bytes(int(x, 16) for x in raw[7:].split(",") if x).decode("utf-16-le").split("\0") if s]
+    except ValueError:
+        return None
+
+
+def foreign_filter_lines(cs: str, class_export: str, foreign: Sequence[str]) -> list[str]:
+    """
+    The device classes' UpperFilters/LowerFilters without the `foreign`
+    drivers; `class_export` is a `hivexregedit --export` of Control\\Class.
+    A list left empty is deleted.
+    """
+    gone = {f.lower() for f in foreign}
+    lines: list[str] = []
+    for path, values in _reg_blocks(class_export):
+        m = _CLASS_KEY.search(path)
+        if not m:
+            continue
+        changed = []
+        for v in values:
+            name = v.partition("=")[0]
+            if name not in ('"UpperFilters"', '"LowerFilters"'):
+                continue
+            items = _multi_sz(v)
+            if items is None or not any(i.lower() in gone for i in items):
+                continue
+            kept = [i for i in items if i.lower() not in gone]
+            data = ("\0".join(kept) + "\0\0").encode("utf-16-le")
+            changed.append(f"{name}={_hex('hex(7)', data)}" if kept else f"{name}=-")
+        if changed:
+            lines += ["", f"[{cs}\\Control\\Class\\{m.group(1)}]", *changed]
+    return lines
+
+
+def nic_services(enum_pci_export: str) -> list[str]:
+    """The drivers of the image's PCI network cards (the services of Net class devices)."""
+    found: list[str] = []
+    for _, values in _reg_blocks(enum_pci_export):
+        text = {v.partition("=")[0].strip('"'): v.partition("=")[2] for v in values}
+        cls = _reg_text(text.get("ClassGUID", ""))
+        service = _reg_text(text.get("Service", ""))
+        if cls.lower() == NET_CLASS and service and service not in found:
+            found.append(service)
+    return found
+
+
+def _reg_text(data: str) -> str:
+    """A .reg string value (quoted, or hex(1)/hex(2) UTF-16) as text; "" when unreadable."""
+    if data.startswith('"') and data.endswith('"'):
+        return data[1:-1].replace("\\\\", "\\")
+    m = re.match(r"^hex\((?:1|2)\):([0-9a-fA-F,]*)$", data)
+    if not m:
+        return ""
+    try:
+        return bytes(int(x, 16) for x in m.group(1).split(",") if x).decode("utf-16-le").rstrip("\0")
+    except ValueError:
+        return ""
+
+
+def diskless_boot_lines(control_set: int, class_export: str, enum_pci_export: str,
+                        foreign: Sequence[str]) -> list[str]:
+    """
+    SYSTEM hive lines so the image boots over plain iSCSI: other diskless
+    systems' drivers off and out of the filter lists, and the network cards'
+    drivers marked for a network boot (BootFlags 1, as Windows marks the card
+    it was installed to boot from), so Windows loads the PC's card early.
+    """
+    cs = f"\\ControlSet{control_set:03d}"
+    lines = foreign_filter_lines(cs, class_export, foreign)
+    for name in foreign:
+        lines += ["", f"[{cs}\\Services\\{name}]", '"Start"=dword:00000004']
+    for service in nic_services(enum_pci_export):
+        lines += ["", f"[{cs}\\Services\\{service}]", '"BootFlags"=dword:00000001']
+    return lines
+
+
 def tuning_patch(control_set: int, net_class_export: str = "", group_order_export: str = "") -> list[str]:
     """
     SYSTEM hive lines for a diskless PC: High performance with nothing ever
@@ -724,6 +816,7 @@ class WindowsSetup:
         problem = self._merge_reg(hive, "prepare", image_patch(control_set, fixed, letters, agent_ok,
                                                                prep.tuning, nics, order))
         tuning_problem = self._tune_software(root) if prep.tuning and problem is None else None
+        diskless_problem = self._diskless_boot(hive, control_set) if prep.tuning and problem is None else None
         defender_problem = self._defender_off(root, hive, control_set) \
             if prep.defender_off and problem is None else None
         if problem is None:
@@ -732,7 +825,28 @@ class WindowsSetup:
                         "yes" if agent_ok else "no", "yes" if prep.tuning and not tuning_problem else "no",
                         "yes" if prep.defender_off and not defender_problem else "no",
                         ", ".join(fixed) or "-", ", ".join(letters) or "-")
-        return "; ".join(p for p in (problem, agent_problem, tuning_problem, defender_problem) if p) or None
+        return "; ".join(p for p in (problem, agent_problem, tuning_problem, diskless_problem, defender_problem)
+                         if p) or None
+
+    def _has_key(self, hive: Path, key: str) -> bool:
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
+        return ok and f"[{key}]".lower() in out.lower()
+
+    def _diskless_boot(self, hive: Path, control_set: int) -> str | None:
+        """Other diskless systems' drivers off and out of the way; network card drivers marked for a network boot."""
+        cs = f"\\ControlSet{control_set:03d}"
+        foreign = [name for name in FOREIGN_DISKLESS if self._has_key(hive, f"{cs}\\Services\\{name}")]
+        ok, classes, _ = self._run(["hivexregedit", "--export", str(hive), f"{cs}\\Control\\Class"], quiet=True)
+        enum = self.enum_pci(hive, control_set) or ""
+        lines = diskless_boot_lines(control_set, classes if ok else "", enum, foreign)
+        if not lines:
+            return None
+        problem = self._merge_reg(hive, "prepare-diskless", "\n".join(["Windows Registry Editor Version 5.00", *lines]) + "\n")
+        if problem:
+            return f"diskless boot: {problem}"
+        if foreign:
+            logger.info("Other diskless systems' drivers turned off in the image: %s", ", ".join(foreign))
+        return None
 
     def _defender_off(self, root: Path, hive: Path, control_set: int) -> str | None:
         """Defender's services and drivers disabled (SYSTEM), its policies off (SOFTWARE)."""

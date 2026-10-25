@@ -737,3 +737,89 @@ def test_a_spare_is_set_up_under_its_own_label(windows, runner):
     assert ["ntfs-3g", "-o", "rw,noatime", "/dev/zd16p3", mount] in runner.calls
     assert any(c[:2] == ["hivexregedit", "--merge"] and c[3].endswith("vip-05-spare.reg") for c in runner.calls)
     assert '"ComputerName"="VIP-05"' in merged["reg"]
+
+
+# ── Other diskless systems ────────────────────────────────────────────
+
+def _msz(*items: str) -> str:
+    data = ("\0".join(items) + "\0\0").encode("utf-16-le")
+    return "hex(7):" + ",".join(f"{b:02x}" for b in data)
+
+
+def _sz(text: str) -> str:
+    return "hex(1):" + ",".join(f"{b:02x}" for b in (text + "\0").encode("utf-16-le"))
+
+
+CLASS_EXPORT = "\r\n".join([
+    "Windows Registry Editor Version 5.00", "",
+    "[\\ControlSet001\\Control\\Class\\{71a27cdd-812a-11d0-bec7-08002be2092f}]",
+    f'"UpperFilters"={_msz("CCacheX", "volsnap")}',
+    f'"LowerFilters"={_msz("fvevol", "iorate", "rdyboost")}', "",
+    "[\\ControlSet001\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}]",
+    f'"UpperFilters"={_msz("CCBootPNPX")}', "",
+    "[\\ControlSet001\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001]",
+    f'"UpperFilters"={_msz("CCBootPNPX")}',            # a device's own key: not a class filter list
+    "",
+])
+
+ENUM_EXPORT = "\r\n".join([
+    "Windows Registry Editor Version 5.00", "",
+    f"[\\ControlSet001\\Enum\\PCI\\{REV15}\\01000000684CE00000]",
+    f'"ClassGUID"={_sz("{4d36e972-e325-11ce-bfc1-08002be10318}")}',
+    f'"Service"={_sz("rt640x64")}', "",
+    "[\\ControlSet001\\Enum\\PCI\\VEN_8086&DEV_A394\\3&11583659&0&E0]",
+    f'"ClassGUID"={_sz("{4d36e97d-e325-11ce-bfc1-08002be10318}")}',
+    f'"Service"={_sz("pci")}', "",
+])
+
+
+def test_foreign_drivers_leave_the_filter_lists_and_cards_are_marked_for_a_network_boot():
+    from app.windows_setup import diskless_boot_lines, nic_services
+
+    assert nic_services(ENUM_EXPORT) == ["rt640x64"]
+    reg = "\n".join(diskless_boot_lines(1, CLASS_EXPORT, ENUM_EXPORT, ["CCacheX", "CCBootPNPX"]))
+    volume = "[\\ControlSet001\\Control\\Class\\{71a27cdd-812a-11d0-bec7-08002be2092f}]"
+    net = "[\\ControlSet001\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}]"
+    assert f'{volume}\n"UpperFilters"={_msz("volsnap")}' in reg            # CCacheX gone, volsnap kept
+    assert "LowerFilters" not in reg                                         # untouched list not rewritten
+    assert f'{net}\n"UpperFilters"=-' in reg                                  # emptied list deleted
+    assert "\\0001]" not in reg
+    assert '[\\ControlSet001\\Services\\CCacheX]\n"Start"=dword:00000004' in reg
+    assert '[\\ControlSet001\\Services\\rt640x64]\n"BootFlags"=dword:00000001' in reg
+
+
+def test_a_clean_image_gets_only_the_network_boot_flags():
+    from app.windows_setup import diskless_boot_lines
+
+    reg = "\n".join(diskless_boot_lines(1, CLASS_EXPORT.replace("CCacheX", "Other"), ENUM_EXPORT, []))
+    assert "Class" not in reg and "Start" not in reg and "BootFlags" in reg
+
+
+def test_prepare_image_turns_ccboot_off(windows, runner, tmp_path):
+    root = _image(windows)
+    (root / "Program Files").mkdir()
+    select = runner.responses[("hivexregedit", "--export")]
+
+    def export(cmd):
+        key = cmd[-1]
+        if key.endswith("\\Control\\Class"):
+            return True, CLASS_EXPORT.replace("ControlSet001", "ControlSet002"), ""
+        if key.endswith("\\Enum\\PCI"):
+            return True, ENUM_EXPORT.replace("ControlSet001", "ControlSet002"), ""
+        if key.endswith(("\\Services\\CCacheX", "\\Services\\CCBootPNPX", "\\Services\\CCBootClient")):
+            return True, f"Windows Registry Editor Version 5.00\r\n\r\n[{key}]\r\n", ""
+        if "\\Services\\CC" in key:
+            return False, "", "not found"
+        return select
+    runner.responses[("hivexregedit", "--export")] = export
+    merges = []
+
+    def merge(cmd):
+        merges.append(Path(cmd[3]).read_text(encoding="utf-8"))
+        return True, "", ""
+    runner.responses[("hivexregedit", "--merge")] = merge
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
+    diskless = next(m for m in merges if "CCacheX" in m)
+    assert '[\\ControlSet002\\Services\\CCBootClient]\n"Start"=dword:00000004' in diskless
+    assert "CCopyFile" not in diskless                                       # not in this image
+    assert '[\\ControlSet002\\Services\\rt640x64]\n"BootFlags"=dword:00000001' in diskless
