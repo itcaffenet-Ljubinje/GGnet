@@ -80,6 +80,45 @@ class GameDiskCreate(BaseModel):
     check_name = field_validator("name")(_disk_name)
 
 
+class ImageFileOut(BaseModel):
+    path: str
+    name: str
+    size: int
+    format: str           # qemu-img's name: vpc (VHD), vhdx, qcow2, vmdk, raw
+
+
+class UsbPartOut(BaseModel):
+    name: str             # the partition, e.g. sdj1
+    path: str
+    size: int
+    fstype: str
+    label: str | None
+    model: str | None
+    mounted: str | None   # where ggNet opened it (read-only), or None
+
+
+class ImportSources(BaseModel):
+    folder: str | None    # the imports folder, None when its dataset is missing
+    files: list[ImageFileOut]
+    usb: list[UsbPartOut]
+
+
+class UsbFolderOut(BaseModel):
+    part: str
+    folder: str
+    files: list[ImageFileOut]
+
+
+class ImportIn(BaseModel):
+    """A new disk from an image file in the imports folder or on an opened USB disk."""
+
+    name: str
+    kind: DiskKind = DiskKind.OS
+    path: str
+
+    check_name = field_validator("name")(_disk_name)
+
+
 class GameDiskCopy(BaseModel):
     """A new image from one version of this one (default: the active version)."""
 

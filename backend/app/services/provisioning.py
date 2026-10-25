@@ -304,6 +304,37 @@ class Provisioner:
                 logger.error("Could not remove %s after a failed resize", tmp)
             raise err
 
+    def import_disk(self, source: str, fmt: str, target: str, progress=None) -> bool:
+        """
+        Fill the new, empty master `target` from an image file and publish it
+        at @base. Without the lock while the data is written (it can take an
+        hour). The zvol is removed again when anything fails.
+        """
+        from app.services.imports import IMPORT_TIMEOUT, qemu_percent
+
+        def line(text: str) -> None:
+            percent = qemu_percent(text)
+            if progress and percent is not None:
+                progress(percent)
+
+        runner = self.zfs.runner
+        ok, _, err = runner.run_stream(
+            ["qemu-img", "convert", "-p", "-n", "--target-is-zero", "-f", fmt, "-O", "raw",
+             source, self.zfs.zvol_device_path(target)],
+            line, timeout=IMPORT_TIMEOUT,
+        )
+        if ok:
+            try:
+                self.publish_disk(target)
+                return True
+            except ProvisioningError as e:
+                err = str(e)
+        logger.error("Importing %s into %s failed: %s", source, target, err)
+        if self.zfs.dataset_exists(target) and not self.zfs.destroy(target, recursive=True):
+            logger.error("Could not remove %s after a failed import", target)
+        runner.last_error = err
+        return False
+
     def copy_disk(self, snapshot: str, target: str, progress=None) -> bool:
         """
         A full, independent copy of one version as the master `target`, at

@@ -2559,3 +2559,60 @@ tr.row-warn td {
   color: #fbbf24;
   vertical-align: -2px;
 }
+
+/* ==========================================================================
+   Import image dialog
+   ========================================================================== */
+.file-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-list li:last-child {
+  border-bottom: 0;
+}
+
+.file-list li.chosen {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.file-list .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.usb-part {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.usb-part-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.usb-part-head .muted {
+  flex: 1;
+  min-width: 0;
+}

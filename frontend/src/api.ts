@@ -26,6 +26,59 @@ export interface GameDisk {
 
 export type DiskKind = "game" | "os";
 
+/** Whether a disk's copy_source is an image file being imported (a path), not a version being copied. */
+export const isImport = (source: string | null | undefined) => !!source && source.startsWith("/");
+
+/** An image file that can be imported (Images → Import). */
+export interface ImageFile {
+  path: string;
+  name: string;
+  size: number;
+  /** qemu-img's name: vpc (VHD), vhdx, qcow2, vmdk, raw */
+  format: string;
+}
+
+/** A file system on a USB disk plugged into the server. */
+export interface UsbPart {
+  name: string;
+  path: string;
+  size: number;
+  fstype: string;
+  label: string | null;
+  model: string | null;
+  /** Where ggNet opened it read-only, or null. */
+  mounted: string | null;
+}
+
+export interface ImportSources {
+  /** The imports folder on the pool; null when its dataset is missing. */
+  folder: string | null;
+  files: ImageFile[];
+  usb: UsbPart[];
+}
+
+/** Upload a file into the imports folder, reporting the bytes sent. */
+export function uploadImage(file: File, onProgress: (sent: number, total: number) => void): Promise<ImageFile> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", `/api/v1/imports/upload/${encodeURIComponent(file.name)}`);
+    xhr.upload.onprogress = (e) => onProgress(e.loaded, e.lengthComputable ? e.total : file.size);
+    xhr.onload = () => {
+      let data: unknown = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        // Not JSON (a proxy error page).
+      }
+      if (xhr.status === 401) window.dispatchEvent(new Event(SIGNED_OUT));
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data as ImageFile);
+      else reject(new ApiError(xhr.status, errorMessage(xhr.status, data)));
+    };
+    xhr.onerror = () => reject(new ApiError(0, "The upload was interrupted"));
+    xhr.send(file);
+  });
+}
+
 /** Which kept writebacks Apply Writebacks turns into versions (Boot Mode has two). */
 export interface ApplyChoice {
   os?: boolean;
@@ -462,6 +515,14 @@ export const api = {
       `/v1/game-disks/${id}/grow`,
       { size_gb, extend },
     ),
+  importSources: () => request<ImportSources>("GET", "/v1/imports"),
+  openUsb: (part: string) =>
+    request<{ part: string; folder: string; files: ImageFile[] }>("POST", `/v1/imports/usb/${part}/open`),
+  ejectUsb: (part: string) => request<void>("POST", `/v1/imports/usb/${part}/eject`),
+  deleteImportFile: (path: string) =>
+    request<void>("DELETE", `/v1/imports/file?path=${encodeURIComponent(path)}`),
+  startImport: (name: string, kind: DiskKind, path: string) =>
+    request<GameDisk>("POST", "/v1/imports", { name, kind, path }),
   copyDisk: (id: number, name: string, snapshot?: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),

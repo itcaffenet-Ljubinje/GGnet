@@ -35,6 +35,7 @@ class FakeHost:
         self.last_error = ""
         self.lio_batch_missing = False                  # rtslib-fb not installed
         self.copy_bytes = 1000                          # size of a `zfs send` stream
+        self.image_files: dict[str, int] = {}           # path -> virtual size, for qemu-img
 
     # ── Runner interface ──────────────────────────────────────────────
 
@@ -50,6 +51,11 @@ class FakeHost:
             return self._targetcli(cmd[1:])
         if cmd[0] == "udevadm":
             return self._ok()
+        if cmd[:2] == ["qemu-img", "info"]:
+            path = cmd[-1]
+            if path not in self.image_files:
+                return self._err(f"Could not open '{path}': No such file or directory")
+            return self._ok(json.dumps({"virtual-size": self.image_files[path], "format": cmd[-2]}))
         if len(cmd) == 4 and cmd[1] == "-I" and cmd[2].endswith("lio_batch.py"):
             return self._lio_batch(json.loads(cmd[3]))
         if cmd[0] == "cat":
@@ -57,6 +63,24 @@ class FakeHost:
                 return self._cat_stats(cmd[1:])
             return self._cat(cmd[1])
         raise AssertionError(f"FakeHost does not know command: {cmd}")
+
+    def run_stream(self, cmd: list[str], on_output, timeout: Optional[int] = None):
+        """`qemu-img convert ... <file> /dev/zvol/<zvol>`: progress lines, the zvol must exist."""
+        cmd = [str(c) for c in cmd]
+        self.calls.append(cmd)
+        for prefix, err in self.fail_on.items():
+            if tuple(cmd[: len(prefix)]) == prefix:
+                return self._err(err)
+        if cmd[:2] != ["qemu-img", "convert"]:
+            raise AssertionError(f"FakeHost does not stream: {cmd}")
+        src, dst = cmd[-2], cmd[-1].removeprefix("/dev/zvol/")
+        if src not in self.image_files:
+            return self._err(f"Could not open '{src}'")
+        if dst not in self.datasets:
+            return self._err(f"Could not open '{cmd[-1]}'")
+        for line in ("    (0.00/100%)", "    (50.00/100%)", "    (100.00/100%)"):
+            on_output(line.strip())
+        return self._ok()
 
     def run_pipe(self, producer: list[str], consumer: list[str], timeout: Optional[int] = None,
                  on_producer_line=None):

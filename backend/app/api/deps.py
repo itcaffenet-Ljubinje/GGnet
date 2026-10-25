@@ -34,6 +34,22 @@ def get_disk_copier(db: Session = Depends(get_db), prov: Provisioner = Depends(g
     return DiskCopier(sessionmaker(bind=db.get_bind(), expire_on_commit=False), prov)
 
 
+def get_disk_importer(db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
+    """Runs image imports in the background, on the request's database."""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.imports import DiskImporter
+
+    return DiskImporter(sessionmaker(bind=db.get_bind(), expire_on_commit=False), prov)
+
+
+def get_usb_disks(prov: Provisioner = Depends(get_provisioner)):
+    """The server's USB disks that image files can be imported from."""
+    from app.services.imports import UsbDisks
+
+    return UsbDisks(prov.zfs.runner)
+
+
 def get_writeback_settings() -> WritebackSettings:
     return WritebackSettings.from_config(get_config())
 

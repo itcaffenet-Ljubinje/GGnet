@@ -4,7 +4,7 @@
 #  - Software goes on the Proxmox system disk:  /opt/ggnet       (code + venv)
 #                                               /var/lib/ggnet   (db, tftp, http root)
 #                                               /etc/ggnet/config.toml
-#  - ZFS operations (images, writebacks, snapshots, iscsi_targets) go to the pool you pick
+#  - ZFS operations (images, writebacks, snapshots, iscsi_targets, imports) go to the pool you pick
 #  - iSCSI / DHCP / TFTP / HTTP bind to the interface/IP you pick (vmbr* or manual)
 #
 # Install from GitHub (downloads the latest release):
@@ -167,7 +167,7 @@ if [[ -z "$POOL" ]]; then
             if [[ $first -eq 1 && "$name" != "$OS_POOL" ]]; then state=ON; first=0; fi
             args+=("$name" "$label" "$state")
         done
-        POOL="$(wt --radiolist "Select the ZFS pool where ggNet will create its datasets and zvols (images, writebacks, snapshots, iscsi_targets):" \
+        POOL="$(wt --radiolist "Select the ZFS pool where ggNet will create its datasets and zvols (images, writebacks, snapshots, iscsi_targets, imports):" \
             18 78 8 "${args[@]}")" || die "Aborted."
     elif (( ${#POOL_LINES[@]} == 1 )); then
         POOL="$(awk '{print $1}' <<<"${POOL_LINES[0]}")"
@@ -274,7 +274,7 @@ App data:     $DATA_DIR
 Config:       $CONF_FILE
 
 ZFS pool:     $POOL  ($POOL_HEALTH, ashift $POOL_ASHIFT, autotrim $POOL_AUTOTRIM$([[ $SET_AUTOTRIM -eq 1 ]] && echo " -> on"))
-Datasets:     $DS_ROOT/{images,writebacks,snapshots,iscsi_targets}
+Datasets:     $DS_ROOT/{images,writebacks,snapshots,iscsi_targets,imports}
 
 Service IF:   $IFACE  ($SERVICE_CIDR)
 iSCSI portal: $SERVICE_IP:3260
@@ -310,7 +310,9 @@ info "Preparing ZFS datasets on $POOL..."
 if ! zfs list -H "$DS_ROOT" >/dev/null 2>&1; then
     zfs create -o compression=lz4 -o atime=off "$DS_ROOT"
 fi
-for ds in images writebacks snapshots iscsi_targets; do
+# imports: image files waiting to be imported (Images -> Import), on the pool:
+# a VHDX of 100 GB would fill the Proxmox system disk.
+for ds in images writebacks snapshots iscsi_targets imports; do
     zfs list -H "$DS_ROOT/$ds" >/dev/null 2>&1 || zfs create "$DS_ROOT/$ds"
 done
 
@@ -359,6 +361,7 @@ images = "$DS_ROOT/images"
 writebacks = "$DS_ROOT/writebacks"
 snapshots = "$DS_ROOT/snapshots"
 iscsi_targets = "$DS_ROOT/iscsi_targets"
+imports = "$DS_ROOT/imports"
 
 [network]
 interface = "$IFACE"

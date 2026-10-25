@@ -186,6 +186,7 @@ def test_setup_dataset_tree_creates_missing(zfs, runner):
         "tank/ggnet/writebacks",
         "tank/ggnet/snapshots",
         "tank/ggnet/iscsi_targets",
+        "tank/ggnet/imports",             # default: <root_dataset>/imports
     ]
 
 

@@ -37,7 +37,9 @@ COMMENT_MAX = 200
 LOCK_PROP = "ggnet:locked"
 
 # Datasets under root_dataset that ggNet creates and manages.
-_CHILD_KEYS = ("images", "writebacks", "snapshots", "iscsi_targets")
+_CHILD_KEYS = ("images", "writebacks", "snapshots", "iscsi_targets", "imports")
+# Older config.toml files have no `imports`: it defaults to <root_dataset>/imports.
+_OPTIONAL_KEYS = ("imports",)
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,11 @@ class ZFSLayout:
     writebacks: str           # per-client clones (the old code's "clients")
     snapshots: str
     iscsi_targets: str
+    imports: str = ""         # image files waiting to be imported (a filesystem, not zvols)
+
+    def __post_init__(self) -> None:
+        if not self.imports:
+            object.__setattr__(self, "imports", f"{self.root_dataset}/imports")
 
     @classmethod
     def from_config(cls, cfg: Optional[Mapping[str, Any]] = None) -> "ZFSLayout":
@@ -57,10 +64,10 @@ class ZFSLayout:
         if not isinstance(storage, Mapping):
             raise ValueError("config.toml has no [storage] section")
         keys = ("pool", "root_dataset", *_CHILD_KEYS)
-        missing = [k for k in keys if not storage.get(k)]
+        missing = [k for k in keys if not storage.get(k) and k not in _OPTIONAL_KEYS]
         if missing:
             raise ValueError(f"[storage] is missing: {', '.join(missing)}")
-        return cls(**{k: str(storage[k]) for k in keys})
+        return cls(**{k: str(storage[k]) for k in keys if storage.get(k)})
 
 
 def valid_comment(comment: str) -> bool:

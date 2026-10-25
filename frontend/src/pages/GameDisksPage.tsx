@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Copy,
   Gamepad2,
+  HardDriveDownload,
   HardDrive,
   Info,
   Layers,
@@ -14,9 +15,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { api, type DiskKind, type GameDisk, type Machine } from "../api";
+import { api, isImport, type DiskKind, type GameDisk, type Machine } from "../api";
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { EditImage } from "../components/EditImage";
+import { ImportImage } from "../components/ImportImage";
 import { PrepareImage } from "../components/PrepareImage";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
@@ -45,6 +47,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   // The OS image in the Prepare image dialog.
   const [preparing, setPreparing] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const assigned = (id: number) =>
     machines.filter((m) => m.game_disk_id === id || m.os_disk_id === id).length;
@@ -264,11 +267,11 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                       <td>
                         {copying(d) ? (
                           <span className="badge badge-editing" title={`From ${d.copy_source}`}>
-                            Copying {d.copy_percent ?? 0}%
+                            {isImport(d.copy_source) ? "Importing" : "Copying"} {d.copy_percent ?? 0}%
                           </span>
                         ) : d.copy_error ? (
                           <span className="badge badge-error" title={d.copy_error}>
-                            Copy failed
+                            {isImport(d.copy_source) ? "Import failed" : "Copy failed"}
                           </span>
                         ) : d.published ? (
                           <span className="badge badge-provisioned">Published @{d.snapshot}</span>
@@ -382,7 +385,26 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
           <Plus size={14} />
           {busy === "create" ? "Creating…" : "Create"}
         </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => setImporting(true)}
+          disabled={busy !== null}
+          title="A new image from a VHD, VHDX, QCOW2, VMDK or RAW file"
+        >
+          <HardDriveDownload size={14} />
+          Import
+        </button>
       </form>
+      {importing && (
+        <ImportImage
+          onClose={() => setImporting(false)}
+          onStarted={async () => {
+            setImporting(false);
+            await reload();
+          }}
+        />
+      )}
 
       {section("OS images", Monitor, disks.filter((d) => d.kind === "os"), "No OS images yet.")}
       {section("Game disks", Gamepad2, disks.filter((d) => d.kind !== "os"), "No game disks yet.")}
