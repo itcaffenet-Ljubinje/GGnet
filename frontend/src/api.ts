@@ -190,7 +190,15 @@ export interface Pool {
 
 export interface ServerStatus {
   pool: Pool | null;
-  arc: { size_bytes: number; max_bytes: number; min_bytes: number; hit_percent: number | null } | null;
+  arc: {
+    size_bytes: number;
+    max_bytes: number;
+    min_bytes: number;
+    hit_percent: number | null;
+    /** What the maximum may be set to on this server. */
+    allowed_min_bytes?: number | null;
+    allowed_max_bytes?: number | null;
+  } | null;
   memory: { total_bytes: number; available_bytes: number } | null;
   writebacks_bytes: number;
   writebacks_count: number;
@@ -476,6 +484,7 @@ export const api = {
   scrub: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/scrub", { action }),
   trim: (action: "start" | "stop") => request<ServerStatus>("POST", "/v1/server/trim", { action }),
   readSmart: () => request<ServerStatus>("POST", "/v1/server/smart"),
+  setArcMax: (max_gb: number) => request<ServerStatus>("PUT", "/v1/server/arc", { max_gb }),
   getSchedule: () => request<Maintenance>("GET", "/v1/server/schedule"),
   saveSchedule: (body: MaintenanceSettings) => request<Maintenance>("PUT", "/v1/server/schedule", body),
   getRetention: () => request<Retention>("GET", "/v1/settings/retention"),

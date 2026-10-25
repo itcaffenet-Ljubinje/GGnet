@@ -11,6 +11,9 @@ from app.main import app
 from app.services.server_status import (
     ServerMonitor,
     disk_device,
+    GiB,
+    arc_limits,
+    modprobe_with_arc_max,
     parse_arcstats,
     parse_meminfo,
     parse_pool,
@@ -109,7 +112,9 @@ def monitor(tmp_path) -> tuple[ServerMonitor, FakeRunner]:
     (tmp_path / "spl" / "kstat" / "zfs").mkdir(parents=True)
     (tmp_path / "spl" / "kstat" / "zfs" / "arcstats").write_text(ARCSTATS)
     (tmp_path / "meminfo").write_text(MEMINFO)
-    return ServerMonitor(POOL, runner, proc=tmp_path, clock=lambda: 1792000000.0), runner
+    runner.responses[("findmnt",)] = (True, "ext4\n", "")
+    return ServerMonitor(POOL, runner, proc=tmp_path, clock=lambda: 1792000000.0,
+                         arc_param=tmp_path / "zfs_arc_max", modprobe=tmp_path / "zfs.conf"), runner
 
 
 @pytest.fixture
@@ -127,7 +132,9 @@ def test_server_api(server):
     assert r.status_code == 200, r.text
     s = r.json()
     assert s["arc"] == {"size_bytes": 68708277664, "max_bytes": 68719476736,
-                        "min_bytes": 6333509632, "hit_percent": 95.0}
+                        "min_bytes": 6333509632, "hit_percent": 95.0,
+                        # 188.4 GiB of RAM: a quarter (47.1 GiB) stays for Proxmox and its VMs.
+                        "allowed_min_bytes": 6333509632, "allowed_max_bytes": 197573400 * 1024 - 197573400 * 256}
     assert s["memory"]["total_bytes"] == 197573400 * 1024
     assert (s["writebacks_bytes"], s["writebacks_count"]) == (4 << 30, 2)
     pool = s["pool"]
@@ -177,3 +184,47 @@ def test_unreadable_pool_still_shows_the_rest(server):
     s = client.get("/api/v1/server").json()
     assert s["pool"] is None and s["arc"]["hit_percent"] == 95.0
 
+
+
+# ── RAM cache maximum ─────────────────────────────────────────────────
+
+def test_modprobe_with_arc_max_changes_the_active_line_and_keeps_the_rest():
+    old = ("#options zfs zfs_arc_max=17179869184\n"
+           "options zfs zfs_arc_min=1073741824 zfs_arc_max=68719476736\n"
+           "options zfs zfs_prefetch_disable=1\n")
+    assert modprobe_with_arc_max(old, 32 * GiB) == (
+        "#options zfs zfs_arc_max=17179869184\n"
+        f"options zfs zfs_arc_min=1073741824 zfs_arc_max={32 * GiB}\n"
+        "options zfs zfs_prefetch_disable=1\n")
+    assert modprobe_with_arc_max("", 8 * GiB) == f"options zfs zfs_arc_max={8 * GiB}\n"
+    assert modprobe_with_arc_max("#options zfs zfs_arc_max=1\n", GiB).endswith(f"options zfs zfs_arc_max={GiB}\n")
+
+
+def test_arc_limits():
+    assert arc_limits(64 * GiB, 2 * GiB) == (2 * GiB, 48 * GiB)
+    assert arc_limits(32 * GiB, 0) == (GiB, 16 * GiB)          # at least 16 GiB stay free
+
+
+def test_set_arc_max_applies_now_and_for_the_next_boot(server, monitor, tmp_path):
+    client, runner = server
+    (tmp_path / "zfs.conf").write_text("options zfs zfs_arc_max=68719476736\n")
+    r = client.put("/api/v1/server/arc", json={"max_gb": 96})
+    assert r.status_code == 200, r.text
+    assert (tmp_path / "zfs_arc_max").read_text() == f"{96 * GiB}\n"
+    assert (tmp_path / "zfs.conf").read_text() == f"options zfs zfs_arc_max={96 * GiB}\n"
+    assert not any(c[0] == "update-initramfs" for c in runner.calls)        # / is not on ZFS
+
+
+def test_set_arc_max_updates_the_initramfs_when_root_is_on_zfs(server, monitor, tmp_path):
+    client, runner = server
+    runner.responses[("findmnt",)] = (True, "zfs\n", "")
+    assert client.put("/api/v1/server/arc", json={"max_gb": 32}).status_code == 200
+    assert ["update-initramfs", "-u", "-k", "all"] in runner.calls
+
+
+def test_set_arc_max_refuses_too_little_or_too_much(server, tmp_path):
+    client, _ = server
+    assert client.put("/api/v1/server/arc", json={"max_gb": 2}).status_code == 409     # under zfs_arc_min
+    r = client.put("/api/v1/server/arc", json={"max_gb": 150})
+    assert r.status_code == 409 and "Proxmox" in r.json()["detail"]["error"]
+    assert not (tmp_path / "zfs_arc_max").exists()

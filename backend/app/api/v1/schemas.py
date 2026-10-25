@@ -820,6 +820,13 @@ class ArcOut(BaseModel):
     max_bytes: int
     min_bytes: int
     hit_percent: float | None                # since boot
+    # What the maximum may be set to (Server → RAM cache), from the RAM and zfs_arc_min.
+    allowed_min_bytes: int | None = None
+    allowed_max_bytes: int | None = None
+
+
+class ArcIn(BaseModel):
+    max_gb: int = Field(gt=0, le=65536)
 
 
 class MemoryOut(BaseModel):

@@ -225,7 +225,7 @@ function Console({ user, onSignOut }: { user: User; onSignOut: () => void }) {
         ) : tab === "disks" ? (
           <GameDisksPage disks={disks} machines={machines} reload={reload} />
         ) : tab === "server" ? (
-          <ServerPage user={user} />
+          <ServerPage user={user} pcs={machines.length} />
         ) : (
           <SettingsPage storage={storage} reload={reload} user={user} onPasswordChanged={onSignOut} />
         )}

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PoolDisk, ServerStatus, User } from "../api";
 import { calls } from "../test/fixtures";
-import { ServerPage, diskProblems } from "./ServerPage";
+import { ServerPage, diskProblems, recommendedCacheGb } from "./ServerPage";
 
 const GB = 2 ** 30;
 const STAFF: User = { id: 2, username: "ana", role: "staff", disabled: false, created_at: "2026-10-19T00:00:00Z", last_login_at: null };
@@ -153,6 +153,32 @@ describe("ServerPage", () => {
     unmount();
     render(<ServerPage />);
     expect(await screen.findByRole("tab", { name: /RAM cache/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("sets the RAM cache maximum after asking; staff cannot", async () => {
+    const s = status();
+    s.arc = { ...s.arc!, allowed_min_bytes: 6 * 1024 ** 3, allowed_max_bytes: 141 * 1024 ** 3 };
+    const mock = stub(s);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { unmount } = render(<ServerPage pcs={17} />);
+    await screen.findByText("Pool STORAGE-01");
+    await openSection(/RAM cache/);
+    expect(screen.getByText(/For 17 PCs about 32 GB is enough/)).toBeInTheDocument();
+    const input = screen.getByLabelText("Maximum (GB)");
+    await userEvent.clear(input);
+    await userEvent.type(input, "48");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(calls(mock).filter((c) => c.method === "PUT")).toEqual([
+      { url: "/api/v1/server/arc", method: "PUT", body: { max_gb: 48 } },
+    ]);
+    unmount();
+    render(<ServerPage user={STAFF} />);
+    await screen.findByText(/of reads served from RAM/);
+    expect(screen.queryByLabelText("Maximum (GB)")).toBeNull();
+  });
+
+  it("recommends the RAM cache by the number of PCs", () => {
+    expect([10, 20, 40, 100, 150, 250].map(recommendedCacheGb)).toEqual([32, 32, 64, 128, 256, 384]);
   });
 
   it("lists a disk's problems", () => {

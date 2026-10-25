@@ -1,7 +1,8 @@
 """
 API for the Server page: the ZFS pool, its disks, the RAM cache and the
 writebacks' total (app.services.server_status). Read-only, except starting
-or stopping a scrub or a TRIM, and reading SMART on request.
+or stopping a scrub or a TRIM, reading SMART on request and setting the RAM
+cache's maximum.
 """
 
 from __future__ import annotations
@@ -13,8 +14,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_provisioner, get_server_monitor
-from app.api.v1.errors import host_failed
+from app.api.v1.errors import conflict, host_failed
 from app.api.v1.schemas import (
+    ArcIn,
     ArcOut,
     MaintenanceIn,
     MaintenanceOut,
@@ -29,7 +31,7 @@ from app.api.v1.schemas import (
 from app.db.session import get_db
 from app.services import maintenance
 from app.services.provisioning import Provisioner
-from app.services.server_status import ServerMonitor, disk_device
+from app.services.server_status import GiB, ServerMonitor, arc_limits, disk_device
 
 router = APIRouter(prefix="/server", tags=["server"])
 
@@ -81,15 +83,38 @@ def get_server(
     mem = mon.memory()
     clones = prov.writebacks()
     lookups = arc["hits"] + arc["misses"] if arc else 0
+    low, high = arc_limits(mem["total"], arc["c_min"]) if arc and mem else (None, None)
     return ServerOut(
         pool=_pool(mon),
         arc=ArcOut(size_bytes=arc["size"], max_bytes=arc["c_max"], min_bytes=arc["c_min"],
-                   hit_percent=round(100 * arc["hits"] / lookups, 1) if lookups else None) if arc else None,
+                   hit_percent=round(100 * arc["hits"] / lookups, 1) if lookups else None,
+                   allowed_min_bytes=low, allowed_max_bytes=high) if arc else None,
         memory=MemoryOut(total_bytes=mem["total"], available_bytes=mem["available"]) if mem else None,
         writebacks_bytes=sum(c["used"] for c in clones),
         writebacks_count=len(clones),
         smart_read_at=_time(mon.smart_read_at),
     )
+
+
+@router.put("/arc", response_model=ServerOut)
+def set_arc(
+    body: ArcIn,
+    mon: ServerMonitor = Depends(get_server_monitor),
+    prov: Provisioner = Depends(get_provisioner),
+):
+    """The RAM cache's (ZFS ARC) maximum: applied now and kept for the next boot."""
+    arc, mem = mon.arc(), mon.memory()
+    if arc is None or mem is None:
+        host_failed("The RAM cache or the server's memory cannot be read")
+    low, high = arc_limits(mem["total"], arc["c_min"])
+    nbytes = body.max_gb * GiB
+    if not low <= nbytes <= high:
+        conflict(f"The RAM cache must be {-(-low // GiB)}–{high // GiB} GB on this server "
+                 "(the rest stays for Proxmox and its VMs)")
+    problem = mon.set_arc_max(nbytes)
+    if problem:
+        host_failed(problem)
+    return get_server(mon, prov)
 
 
 @router.post("/smart", response_model=ServerOut)
