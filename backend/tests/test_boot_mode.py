@@ -472,6 +472,14 @@ class FakeWindows:
 
     prep_problem: str | None = None
 
+    def nic_support(self, device, nics):
+        self.checked = getattr(self, "checked", []) + [(device, list(nics))]
+        if getattr(self, "check_problem", None):
+            return self.check_problem
+        known = {"VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15": "ready",
+                 "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16": "added"}
+        return {n: known.get(n, "missing") for n in nics}
+
     def prepare_image(self, device, prep, label="image"):
         # Whether the clone was already made a version when it was prepared.
         promoted = any(c[:2] == ["zfs", "promote"] for c in self.host.calls)
@@ -691,6 +699,49 @@ def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
     assert "no Program Files folder" in r.text
     assert client.get(f"/api/v1/game-disks/{os_disk['id']}").json()["snapshot"] == "base"
     assert ["zfs", "destroy", "tank/ggnet/writebacks/win11_ggnet_prep"] in [c[:3] for c in host.calls]
+
+
+def test_hardware_check_tells_which_pcs_the_image_can_boot(client, host, disks, windows, db_url):
+    os_disk, game = disks
+    for name, nic in (("komp-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16"),
+                      ("vip-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15"),
+                      ("new-pc", "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"),
+                      ("disk-pc", None)):
+        client.post("/api/v1/machines", json={"name": name, "game_disk_id": game["id"]})
+        if nic:
+            engine = make_engine(db_url)
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE machines SET boot_nic = :n WHERE name = :m"), {"n": nic, "m": name})
+            engine.dispose()
+    host.calls.clear()
+    r = client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["snapshot"] == "base" and body["problem"] is None
+    assert [(n["status"], n["machines"]) for n in body["nics"]] == [
+        ("ready", ["vip-01"]), ("added", ["komp-01"]), ("missing", ["new-pc"]), ("unknown", ["disk-pc"])]
+    tmp = "tank/ggnet/writebacks/win11_ggnet_hw"
+    assert windows.checked == [(f"/dev/zvol/{tmp}", [
+        "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16",
+        "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"])]
+    assert tmp not in host.datasets                                   # the temporary clone is gone
+    client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware")
+    assert len(windows.checked) == 1                                  # a version is checked once
+    assert client.get(f"/api/v1/game-disks/{game['id']}/hardware").status_code == 409
+
+
+def test_a_failed_hardware_check_is_reported_and_retried(client, host, disks, windows, db_url):
+    os_disk, game = disks
+    client.post("/api/v1/machines", json={"name": "komp-01", "game_disk_id": game["id"]})
+    engine = make_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE machines SET boot_nic = 'VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16'"))
+    engine.dispose()
+    windows.check_problem = "no Windows partition found"
+    body = client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware").json()
+    assert (body["problem"], body["nics"]) == ("no Windows partition found", [])
+    windows.check_problem = None
+    assert client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware").json()["nics"][0]["status"] == "added"
 
 
 # ── Spare writebacks ──────────────────────────────────────────────────

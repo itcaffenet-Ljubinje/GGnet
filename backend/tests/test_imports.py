@@ -196,3 +196,59 @@ def test_without_the_imports_dataset_the_folder_is_none(client, host):
 
 def test_usb_mounts_stay_under_run_ggnet():
     assert imports.USB_MOUNTS == Path("/run/ggnet/usb")
+
+
+# ── After the import: Prepare image; cancel ───────────────────────────
+
+def test_an_imported_os_image_is_prepared_as_its_next_version(client, host, folder, importer, prov):
+    from tests.test_boot_mode import FakeWindows
+
+    prov.windows = FakeWindows(host)
+    prov.windows.prep_problem = None
+    f = _file(host, folder, "pc07.vhdx")
+    r = client.post("/api/v1/imports", json={"name": "win11-pc07", "path": str(f), "defender_off": True})
+    d = client.get(f"/api/v1/game-disks/{r.json()['id']}").json()
+    assert (d["snapshot"], d["copy_source"]) == ("v2", None)
+    [(_, prep, _)] = prov.windows.prepared
+    assert prep.defender_off is True
+    versions = {v["name"]: v["comment"] for v in client.get(f"/api/v1/game-disks/{d['id']}/snapshots").json()}
+    assert versions["base"] == "ggNet: imported from pc07.vhdx"
+    assert versions["v2"] == "ggNet: prepared for all PCs after the import, Defender off"
+
+
+def test_prepare_can_be_skipped_and_a_failed_prepare_keeps_base(client, host, folder, importer, prov):
+    f = _file(host, folder, "a.vhdx")
+    r = client.post("/api/v1/imports", json={"name": "plain", "path": str(f), "prepare": False})
+    assert client.get(f"/api/v1/game-disks/{r.json()['id']}").json()["snapshot"] == "base"
+    prov.windows = None                                   # Windows setup not available here
+    f = _file(host, folder, "b.vhdx")
+    r = client.post("/api/v1/imports", json={"name": "unprepared", "path": str(f)})
+    d = client.get(f"/api/v1/game-disks/{r.json()['id']}").json()
+    assert (d["snapshot"], d["copy_error"]) == ("base", None)
+    base = client.get(f"/api/v1/game-disks/{d['id']}/snapshots").json()[0]
+    assert "Prepare image failed" in base["comment"]
+
+
+def test_a_game_disk_import_is_never_prepared(client, host, folder, importer, prov):
+    f = _file(host, folder, "games.qcow2")
+    r = client.post("/api/v1/imports", json={"name": "games2", "kind": "game", "path": str(f)})
+    assert client.get(f"/api/v1/game-disks/{r.json()['id']}").json()["snapshot"] == "base"
+
+
+def test_a_cancelled_import_fails_and_removes_its_zvol(host, prov, folder):
+    import threading
+
+    f = _file(host, folder, "big.vhdx")
+    host.add_dataset("tank/ggnet/images/big")
+    flag = threading.Event()
+    flag.set()
+    assert prov.import_disk(str(f), "vhdx", "tank/ggnet/images/big", cancel=flag) is False
+    assert host.last_error == "Cancelled" and "tank/ggnet/images/big" not in host.datasets
+
+
+def test_cancel_needs_a_running_import(client, host, folder, importer):
+    f = _file(host, folder, "done.vhdx")
+    r = client.post("/api/v1/imports", json={"name": "done", "kind": "game", "path": str(f)})
+    assert client.post(f"/api/v1/imports/{r.json()['id']}/cancel").status_code == 409
+    assert client.post("/api/v1/imports/999/cancel").status_code == 404
+    assert imports.cancel(12345) is False

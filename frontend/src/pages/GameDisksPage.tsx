@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   Wand2,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -99,6 +100,12 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
+  async function cancelImport(disk: GameDisk) {
+    if (!window.confirm(`Stop importing "${disk.name}"? What was imported so far is removed.`)) return;
+    await run(`cancel-${disk.id}`, () => api.cancelImport(disk.id));
+    await reload();
+  }
+
   async function copy(disk: GameDisk) {
     const what = disk.kind === "os" ? "OS image" : "game disk";
     const next = window.prompt(
@@ -150,6 +157,17 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
               onSelect: () => setPreparing(d.id),
               disabled: busy !== null,
               title: "New version with the server's agent and the settings every PC needs",
+            },
+          ]
+        : []),
+      ...(copying(d) && isImport(d.copy_source)
+        ? [
+            {
+              label: "Cancel import",
+              icon: XCircle,
+              onSelect: () => cancelImport(d),
+              disabled: busy !== null,
+              title: "Stop the import; the disk can then be removed",
             },
           ]
         : []),

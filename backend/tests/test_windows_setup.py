@@ -347,6 +347,20 @@ def test_nic_patch_on_another_board_gets_its_subsystem():
     assert "E0001458" not in reg and "e0001458" not in reg
 
 
+def test_nic_support_reads_the_image_read_only(windows, runner):
+    _windows_on(windows, "hardware-check")
+    select = runner.responses[("hivexregedit", "--export")]
+    runner.responses[("hivexregedit", "--export")] = lambda cmd: (
+        (True, ENUM, "") if cmd[-1].endswith("\\Enum\\PCI") else select)
+    intel = "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"
+    assert windows.nic_support(DEVICE, [REV15, REV16, intel]) == {
+        REV15: "ready", REV16: "added", intel: "missing"}
+    mounts = [c for c in runner.calls if c[0] == "ntfs-3g"]
+    assert mounts and all(c[2] == "ro" for c in mounts)
+    assert not any(c[:2] == ["hivexregedit", "--merge"] for c in runner.calls)
+    assert windows.nic_support(DEVICE, ["not an id"]).startswith("Invalid PCI hardware ID")
+
+
 def test_nic_patch_leaves_a_known_nic_and_reports_an_unknown_chip():
     assert nic_patch(ENUM, REV15) == (None, None)
     reg, problem = nic_patch(ENUM, "VEN_8086&DEV_15F3&SUBSYS_00008086&REV_03")

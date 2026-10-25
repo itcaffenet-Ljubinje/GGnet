@@ -50,6 +50,20 @@ export interface UsbPart {
   mounted: string | null;
 }
 
+/** Whether an OS image's active version can boot the PCs with one boot network card. */
+export interface NicSupport {
+  /** PCI hardware ID; null for PCs that never booted over the network. */
+  nic: string | null;
+  status: "ready" | "added" | "missing" | "unknown";
+  machines: string[];
+}
+
+export interface Hardware {
+  snapshot: string | null;
+  problem: string | null;
+  nics: NicSupport[];
+}
+
 export interface ImportSources {
   /** The imports folder on the pool; null when its dataset is missing. */
   folder: string | null;
@@ -521,8 +535,10 @@ export const api = {
   ejectUsb: (part: string) => request<void>("POST", `/v1/imports/usb/${part}/eject`),
   deleteImportFile: (path: string) =>
     request<void>("DELETE", `/v1/imports/file?path=${encodeURIComponent(path)}`),
-  startImport: (name: string, kind: DiskKind, path: string) =>
-    request<GameDisk>("POST", "/v1/imports", { name, kind, path }),
+  startImport: (name: string, kind: DiskKind, path: string, options: { prepare: boolean; defender_off: boolean }) =>
+    request<GameDisk>("POST", "/v1/imports", { name, kind, path, ...options }),
+  cancelImport: (id: number) => request<void>("POST", `/v1/imports/${id}/cancel`),
+  getHardware: (id: number) => request<Hardware>("GET", `/v1/game-disks/${id}/hardware`),
   copyDisk: (id: number, name: string, snapshot?: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),

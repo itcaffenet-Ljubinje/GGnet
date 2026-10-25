@@ -3,6 +3,7 @@ import { ArrowLeft, Gamepad2, GitBranch, HardDrive, Layers, Monitor } from "luci
 
 import { isImport, type GameDisk, type Machine, type Snapshot, type Writeback } from "../api";
 import { DiskDetails } from "../components/DiskDetails";
+import { HardwarePanel } from "../components/HardwarePanel";
 import { formatBytes } from "../format";
 
 interface Props {
@@ -54,12 +55,15 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props
               `${disk.copy_percent ?? 0}% done. It is published by itself when it ends.`}
         </p>
       ) : disk.published ? (
-        <DiskDetails
-          disk={disk}
-          onChanged={reload}
-          refreshKey={machines}
-          summary={(snapshots, writebacks) => <Summary disk={disk} snapshots={snapshots} writebacks={writebacks} />}
-        />
+        <>
+          {disk.kind === "os" && <HardwarePanel disk={disk} />}
+          <DiskDetails
+            disk={disk}
+            onChanged={reload}
+            refreshKey={machines}
+            summary={(snapshots, writebacks) => <Summary disk={disk} snapshots={snapshots} writebacks={writebacks} />}
+          />
+        </>
       ) : (
         <p className="empty">
           A draft has no snapshots or writebacks yet: fill it {disk.kind === "os" ? "" : "on a PC "}and publish it.

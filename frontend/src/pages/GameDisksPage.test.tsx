@@ -218,6 +218,21 @@ describe("GameDisksPage", () => {
     expect(reload).toHaveBeenCalled();
   });
 
+  it("cancels a running import from its menu", async () => {
+    const fetchMock = stubFetch(204);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      <GameDisksPage
+        disks={[disk({ id: 4, name: "win", published: false, snapshot: null, copy_source: "/imports/a.vhdx", copy_percent: 7 })]}
+        machines={[]}
+        reload={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getByText("Importing 7%")).toBeInTheDocument();
+    await menu("win", "Cancel import");
+    expect(calls(fetchMock)).toEqual([{ url: "/api/v1/imports/4/cancel", method: "POST", body: undefined }]);
+  });
+
   it("shows a running and a failed copy with their limits", async () => {
     render(
       <GameDisksPage

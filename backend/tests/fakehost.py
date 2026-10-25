@@ -64,7 +64,7 @@ class FakeHost:
             return self._cat(cmd[1])
         raise AssertionError(f"FakeHost does not know command: {cmd}")
 
-    def run_stream(self, cmd: list[str], on_output, timeout: Optional[int] = None):
+    def run_stream(self, cmd: list[str], on_output, timeout: Optional[int] = None, cancel=None):
         """`qemu-img convert ... <file> /dev/zvol/<zvol>`: progress lines, the zvol must exist."""
         cmd = [str(c) for c in cmd]
         self.calls.append(cmd)
@@ -79,6 +79,8 @@ class FakeHost:
         if dst not in self.datasets:
             return self._err(f"Could not open '{cmd[-1]}'")
         for line in ("    (0.00/100%)", "    (50.00/100%)", "    (100.00/100%)"):
+            if cancel is not None and cancel.is_set():
+                return self._err("killed")
             on_output(line.strip())
         return self._ok()
 

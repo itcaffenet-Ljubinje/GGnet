@@ -42,6 +42,8 @@ export function ImportImage({ onClose, onStarted }: Props) {
   const [chosen, setChosen] = useState<ImageFile | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<DiskKind>("os");
+  const [prepare, setPrepare] = useState(true);
+  const [defenderOff, setDefenderOff] = useState(false);
   const [upload, setUpload] = useState<{ name: string; sent: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -101,7 +103,8 @@ export function ImportImage({ onClose, onStarted }: Props) {
       `Import ${chosen.name} (${formatBytes(chosen.size)}) as the ${what} "${name}"?\n\n` +
       "It is copied into a new zvol in the background and published when done; the file stays where it is.";
     if (!window.confirm(msg)) return;
-    const ok = await run("import", () => api.startImport(name.trim().toLowerCase(), kind, chosen.path));
+    const options = { prepare: kind === "os" && prepare, defender_off: kind === "os" && prepare && defenderOff };
+    const ok = await run("import", () => api.startImport(name.trim().toLowerCase(), kind, chosen.path, options));
     if (ok) await onStarted();
   }
 
@@ -279,6 +282,28 @@ export function ImportImage({ onClose, onStarted }: Props) {
                   </select>
                 </label>
               </div>
+            )}
+            {chosen && kind === "os" && (
+              <>
+                <label className="check">
+                  <input type="checkbox" checked={prepare} onChange={(e) => setPrepare(e.target.checked)} />
+                  Prepare image for all PCs after the import (agent, diskless settings)
+                </label>
+                {prepare && (
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={defenderOff}
+                      onChange={(e) => setDefenderOff(e.target.checked)}
+                    />
+                    Turn off Microsoft Defender
+                  </label>
+                )}
+                <p className="muted small">
+                  After the import, the image&apos;s page shows which PCs it can boot: their network card must be
+                  known to it.
+                </p>
+              </>
             )}
           </div>
 

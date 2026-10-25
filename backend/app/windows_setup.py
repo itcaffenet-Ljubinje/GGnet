@@ -608,7 +608,37 @@ class WindowsSetup:
             logger.exception("Preparing the image on %s failed", device)
             return f"unexpected error: {e}"
 
-    def _on_windows(self, device: str, name: str, work: Callable[[Path, Path], str | None]) -> str | None:
+    def nic_support(self, device: str, nics: Sequence[str]) -> dict[str, str] | str:
+        """
+        Whether the Windows on `device` can boot PCs with these boot network
+        cards (PCI hardware IDs): "ready" when it knows the card, "added" when
+        it knows the chip under another revision or board (personalize adds
+        the card at every boot), "missing" when it has no driver for it.
+        A string says why it could not be read. Mounted read-only.
+        """
+        result: dict[str, str] = {}
+
+        def work(root: Path, hive: Path) -> str | None:
+            export = self.enum_pci(hive, self.control_set(hive))
+            if export is None:
+                return "the image's PCI devices cannot be read"
+            for nic in nics:
+                lines, missing = nic_patch(export, nic)
+                result[nic] = "missing" if missing else "added" if lines else "ready"
+            return None
+
+        for nic in nics:
+            if not NIC_ID_RE.match(nic):
+                return f"Invalid PCI hardware ID: {nic!r}"
+        try:
+            problem = self._on_windows(device, "hardware-check", work, readonly=True)
+        except Exception as e:
+            logger.exception("Checking the hardware of %s failed", device)
+            return f"unexpected error: {e}"
+        return problem or result
+
+    def _on_windows(self, device: str, name: str, work: Callable[[Path, Path], str | None],
+                    readonly: bool = False) -> str | None:
         """Mount the disk's Windows partition and run `work(root, SYSTEM hive)` on it."""
         parts = self.ntfs_partitions(device)
         if not parts:
@@ -620,7 +650,7 @@ class WindowsSetup:
                 mount.mkdir(parents=True, exist_ok=True)
             except OSError as e:
                 return f"cannot create {mount}: {e}"
-            ok, _, err = self._run(["ntfs-3g", "-o", "rw,noatime", part, str(mount)])
+            ok, _, err = self._run(["ntfs-3g", "-o", "ro" if readonly else "rw,noatime", part, str(mount)])
             if not ok:
                 reasons.append(f"{part}: {err.strip() or 'mount failed'}")
                 continue

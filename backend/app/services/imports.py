@@ -17,8 +17,10 @@ The import itself (DiskImporter) runs in the background like a copy
     qemu-img convert -p -n --target-is-zero -f <format> -O raw <file> <zvol>
 
 which skips the blocks that are empty, so the zvol only holds the data, and
-is published at @base when done. recover() in copies covers an import that
-ran when ggNet stopped.
+is published at @base when done. An OS image is then prepared for every PC
+(Prepare image, optionally with Defender off) as its next version, so it is
+ready to boot. A running import can be cancelled (cancel()); recover() in
+copies covers an import that ran when ggNet stopped.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,7 +36,7 @@ from typing import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import GameDisk
+from app.db.models import DiskKind, GameDisk
 from app.services.provisioning import Provisioner
 
 logger = logging.getLogger("ggnet.imports")
@@ -50,6 +53,23 @@ PROGRESS_EVERY = 2.0
 IMPORT_TIMEOUT = 24 * 3600
 _PERCENT = re.compile(r"\((\d+(?:\.\d+)?)/100%\)")
 _PART_NAME = re.compile(r"^[a-z0-9]+$")
+# Imports running in this process: disk id -> its cancel flag.
+_RUNNING: dict[int, threading.Event] = {}
+
+
+def cancel(disk_id: int) -> bool:
+    """Stop a running import; False when none runs for that disk here."""
+    flag = _RUNNING.get(disk_id)
+    if flag is None:
+        return False
+    flag.set()
+    return True
+
+
+@dataclass
+class ImportOptions:
+    prepare: bool = True           # an OS image: Prepare image right after the import
+    defender_off: bool = False     # ... with Microsoft Defender turned off
 
 
 @dataclass
@@ -198,15 +218,22 @@ class DiskImporter:
         self.prov = prov
         self.background = background     # tests run the import in the request
 
-    def start(self, disk_id: int) -> None:
+    def start(self, disk_id: int, options: ImportOptions | None = None) -> None:
+        options = options or ImportOptions()
+        _RUNNING[disk_id] = threading.Event()
         if not self.background:
-            self.run(disk_id)
+            self.run(disk_id, options)
             return
-        import threading
+        threading.Thread(target=self.run, args=(disk_id, options), name=f"ggnet-import-{disk_id}",
+                         daemon=True).start()
 
-        threading.Thread(target=self.run, args=(disk_id,), name=f"ggnet-import-{disk_id}", daemon=True).start()
+    def run(self, disk_id: int, options: ImportOptions | None = None) -> None:
+        try:
+            self._run(disk_id, options or ImportOptions())
+        finally:
+            _RUNNING.pop(disk_id, None)
 
-    def run(self, disk_id: int) -> None:
+    def _run(self, disk_id: int, options: ImportOptions) -> None:
         with self.make_session() as db:
             disk = db.get(GameDisk, disk_id)
             if disk is None or not disk.copying:
@@ -215,18 +242,41 @@ class DiskImporter:
         fmt = image_format(Path(source)) or "raw"
         logger.info("Importing %s (%s) into %s", source, fmt, target)
         started = time.monotonic()
-        ok = self.prov.import_disk(source, fmt, target, self._progress(disk_id))
+        ok = self.prov.import_disk(source, fmt, target, self._progress(disk_id), cancel=_RUNNING.get(disk_id))
         with self.make_session() as db:
             disk = db.get(GameDisk, disk_id)
             if disk is None:
                 return
-            if ok:
-                disk.snapshot, disk.copy_source, disk.copy_percent = "base", None, None
-                logger.info("Import of %s into %s done in %.0f s", source, target, time.monotonic() - started)
-            else:
+            if not ok:
                 disk.copy_percent = None
                 disk.copy_error = (self.prov.zfs.runner.last_error or "the import failed")[:500]
+                db.commit()
+                return
+            os_image = disk.kind is DiskKind.OS
+            disk.copy_percent = 99 if os_image and options.prepare else None
             db.commit()
+        logger.info("Import of %s into %s done in %.0f s", source, target, time.monotonic() - started)
+        snapshot, note = "base", f"ggNet: imported from {Path(source).name}"
+        if os_image and options.prepare:
+            from app.services.os_setup import image_prep
+            from app.services.provisioning import ProvisioningError
+
+            try:
+                snapshot = self.prov.prepare_image(target, image_prep(defender_off=options.defender_off))
+                defender = ", Defender off" if options.defender_off else ""
+                self.prov.set_comment(target, snapshot, f"ggNet: prepared for all PCs after the import{defender}")
+            except ProvisioningError as e:
+                note += f"; Prepare image failed: {e}"[:150]
+                logger.warning("Preparing %s after its import failed: %s", target, e)
+        try:
+            self.prov.set_comment(target, "base", note[:200])
+        except Exception as e:      # the image is there; only its comment is missing
+            logger.warning("%s", e)
+        with self.make_session() as db:
+            disk = db.get(GameDisk, disk_id)
+            if disk is not None:
+                disk.snapshot, disk.copy_source, disk.copy_percent = snapshot, None, None
+                db.commit()
 
     def _progress(self, disk_id: int) -> Callable[[float], None]:
         last = [0.0, -1]

@@ -30,6 +30,8 @@ from app.api.v1.schemas import (
     GameDiskEdit,
     GameDiskOut,
     GameDiskRename,
+    HardwareOut,
+    NicSupportOut,
     PrepareImage,
     SnapshotComment,
     SnapshotLock,
@@ -210,6 +212,41 @@ def grow_disk(
     logger.info("'%s' grown from %s to %s GB%s", disk.name, old, body.size_gb, f" as @{version}" if version else "")
     return GameDiskGrown(disk=GameDiskOut.model_validate(disk), version=version,
                          extended=bool(result and result.extended), note=note)
+
+
+# Hardware checks per (zvol, version, cards): a version never changes.
+_HARDWARE: dict[tuple[str, str, tuple[str, ...]], dict[str, str] | str] = {}
+
+
+@router.get("/{disk_id}/hardware", response_model=HardwareOut)
+def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
+    """
+    Which PCs the OS image's active version can boot: each boot network card
+    the PCs reported (iPXE) is "ready" (the image knows it), "added" (the
+    same chip under another revision or board: added at every boot) or
+    "missing" (no driver: those PCs cannot boot it). PCs that never booted
+    over the network are "unknown".
+    """
+    disk = _get(db, disk_id)
+    if disk.kind is not DiskKind.OS:
+        conflict(f"'{disk.name}' is a game disk; only OS images are checked")
+    if not disk.published or disk.copying:
+        return HardwareOut(snapshot=None, problem="not published yet", nics=[])
+    by_nic: dict[str | None, list[str]] = {}
+    for m in db.scalars(select(Machine).order_by(Machine.name)):
+        by_nic.setdefault(m.boot_nic, []).append(m.name)
+    nics = tuple(sorted(n for n in by_nic if n))
+    key = (disk.zvol_path, disk.snapshot, nics)
+    if key not in _HARDWARE:
+        _HARDWARE[key] = prov.check_hardware(disk.zvol_path, disk.snapshot, list(nics)) if nics else {}
+    found = _HARDWARE[key]
+    if isinstance(found, str):
+        _HARDWARE.pop(key)          # try again next time
+        return HardwareOut(snapshot=disk.snapshot, problem=found, nics=[])
+    out = [NicSupportOut(nic=n, status=found.get(n, "unknown"), machines=by_nic[n]) for n in nics]
+    if None in by_nic:
+        out.append(NicSupportOut(nic=None, status="unknown", machines=by_nic[None]))
+    return HardwareOut(snapshot=disk.snapshot, problem=None, nics=out)
 
 
 def _not_copying(disk: GameDisk) -> None:

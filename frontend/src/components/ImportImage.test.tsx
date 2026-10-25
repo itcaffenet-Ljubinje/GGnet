@@ -49,12 +49,20 @@ describe("ImportImage", () => {
     render(<ImportImage onClose={vi.fn()} onStarted={onStarted} />);
     await userEvent.click(await screen.findByRole("radio"));
     expect(screen.getByLabelText("Name")).toHaveValue("pc-07-win11");
+    expect(screen.getByLabelText(/Prepare image for all PCs/)).toBeChecked();
+    await userEvent.click(screen.getByLabelText("Turn off Microsoft Defender"));
     await userEvent.click(screen.getByRole("button", { name: /^Import$/ }));
     expect(calls(mock).filter((c) => c.method === "POST")).toEqual([
       {
         url: "/api/v1/imports",
         method: "POST",
-        body: { name: "pc-07-win11", kind: "os", path: "/STORAGE-01/ggnet/imports/PC-07 Win11.vhdx" },
+        body: {
+          name: "pc-07-win11",
+          kind: "os",
+          path: "/STORAGE-01/ggnet/imports/PC-07 Win11.vhdx",
+          prepare: true,
+          defender_off: true,
+        },
       },
     ]);
     expect(onStarted).toHaveBeenCalled();
@@ -72,7 +80,14 @@ describe("ImportImage", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Import$/ }));
     const posts = calls(mock).filter((c) => c.method === "POST");
     expect(posts[0]).toEqual({ url: "/api/v1/imports/usb/sdj1/open", method: "POST", body: undefined });
-    expect(posts[1].body).toEqual({ name: "games", kind: "game", path: "/run/ggnet/usb/sdj1/games.qcow2" });
+    expect(screen.queryByLabelText(/Prepare image/)).toBeNull();     // a game disk is not prepared
+    expect(posts[1].body).toEqual({
+      name: "games",
+      kind: "game",
+      path: "/run/ggnet/usb/sdj1/games.qcow2",
+      prepare: false,
+      defender_off: false,
+    });
     await userEvent.click(screen.getByRole("button", { name: "Eject" }));
     expect(calls(mock).filter((c) => c.method === "POST").at(-1)?.url).toBe("/api/v1/imports/usb/sdj1/eject");
   });

@@ -70,11 +70,13 @@ class CommandRunner:
         cmd: list[str],
         on_output: Callable[[str], None],
         timeout: Optional[int] = None,
+        cancel: Optional[threading.Event] = None,
     ) -> tuple[bool, str, str]:
         """
         Run a long command and hand each piece of its stdout to `on_output` as
         it comes (split on newlines and carriage returns, as progress bars
-        like `qemu-img convert -p` print). Returns (success, "", stderr).
+        like `qemu-img convert -p` print). Setting `cancel` stops it.
+        Returns (success, "", stderr).
         """
         timeout = timeout or self.timeout
         str_cmd = [str(c) for c in cmd]
@@ -88,6 +90,13 @@ class CommandRunner:
         drain.start()
         timer = threading.Timer(timeout, proc.kill)
         timer.start()
+        if cancel is not None:
+            def watch() -> None:
+                while proc.poll() is None:
+                    if cancel.wait(0.5):
+                        proc.kill()
+                        return
+            threading.Thread(target=watch, daemon=True).start()
         try:
             buf = b""
             while chunk := proc.stdout.read1(4096):

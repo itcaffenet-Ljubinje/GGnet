@@ -8,6 +8,7 @@ app.services.imports:
   PUT    /imports/upload/{filename}  upload a file into the imports folder (the body is the file)
   DELETE /imports/file?path=...      delete a file from the imports folder
   POST   /imports                    import a file: a new disk, filled in the background
+  POST   /imports/{disk_id}/cancel   stop a running import
 """
 
 from __future__ import annotations
@@ -169,6 +170,19 @@ def start_import(
         prov.delete_disk(path, published=False)
         conflict(f"Game disk '{body.name}' already exists")
     logger.info("Import of %s (%s, %d GB) into '%s' started", file, fmt, size_gb, disk.name)
-    importer.start(disk.id)
+    importer.start(disk.id, imports.ImportOptions(prepare=body.prepare, defender_off=body.defender_off))
     db.refresh(disk)
     return disk
+
+
+@router.post("/{disk_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_import(disk_id: int, db: Session = Depends(get_db)):
+    """Stop a running import; the disk then shows "Cancelled" and can be removed."""
+    disk = db.get(GameDisk, disk_id)
+    if disk is None:
+        not_found("Game disk", disk_id)
+    if not disk.copying or not str(disk.copy_source).startswith("/"):
+        conflict(f"'{disk.name}' is not being imported")
+    if not imports.cancel(disk_id):
+        conflict(f"The import of '{disk.name}' does not run in this server process")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

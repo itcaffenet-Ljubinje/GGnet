@@ -1,0 +1,38 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import type { Hardware } from "../api";
+import { disk } from "../test/fixtures";
+import { HardwarePanel } from "./HardwarePanel";
+
+function stub(body: Hardware) {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })));
+}
+
+describe("HardwarePanel", () => {
+  it("lists which PCs the image can boot and names those it cannot", async () => {
+    stub({
+      snapshot: "v2",
+      problem: null,
+      nics: [
+        { nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", status: "ready", machines: ["vip-01", "vip-02"] },
+        { nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", status: "added", machines: ["komp-01"] },
+        { nic: "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00", status: "missing", machines: ["new-pc"] },
+        { nic: null, status: "unknown", machines: ["server"] },
+      ],
+    });
+    render(<HardwarePanel disk={disk({ id: 3, kind: "os", snapshot: "v2" })} />);
+    expect(await screen.findByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Added at boot")).toBeInTheDocument();
+    expect(screen.getByText("No driver")).toBeInTheDocument();
+    expect(screen.getByText("Not seen yet")).toBeInTheDocument();
+    expect(screen.getByText(/new-pc cannot boot this image/)).toBeInTheDocument();
+    expect(screen.getByText("vip-01, vip-02")).toBeInTheDocument();
+  });
+
+  it("says when the image could not be checked", async () => {
+    stub({ snapshot: "base", problem: "no Windows partition found", nics: [] });
+    render(<HardwarePanel disk={disk({ id: 3, kind: "os" })} />);
+    expect(await screen.findByText(/could not be checked: no Windows partition found/)).toBeInTheDocument();
+  });
+});

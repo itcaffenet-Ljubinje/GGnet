@@ -304,7 +304,28 @@ class Provisioner:
                 logger.error("Could not remove %s after a failed resize", tmp)
             raise err
 
-    def import_disk(self, source: str, fmt: str, target: str, progress=None) -> bool:
+    def check_hardware(self, master: str, snapshot: str, nics: list[str]) -> dict[str, str] | str:
+        """
+        WindowsSetup.nic_support() on one version of an OS image: on a
+        temporary clone (a snapshot has no device of its own), removed after.
+        """
+        if self.windows is None:
+            return "Windows setup is not available on this server"
+        tmp = f"{self.zfs.layout.writebacks}/{master.rsplit('/', 1)[-1]}_ggnet_hw"   # '_': never a PC
+        with self.lock:
+            self._clear()
+            if self.zfs.dataset_exists(tmp) and not self.zfs.destroy(tmp):
+                return f"{tmp} is left over from an earlier check and cannot be removed"
+            if not self.zfs.clone(f"{master}@{snapshot}", tmp):
+                return f"Cloning {master}@{snapshot} failed: {self.zfs.runner.last_error}"
+            try:
+                self.zfs.runner.run(["udevadm", "settle"])
+                return self.windows.nic_support(self.zfs.zvol_device_path(tmp), nics)
+            finally:
+                if not self.zfs.destroy(tmp):
+                    logger.error("Could not remove %s after the hardware check", tmp)
+
+    def import_disk(self, source: str, fmt: str, target: str, progress=None, cancel=None) -> bool:
         """
         Fill the new, empty master `target` from an image file and publish it
         at @base. Without the lock while the data is written (it can take an
@@ -321,8 +342,10 @@ class Provisioner:
         ok, _, err = runner.run_stream(
             ["qemu-img", "convert", "-p", "-n", "--target-is-zero", "-f", fmt, "-O", "raw",
              source, self.zfs.zvol_device_path(target)],
-            line, timeout=IMPORT_TIMEOUT,
+            line, timeout=IMPORT_TIMEOUT, cancel=cancel,
         )
+        if cancel is not None and cancel.is_set():
+            err = "Cancelled"
         if ok:
             try:
                 self.publish_disk(target)

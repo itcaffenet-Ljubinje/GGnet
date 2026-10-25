@@ -115,8 +115,24 @@ class ImportIn(BaseModel):
     name: str
     kind: DiskKind = DiskKind.OS
     path: str
+    prepare: bool = True          # an OS image: Prepare image right after the import
+    defender_off: bool = False    # ... with Microsoft Defender turned off
 
     check_name = field_validator("name")(_disk_name)
+
+
+class NicSupportOut(BaseModel):
+    """Whether an OS image's active version can boot the PCs with one boot network card."""
+
+    nic: str | None              # PCI hardware ID (VEN_..&DEV_..&SUBSYS_..&REV_..); None: never booted over the network
+    status: str                  # ready | added | missing | unknown
+    machines: list[str]
+
+
+class HardwareOut(BaseModel):
+    snapshot: str | None
+    problem: str | None          # why the image could not be checked
+    nics: list[NicSupportOut]
 
 
 class GameDiskCopy(BaseModel):
