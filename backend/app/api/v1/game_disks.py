@@ -166,9 +166,9 @@ def grow_disk(
     """
     Make a disk bigger (never smaller). A published disk gets a new active
     version with the bigger size; PCs move to it at their next reboot. Its
-    last data partition is grown too (`extend`) when it is the last one on
-    the disk, as on a game disk; otherwise (an OS image, Recovery behind C:)
-    the volume is extended in Windows and the writeback applied.
+    data partition is grown on the server too (`extend`, app.disk_grow): a
+    game disk's last partition, or an OS image's C: after its Recovery
+    partition was moved to the end. Any other layout is extended in Windows.
     """
     disk = _get(db, disk_id)
     _not_copying(disk)
@@ -196,8 +196,9 @@ def grow_disk(
         note = "The draft is bigger; the new space shows in Disk Management while it is filled."
     else:
         why = f" ({result.note})" if result is not None else ""
-        note = ("Windows shows the new space as unallocated" + why + ". On one PC with Keep Writeback: "
-                "Disk Management → Extend Volume, shut down, then Apply Writebacks.")
+        note = ("Windows shows the new space as unallocated" + why + ". To use it, on one PC with Keep "
+                "Writeback: Disk Management → Extend Volume (it needs the free space right behind the "
+                "volume), shut down, then Apply Writebacks.")
     if version:
         comment = f"ggNet: grown from {old} to {body.size_gb} GB" + (
             ", data partition extended" if result is not None and result.extended else "")

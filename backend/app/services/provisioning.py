@@ -270,8 +270,8 @@ class Provisioner:
         """
         Make a disk bigger. A draft grows in place. A published master gets a
         new version, as Prepare image does: its newest version is cloned, the
-        clone grown (and its last data partition with it, `extend`) and made
-        the next version. Returns (the new version or None, what was done to
+        clone grown (and its data partition with it, `extend`, see
+        app.disk_grow) and made the next version. Returns (the new version or None, what was done to
         the partition or None). Nothing changes on failure.
         """
         size = f"{size_gb}G"

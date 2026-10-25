@@ -6,10 +6,9 @@ import json
 
 import pytest
 
-from app.disk_grow import BASIC_DATA, GrowResult, PartitionGrower
+from app.disk_grow import BASIC_DATA, RECOVERY, GrowResult, PartitionGrower
 
 MASTER = "tank/ggnet/images/cs2"
-RECOVERY = "DE94BBA4-06D1-4D40-A16A-BFD50179D6AC"
 DEV = "/dev/zd896"
 
 
@@ -55,13 +54,45 @@ def test_grows_the_last_data_partition_and_its_ntfs():
     ]
 
 
-def test_an_os_image_with_recovery_last_is_left_for_windows():
+def test_an_os_image_moves_recovery_to_the_end_and_grows_c():
     r = Script({"sfdisk": _table((1, 2048, 409600, "C12A7328-F81F-11D2-BA4B-00A0C93EC93B", None),
                                  (3, 450560, 160000000, BASIC_DATA, "Basic data partition"),
-                                 (4, 160450560, 1826816, RECOVERY, None))})
+                                 (4, 160450560, 1826816, RECOVERY, None),
+                                 last_lba=314572766)})
+    data = json.loads(r.table["sfdisk"])
+    data["partitiontable"]["partitions"][2]["attrs"] = "RequiredPartition GUID:63"
+    r.table["sfdisk"] = json.dumps(data)
     result = PartitionGrower(r).extend_last(DEV)
-    assert not result.extended and "Recovery" in result.note
-    assert not any(c[0] in ("ntfsresize", "blockdev") for c in r.calls)
+    assert result.extended and "Recovery partition was moved" in result.note
+    new = (314572766 + 1 - 1826816) // 2048 * 2048        # aligned, at the end of the disk
+    src, dst, size = 160450560 * 512, new * 512, 1826816 * 512
+    assert ["dd", f"if={DEV}", f"of={DEV}", "bs=4M", f"skip={src}", f"seek={dst}", f"count={size}",
+            "iflag=skip_bytes,count_bytes", "oflag=seek_bytes", "conv=notrunc,fsync", "status=none"] in r.calls
+    assert ["cmp", "-n", str(size), "-i", f"{src}:{dst}", DEV, DEV] in r.calls
+    assert ["sgdisk", "-d", "3", "-d", "4",
+            "-n", f"4:{new}:{new + 1826816 - 1}", "-t", f"4:{RECOVERY}", "-u", "4:UUID-4",
+            "-A", "4:set:0", "-A", "4:set:63",
+            "-n", f"3:450560:{new - 1}", "-t", f"3:{BASIC_DATA}", "-u", "3:UUID-3", "-c", "3:Basic data partition",
+            DEV] in r.calls
+    assert ["ntfsresize", "--force", f"{DEV}p3"] in r.calls
+
+
+def test_a_bad_recovery_copy_leaves_the_table_alone():
+    r = Script({"sfdisk": _table((3, 450560, 160000000, BASIC_DATA, None),
+                                 (4, 160450560, 1826816, RECOVERY, None), last_lba=314572766)},
+               fail=("cmp",))
+    result = PartitionGrower(r).extend_last(DEV)
+    assert not result.extended and "differs" in result.note
+    assert not any(c[0] == "sgdisk" and "-d" in c for c in r.calls)
+
+
+def test_an_unknown_layout_is_left_for_windows():
+    r = Script({"sfdisk": _table((3, 450560, 160000000, BASIC_DATA, None),
+                                 (4, 160450560, 1826816, "0FC63DAF-8483-4772-8E79-3D69D8477DE4", None),
+                                 last_lba=314572766)})
+    result = PartitionGrower(r).extend_last(DEV)
+    assert not result.extended and "in Windows" in result.note
+    assert not any(c[0] in ("dd", "ntfsresize") for c in r.calls)
 
 
 def test_nothing_to_do_without_new_space():

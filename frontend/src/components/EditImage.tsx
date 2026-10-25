@@ -17,8 +17,8 @@ interface Props {
 
 /**
  * Edit an image: its name and its size. A disk only grows: a published one
- * gets a new version with the bigger size (and its data partition grown
- * when it is the last one, as on a game disk).
+ * gets a new version with the bigger size and, unless turned off, its data
+ * partition (a game disk's, or an OS image's C:) grown on the server.
  */
 export function EditImage({ disk, onClose, onSaved }: Props) {
   const { busy, error, setError, run } = useAsyncAction();
@@ -110,13 +110,13 @@ export function EditImage({ disk, onClose, onSaved }: Props) {
             {grows && disk.published && (
               <label className="check">
                 <input type="checkbox" checked={extend} onChange={(e) => setExtend(e.target.checked)} />
-                Extend the data partition on the server too (a game disk: no work in Windows)
+                Extend the data partition on the server too, so Windows needs no work
               </label>
             )}
-            {grows && disk.kind === "os" && (
-              <p className="small warn-text">
-                On an OS image the Recovery partition sits behind C:, so C: is extended in Windows: on one PC
-                with Keep Writeback, Disk Management → Extend Volume, shut down, then Apply Writebacks.
+            {grows && disk.published && extend && disk.kind === "os" && (
+              <p className="muted small">
+                C: is grown on the server: its Recovery partition is first moved to the end of the disk
+                (copied and checked), so Windows still finds it.
               </p>
             )}
           </div>
