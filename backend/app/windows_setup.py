@@ -866,6 +866,15 @@ class WindowsSetup:
         result: dict = {}
 
         def work(root: Path, hive: Path) -> str | None:
+            # What Windows did while installing, for when it went wrong.
+            log = _find(root, ("Windows", "INF", "setupapi.dev.log"))
+            if log is not None and log.is_file():
+                saved = self.run_dir / f"toolchain-{label}-setupapi.dev.log"
+                try:
+                    shutil.copyfile(log, saved)
+                    logger.info("Windows' device install log of the toolchain run saved in %s", saved)
+                except OSError as e:
+                    logger.warning("Could not save %s: %s", log, e)
             folder = _toolchain_dir(root)
             path = folder / TOOLCHAIN_RESULT if folder else None
             if path is None or not path.is_file():

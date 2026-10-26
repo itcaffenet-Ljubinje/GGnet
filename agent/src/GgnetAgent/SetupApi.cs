@@ -48,13 +48,30 @@ public sealed class SetupApiInstaller : IDeviceInstaller
                     || !SetupDiOpenDeviceInfoW(set, device.InstanceId, IntPtr.Zero, 0, ref data))
                     return Fail(device, "SetupDiCreateDeviceInfo");
             }
-            if (!SetProperty(set, ref data, SpdrpHardwareId, device.HardwareIds))
+            // Windows 10 and later take hardware IDs through SetupAPI only for
+            // root-enumerated devices; a PCI device gets them in its Enum key.
+            var idsSet = SetProperty(set, ref data, SpdrpHardwareId, device.HardwareIds)
+                && (device.CompatibleIds is not { Count: > 0 } compatible
+                    || SetProperty(set, ref data, SpdrpCompatibleIds, compatible));
+            if (!idsSet && Marshal.GetLastWin32Error() != ErrorInvalidRegProperty)
                 return Fail(device, "set the hardware IDs");
-            if (device.CompatibleIds is { Count: > 0 } compatible && !SetProperty(set, ref data, SpdrpCompatibleIds, compatible))
-                return Fail(device, "set the compatible IDs");
             if (!SetupDiCallClassInstaller(DifRegisterDevice, set, ref data)
                 && Marshal.GetLastWin32Error() != ErrorDevinstAlreadyExists)
                 return Fail(device, "register the device");
+            if (!idsSet)
+            {
+                try
+                {
+                    if (!OperatingSystem.IsWindows())
+                        throw new PlatformNotSupportedException("the registry is only on Windows");
+                    WriteIds(device);
+                }
+                catch (Exception e) when (e is UnauthorizedAccessException or IOException
+                    or System.Security.SecurityException or PlatformNotSupportedException)
+                {
+                    return new ToolchainDeviceResult(device.InstanceId, false, Error: $"write the hardware IDs: {e.Message}");
+                }
+            }
             if (!SetupDiBuildDriverInfoList(set, ref data, SpditCompatDriver))
                 return Fail(device, "list its drivers");
             if (!SetupDiCallClassInstaller(DifSelectBestCompatDrv, set, ref data))
@@ -75,6 +92,18 @@ public sealed class SetupApiInstaller : IDeviceInstaller
     private static ToolchainDeviceResult Fail(ToolchainDevice device, string step) =>
         new(device.InstanceId, false, Error: $"{step}: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
 
+    /// <summary>HardwareID and CompatibleIDs of a registered device, in its Enum key.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static void WriteIds(ToolchainDevice device)
+    {
+        using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+            $@"SYSTEM\CurrentControlSet\Enum\{device.InstanceId}", writable: true)
+            ?? throw new IOException($"the device's Enum key is missing after its registration");
+        key.SetValue("HardwareID", device.HardwareIds.ToArray(), Microsoft.Win32.RegistryValueKind.MultiString);
+        if (device.CompatibleIds is { Count: > 0 } compatible)
+            key.SetValue("CompatibleIDs", compatible.ToArray(), Microsoft.Win32.RegistryValueKind.MultiString);
+    }
+
     private static bool SetProperty(IntPtr set, ref SpDevinfoData data, int property, IReadOnlyList<string> values)
     {
         var bytes = System.Text.Encoding.Unicode.GetBytes(string.Join('\0', values) + "\0\0");
@@ -85,6 +114,7 @@ public sealed class SetupApiInstaller : IDeviceInstaller
 
     private static readonly IntPtr InvalidHandle = new(-1);
     private const int ErrorDevinstAlreadyExists = unchecked((int)0xE0000207);
+    private const int ErrorInvalidRegProperty = unchecked((int)0xE0000209);
     private const int SpdrpHardwareId = 0x01;
     private const int SpdrpCompatibleIds = 0x02;
     private const int DifSelectBestCompatDrv = 0x17;
