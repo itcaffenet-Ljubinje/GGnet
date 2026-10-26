@@ -117,6 +117,16 @@ def alembic_config(url: str):
     return cfg
 
 
+@pytest.fixture(autouse=True)
+def _fresh_hardware_status():
+    """Which cards an image version starts is cached per process; every test starts empty."""
+    from app.services import scan
+
+    scan._STATUS.clear()
+    yield
+    scan._STATUS.clear()
+
+
 @pytest.fixture
 def host() -> FakeHost:
     h = FakeHost()

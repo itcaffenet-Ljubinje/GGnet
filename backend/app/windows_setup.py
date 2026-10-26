@@ -316,6 +316,50 @@ def toolchain_job(nics: Sequence[tuple[str, str]]) -> dict:
     return {"devices": devices}
 
 
+DRIVERS_HIVE = ("Windows", "System32", "config", "DRIVERS")
+DRIVER_STORE = ("Windows", "System32", "DriverStore", "FileRepository")
+_PACKAGE_RE = re.compile(r"^[A-Za-z0-9_.-]+\.inf_[A-Za-z0-9]+_[0-9a-fA-F]{16}$")
+
+
+def driver_ids(nic: str) -> list[str]:
+    """The DriverDatabase\\DeviceIds\\PCI keys that can hold drivers for a card, best first."""
+    m = NIC_ID_RE.match(nic)
+    if m is None:
+        raise ValueError(f"Invalid PCI hardware ID: {nic!r}")
+    ven, dev, sub, rev = m.groups()
+    vd = f"VEN_{ven}&DEV_{dev}"
+    return [nic, f"{vd}&SUBSYS_{sub}", f"{vd}&REV_{rev}", vd]
+
+
+def best_inf(device_ids_export: str) -> str | None:
+    """
+    The INF Windows ranks best for a device, from an export of one
+    DriverDatabase\\DeviceIds key: its values are INF names with a rank
+    (hex(3) data, the lower the better).
+    """
+    ranked = []
+    for _, values in _reg_blocks(device_ids_export)[:1]:
+        for v in values:
+            name, _, data = v.partition("=")
+            m = re.match(r'^"([^"\\]+\.inf)"$', name, re.IGNORECASE)
+            if not m or not data.startswith("hex(3):"):
+                continue
+            raw = [int(x, 16) for x in data[7:].split(",") if x]
+            ranked.append((int.from_bytes(bytes(raw[:4]).ljust(4, b"\0"), "little"), m.group(1)))
+    return min(ranked)[1] if ranked else None
+
+
+def active_package(inf_export: str) -> str | None:
+    """The driver store folder of an INF, from an export of DriverDatabase\\DriverInfFiles\\<inf>."""
+    for _, values in _reg_blocks(inf_export)[:1]:
+        text = {v.partition("=")[0]: v.partition("=")[2] for v in values}
+        package = _reg_text(text.get('"Active"', ""))
+        if not package and (items := _multi_sz("=" + text.get("@", ""))):
+            package = items[0]
+        return package if package and _PACKAGE_RE.match(package) else None
+    return None
+
+
 def toolchain_boot_lines(control_set: int) -> list[str]:
     """The VM's disk driver started at boot (it may be off in an image made on an NVMe PC)."""
     cs = f"\\ControlSet{control_set:03d}"
@@ -856,6 +900,57 @@ class WindowsSetup:
         except Exception as e:
             logger.exception("Preparing the toolchain run on %s failed", device)
             return f"unexpected error: {e}"
+
+    def copy_nic_driver(self, device: str, nic: str, dest: Path) -> list[str] | str:
+        """
+        The driver package the Windows on `device` would install for this
+        network card (DRIVERS hive → DriverStore), copied into `dest` (only
+        its top-level files, as wimboot injects them into one folder): the
+        names of its INF files, or why there is none. Mounted read-only.
+        """
+        try:
+            ids = driver_ids(nic)
+        except ValueError as e:
+            return str(e)
+        copied: list[str] = []
+
+        def work(root: Path, hive: Path) -> str | None:
+            drivers = _find(root, DRIVERS_HIVE)
+            store = _find_dir(root, DRIVER_STORE)
+            if drivers is None or store is None:
+                return "the image has no driver database"
+            inf = None
+            for key in ids:
+                ok, out, _ = self._run(["hivexregedit", "--export", str(drivers),
+                                        f"\\DriverDatabase\\DeviceIds\\PCI\\{key}"], quiet=True)
+                if ok and (inf := best_inf(out)):
+                    break
+            if inf is None:
+                return f"the image has no driver for PCI\\{nic}"
+            ok, out, _ = self._run(["hivexregedit", "--export", str(drivers),
+                                    f"\\DriverDatabase\\DriverInfFiles\\{inf}"], quiet=True)
+            package = active_package(out) if ok else None
+            folder = _find_dir(store, (package,)) if package else None
+            if folder is None:
+                return f"the driver package of {inf} is not in the image's driver store"
+            try:
+                dest.mkdir(parents=True, exist_ok=True)
+                for f in sorted(folder.iterdir()):
+                    if f.is_file():
+                        shutil.copyfile(f, dest / f.name)
+                        if f.suffix.lower() == ".inf":
+                            copied.append(f.name)
+            except OSError as e:
+                return f"copying the driver failed: {e}"
+            logger.info("Driver %s (%s) for PCI\\%s copied from the image", inf, package, nic)
+            return None if copied else f"{package} has no INF file"
+
+        try:
+            problem = self._on_windows(device, "nic-driver", work, readonly=True)
+        except Exception as e:
+            logger.exception("Copying the network driver from %s failed", device)
+            return f"unexpected error: {e}"
+        return problem or copied
 
     def toolchain_result(self, device: str, label: str = "image") -> dict | str:
         """

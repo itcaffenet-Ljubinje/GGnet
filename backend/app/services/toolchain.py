@@ -136,6 +136,21 @@ class HardwareJob:
                 "devices": self.devices, "started": self.started, "finished": self.finished}
 
 
+def activate_when_done(make_session, disk_id: int, base: str) -> Callable[[str], None]:
+    """A HardwareAdder `done` callback: the new version becomes the image's active one,
+    unless someone chose another version meanwhile."""
+    from app.db.models import GameDisk
+
+    def done(snapshot: str) -> None:
+        with make_session() as s:
+            d = s.get(GameDisk, disk_id)
+            if d is not None and d.snapshot == base:
+                d.snapshot = snapshot
+                s.commit()
+
+    return done
+
+
 class HardwareAdder:
     """Add new hardware jobs, one per image, in the background."""
 

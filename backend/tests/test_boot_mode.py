@@ -66,7 +66,8 @@ def _mark_dirty(db_url) -> None:
 
 
 def _clones_made(host) -> list[str]:
-    return [c[-1] for c in host.calls if c[:2] == ["zfs", "clone"]]
+    """Clones made for PCs (not the image's temporary hardware-check clone)."""
+    return [c[-1] for c in host.calls if c[:2] == ["zfs", "clone"] and not c[-1].endswith("_ggnet_hw")]
 
 
 @pytest.fixture

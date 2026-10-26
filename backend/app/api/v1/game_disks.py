@@ -45,6 +45,8 @@ from app.db.session import get_db
 from app.services.agent_package import default_package
 from app.services.os_setup import image_prep
 from app.services.provisioning import Provisioner, ProvisioningError
+from app.services.scan import nic_status
+from app.services.toolchain import activate_when_done
 
 logger = logging.getLogger("ggnet.api.game_disks")
 
@@ -216,10 +218,6 @@ def grow_disk(
                          extended=bool(result and result.extended), note=note)
 
 
-# Hardware checks per (zvol, version, cards): a version never changes.
-_HARDWARE: dict[tuple[str, str, tuple], dict | str] = {}
-
-
 @router.get("/{disk_id}/hardware", response_model=HardwareOut)
 def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
     """
@@ -239,12 +237,8 @@ def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = De
         card = (m.boot_nic, m.nic_instance) if m.boot_nic else None
         by_card.setdefault(card, []).append(m.name)
     cards = tuple(sorted((c for c in by_card if c), key=lambda c: (c[0], c[1] or "")))
-    key = (disk.zvol_path, disk.snapshot, cards)
-    if key not in _HARDWARE:
-        _HARDWARE[key] = prov.check_hardware(disk.zvol_path, disk.snapshot, list(cards)) if cards else {}
-    found = _HARDWARE[key]
+    found = nic_status(prov, disk.zvol_path, disk.snapshot, list(cards)) if cards else {}
     if isinstance(found, str):
-        _HARDWARE.pop(key)          # try again next time
         return HardwareOut(snapshot=disk.snapshot, problem=found, nics=[])
     out = [NicSupportOut(nic=c[0], instance=c[1], status=found.get(c, "unknown"), machines=by_card[c])
            for c in cards]
@@ -286,15 +280,7 @@ def add_hardware(
     if names and names[-1] != disk.snapshot:
         conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
                  f"make @{names[-1]} active first (a new version always follows the newest)")
-    make_session = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
-    base = disk.snapshot
-
-    def done(snapshot: str) -> None:
-        with make_session() as s:
-            d = s.get(GameDisk, disk_id)
-            if d is not None and d.snapshot == base:      # nobody chose another version meanwhile
-                d.snapshot = snapshot
-                s.commit()
+    done = activate_when_done(sessionmaker(bind=db.get_bind(), expire_on_commit=False), disk_id, disk.snapshot)
 
     try:
         job = adder.start(disk.zvol_path, [(c.nic, c.instance) for c in body.cards], done)
