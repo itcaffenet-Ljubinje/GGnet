@@ -326,5 +326,6 @@ def test_copy_nic_driver_adds_the_catalog_of_an_inbox_driver(tmp_path):
 
     dest = tmp_path / "out"
     assert windows.copy_nic_driver("/dev/zvol/x", I219, dest) == ["net1ic64.inf"]
-    assert sorted(p.name for p in dest.iterdir()) == sorted(["e1i68x64.sys", signing, "net1ic64.inf"])
-    assert scan.scan_config("http://s/", MAC, sorted(p.name for p in dest.iterdir())).count(signing) == 1
+    assert sorted(p.name for p in dest.iterdir()) == ["e1i68x64.sys", "ggnet1.cat", "net1ic64.inf"]
+    assert (dest / "ggnet1.cat").read_bytes() == (catroot / signing).read_bytes()
+    assert '"catalogs": ["ggnet1.cat"]' in scan.scan_config("http://s/", MAC, sorted(p.name for p in dest.iterdir()))

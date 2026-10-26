@@ -955,8 +955,10 @@ class WindowsSetup:
             logger.info("Driver %s (%s) for PCI\\%s copied from the image", inf, package, nic)
             if unsigned:
                 catalogs = self._catalogs_with(root, unsigned, hints=[f.stem for f in folder.iterdir()])
-                for cat in catalogs:
-                    (dest / cat.name).write_bytes(self._volume_file(root, cat) or b"")
+                # Short names: wimboot's virtual disk cannot hold catalog names like
+                # Microsoft-Windows-Ethernet-Client-Intel-E1i68x64-FOD-Package~31bf...cat.
+                for i, cat in enumerate(catalogs, 1):
+                    (dest / f"ggnet{i}.cat").write_bytes(self._volume_file(root, cat) or b"")
                 logger.info("Catalogs signing it: %s", ", ".join(c.name for c in catalogs) or "none found")
             return None if copied else f"{package} has no INF file"
 
