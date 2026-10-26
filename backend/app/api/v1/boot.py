@@ -41,7 +41,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_driver_cache,
+    get_driver_library,
     get_hardware_adder,
     get_provisioner,
     get_pxe_service,
@@ -202,7 +202,7 @@ def ipxe_script(
     prov: Provisioner = Depends(get_provisioner),
     settings: WritebackSettings = Depends(get_writeback_settings),
     adder=Depends(get_hardware_adder),
-    drivers: scan.DriverCache = Depends(get_driver_cache),
+    drivers: scan.DriverLibrary = Depends(get_driver_library),
 ):
     try:
         mac = _mac(mac)
@@ -256,7 +256,7 @@ def secure_boot_certificate(service: PxeService = Depends(get_pxe_service)):
 
 # ── New hardware: hardware scan (WinPE) and Add new hardware ──────────
 
-def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drivers: scan.DriverCache,
+def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drivers: scan.DriverLibrary,
                   m: Machine, nic: str | None, mac: str, again: str, cfg: dict) -> PlainTextResponse | None:
     """
     What a PC gets instead of its Windows while its OS image cannot start its
@@ -289,11 +289,13 @@ def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drive
             logger.warning("iPXE: %s needs the hardware scan, but Windows PE (%s) or %s is missing",
                            m.name, folder, scan.SCANNER_EXE)
             return None
-        infs = drivers.infs(nic, lambda dest: prov.nic_driver(disk.zvol_path, disk.snapshot, nic, dest))
         chip = scan.chip_key(nic)
-        logger.info("iPXE: %s gets the hardware scan (PCI\\%s is new to %s; driver %s)",
-                    m.name, nic, disk.name, ", ".join(infs) or "none")
-        return PlainTextResponse(scan.ipxe_scan_script(base, mac, chip, drivers.files(chip) if infs else []))
+        found = drivers.match(chip)
+        package, infs = found if found else (None, [])
+        logger.info("iPXE: %s gets the hardware scan (PCI\\%s is new to %s; WinPE driver %s)",
+                    m.name, nic, disk.name, f"{package}: {', '.join(infs)}" if package else "none in the library")
+        return PlainTextResponse(scan.ipxe_scan_script(base, mac, chip, package,
+                                                       drivers.files(package) if package else []))
     if job is not None and job.error and card in job.nics:
         return exit_script(f"ggNet: adding the network card of {m.name} to {disk.name} failed: {job.error}. "
                            f"Try again in the web UI: Images -> {disk.name} -> Add new hardware.")
@@ -352,20 +354,22 @@ def scan_exe():
 
 @router.get("/scan/config")
 def scan_config(request: Request, mac: str = "", chip: str = "",
-                drivers: scan.DriverCache = Depends(get_driver_cache)):
-    """ggnet-scan.json for one PC: this server, its MAC and the network driver to load (of its chip)."""
+                drivers: scan.DriverLibrary = Depends(get_driver_library)):
+    """ggnet-scan.json for one PC: this server, its MAC and the network driver to load (for its chip)."""
     try:
         mac = _mac(mac)
     except ValueError:
         not_found("PC with MAC", mac)
-    return Response(scan.scan_config(str(request.base_url), mac, drivers.files(chip)), media_type="application/json")
+    found = drivers.match(chip)
+    return Response(scan.scan_config(str(request.base_url), mac, found[1] if found else []),
+                    media_type="application/json")
 
 
-@router.get("/scan/driver/{chip}/{name}")
-def scan_driver(chip: str, name: str, drivers: scan.DriverCache = Depends(get_driver_cache)):
-    path = drivers.file(chip, name)
+@router.get("/scan/driver/{package}/{name}")
+def scan_driver(package: str, name: str, drivers: scan.DriverLibrary = Depends(get_driver_library)):
+    path = drivers.file(package, name)
     if path is None:
-        not_found("Driver file", f"{chip}/{name}")
+        not_found("Driver file", f"{package}/{name}")
     return FileResponse(path, media_type="application/octet-stream")
 
 

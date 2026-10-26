@@ -8,8 +8,7 @@ namespace GgnetScan;
 /// the scanner by wimboot: where to send the report, the PC's boot MAC (as
 /// iPXE saw it) and the network card drivers to load first.
 /// </summary>
-public sealed record ScanConfig(
-    string Server, string Mac, IReadOnlyList<string>? Drivers = null, IReadOnlyList<string>? Catalogs = null)
+public sealed record ScanConfig(string Server, string Mac, IReadOnlyList<string>? Drivers = null)
 {
     public static ScanConfig Parse(string json)
     {
@@ -28,8 +27,8 @@ public sealed record ScanConfig(
         if (string.IsNullOrWhiteSpace(config.Mac))
             throw new FormatException("ggnet-scan.json has no MAC address");
         // Only plain file names: they are loaded from the scanner's own folder.
-        if (!PlainNames(config.Drivers, ".inf") || !PlainNames(config.Catalogs, ".cat"))
-            throw new FormatException("ggnet-scan.json names a driver or catalog that is not a plain file name");
+        if (!PlainNames(config.Drivers, ".inf"))
+            throw new FormatException("ggnet-scan.json names a driver that is not a plain .inf file name");
         return config;
     }
 

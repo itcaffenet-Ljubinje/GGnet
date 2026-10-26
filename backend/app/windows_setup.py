@@ -74,7 +74,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence
 
-from app import wof
 from app.runner import CommandRunner
 
 logger = logging.getLogger("ggnet.windows")
@@ -315,51 +314,6 @@ def toolchain_job(nics: Sequence[tuple[str, str]]) -> dict:
     if not devices:
         raise ValueError("No devices to add")
     return {"devices": devices}
-
-
-DRIVERS_HIVE = ("Windows", "System32", "config", "DRIVERS")
-DRIVER_STORE = ("Windows", "System32", "DriverStore", "FileRepository")
-CATROOT = ("Windows", "System32", "CatRoot", "{F750E6C3-38EE-11D1-85E5-00C04FC295EE}")
-_PACKAGE_RE = re.compile(r"^[A-Za-z0-9_.-]+\.inf_[A-Za-z0-9]+_[0-9a-fA-F]{16}$")
-
-
-def driver_ids(nic: str) -> list[str]:
-    """The DriverDatabase\\DeviceIds\\PCI keys that can hold drivers for a card, best first."""
-    m = NIC_ID_RE.match(nic)
-    if m is None:
-        raise ValueError(f"Invalid PCI hardware ID: {nic!r}")
-    ven, dev, sub, rev = m.groups()
-    vd = f"VEN_{ven}&DEV_{dev}"
-    return [nic, f"{vd}&SUBSYS_{sub}", f"{vd}&REV_{rev}", vd]
-
-
-def best_inf(device_ids_export: str) -> str | None:
-    """
-    The INF Windows ranks best for a device, from an export of one
-    DriverDatabase\\DeviceIds key: its values are INF names with a rank
-    (hex(3) data, the lower the better).
-    """
-    ranked = []
-    for _, values in _reg_blocks(device_ids_export)[:1]:
-        for v in values:
-            name, _, data = v.partition("=")
-            m = re.match(r'^"([^"\\]+\.inf)"$', name, re.IGNORECASE)
-            if not m or not data.startswith("hex(3):"):
-                continue
-            raw = [int(x, 16) for x in data[7:].split(",") if x]
-            ranked.append((int.from_bytes(bytes(raw[:4]).ljust(4, b"\0"), "little"), m.group(1)))
-    return min(ranked)[1] if ranked else None
-
-
-def active_package(inf_export: str) -> str | None:
-    """The driver store folder of an INF, from an export of DriverDatabase\\DriverInfFiles\\<inf>."""
-    for _, values in _reg_blocks(inf_export)[:1]:
-        text = {v.partition("=")[0]: v.partition("=")[2] for v in values}
-        package = _reg_text(text.get('"Active"', ""))
-        if not package and (items := _multi_sz("=" + text.get("@", ""))):
-            package = items[0]
-        return package if package and _PACKAGE_RE.match(package) else None
-    return None
 
 
 def toolchain_boot_lines(control_set: int) -> list[str]:
@@ -746,9 +700,6 @@ class WindowsSetup:
     def __init__(self, runner: Optional[CommandRunner] = None, run_dir: Path = DEFAULT_RUN_DIR):
         self.runner = runner or CommandRunner()
         self.run_dir = run_dir
-        # The partition mounted for the running work (WOF files are read from it directly).
-        self._partition: str | None = None
-        self.read_bytes: Callable[[str, str], bytes | None] = wof.read_file
 
     def _run(self, cmd: list[str], quiet: bool = False) -> tuple[bool, str, str]:
         return self.runner.run(cmd, quiet=quiet)
@@ -906,106 +857,6 @@ class WindowsSetup:
             logger.exception("Preparing the toolchain run on %s failed", device)
             return f"unexpected error: {e}"
 
-    def copy_nic_driver(self, device: str, nic: str, dest: Path) -> list[str] | str:
-        """
-        The driver package the Windows on `device` would install for this
-        network card (DRIVERS hive → DriverStore), copied into `dest` (only
-        its top-level files, as wimboot injects them into one folder): the
-        names of its INF files, or why there is none. Mounted read-only.
-        """
-        try:
-            ids = driver_ids(nic)
-        except ValueError as e:
-            return str(e)
-        copied: list[str] = []
-
-        def work(root: Path, hive: Path) -> str | None:
-            drivers = _find(root, DRIVERS_HIVE)
-            store = _find_dir(root, DRIVER_STORE)
-            if drivers is None or store is None:
-                return "the image has no driver database"
-            inf = None
-            for key in ids:
-                ok, out, _ = self._run(["hivexregedit", "--export", str(drivers),
-                                        f"\\DriverDatabase\\DeviceIds\\PCI\\{key}"], quiet=True)
-                if ok and (inf := best_inf(out)):
-                    break
-            if inf is None:
-                return f"the image has no driver for PCI\\{nic}"
-            ok, out, _ = self._run(["hivexregedit", "--export", str(drivers),
-                                    f"\\DriverDatabase\\DriverInfFiles\\{inf}"], quiet=True)
-            package = active_package(out) if ok else None
-            folder = _find_dir(store, (package,)) if package else None
-            if folder is None:
-                return f"the driver package of {inf} is not in the image's driver store"
-            try:
-                dest.mkdir(parents=True, exist_ok=True)
-                unsigned: list[bytes] = []
-                for f in sorted(folder.iterdir()):
-                    data = self._volume_file(root, f)
-                    if data is None:
-                        continue
-                    (dest / f.name).write_bytes(data)
-                    if f.suffix.lower() == ".inf":
-                        copied.append(f.name)
-                    elif f.suffix.lower() == ".sys" and not wof.embedded_signature(data):
-                        unsigned += wof.pe_hashes(data)[:1]
-            except OSError as e:
-                return f"copying the driver failed: {e}"
-            logger.info("Driver %s (%s) for PCI\\%s copied from the image", inf, package, nic)
-            if unsigned:
-                catalogs = self._catalogs_with(root, unsigned, hints=[f.stem for f in folder.iterdir()])
-                # Short names: wimboot's virtual disk cannot hold catalog names like
-                # Microsoft-Windows-Ethernet-Client-Intel-E1i68x64-FOD-Package~31bf...cat.
-                for i, cat in enumerate(catalogs, 1):
-                    (dest / f"ggnet{i}.cat").write_bytes(self._volume_file(root, cat) or b"")
-                logger.info("Catalogs signing it: %s", ", ".join(c.name for c in catalogs) or "none found")
-            return None if copied else f"{package} has no INF file"
-
-        try:
-            problem = self._on_windows(device, "nic-driver", work, readonly=True)
-        except Exception as e:
-            logger.exception("Copying the network driver from %s failed", device)
-            return f"unexpected error: {e}"
-        return problem or copied
-
-    def _volume_file(self, root: Path, path: Path) -> bytes | None:
-        """A file of the mounted Windows; one Windows keeps compressed (WOF) is read past ntfs-3g."""
-        if not path.is_symlink():
-            return path.read_bytes() if path.is_file() else None
-        try:
-            reparse = os.getxattr(path, "system.ntfs_reparse_data", follow_symlinks=False)
-        except OSError:
-            return None
-        if wof.wof_algorithm(reparse) is None or self._partition is None:
-            return None
-        return self.read_bytes(self._partition, str(path.relative_to(root)))
-
-    def _catalogs_with(self, root: Path, hashes: list[bytes], hints: Sequence[str] = ()) -> list[Path]:
-        """
-        The catalogs of the mounted Windows that list these file hashes
-        (inbox drivers are signed only there); likely names first, as
-        reading all of them takes a minute.
-        """
-        folder = _find_dir(root, CATROOT)
-        if folder is None:
-            return []
-        hints = [h.lower() for h in hints if h] + ["ethernet", "net"]
-        files = sorted((p for p in folder.iterdir() if p.suffix.lower() == ".cat"),
-                       key=lambda p: (not any(h in p.name.lower() for h in hints), p.name))
-        left, found = set(hashes), []
-        for cat in files:
-            data = self._volume_file(root, cat)
-            if not data:
-                continue
-            hit = {h for h in left if h in data}
-            if hit:
-                found.append(cat)
-                left -= hit
-                if not left:
-                    break
-        return found
-
     def toolchain_result(self, device: str, label: str = "image") -> dict | str:
         """
         What the agent wrote after the toolchain run (see ToolchainResult in
@@ -1071,10 +922,8 @@ class WindowsSetup:
                 if hive is None:
                     reasons.append(f"{part}: no Windows on it")
                     continue
-                self._partition = part
                 return work(mount, hive)
             finally:
-                self._partition = None
                 if not self._run(["umount", str(mount)])[0]:
                     logger.error("Could not unmount %s", mount)
                 try:

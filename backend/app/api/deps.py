@@ -57,13 +57,11 @@ def get_hardware_adder(prov: Provisioner = Depends(get_provisioner)):
 
 
 @lru_cache(maxsize=1)
-def get_driver_cache():
-    """Network card drivers for the hardware scan's Windows PE, one folder per chip."""
-    from pathlib import Path
+def get_driver_library():
+    """Signed network driver packages for the hardware scan's Windows PE ([paths] winpe_drivers)."""
+    from app.services.scan import DriverLibrary, winpe_drivers_dir
 
-    from app.services.scan import DriverCache
-
-    return DriverCache(Path(get_config()["paths"]["data_dir"]) / "scan-drivers")
+    return DriverLibrary(winpe_drivers_dir(get_config()))
 
 
 def get_usb_disks(prov: Provisioner = Depends(get_provisioner)):

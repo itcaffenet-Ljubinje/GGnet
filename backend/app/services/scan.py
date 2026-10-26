@@ -11,8 +11,11 @@ not known yet, the server answers iPXE with a WinPE boot instead of Windows
 
   1. wimboot injects into WinPE's System32: winpeshl.ini (starts the
      scanner), the scanner, its ggnet-scan.json (this server, the PC's MAC)
-     and the image's own driver for the card (WinPE has few network
-     drivers), copied once per chip from the image's driver store;
+     and a signed driver package for the card from `[paths] winpe_drivers`
+     (DriverLibrary: the vendors' packages, e.g. Intel's PRO1000 NDIS68
+     folder; WinPE has few network drivers, and Windows' own inbox
+     drivers cannot be loaded there, as they are signed only by the
+     catalogs of the Windows they come with);
   2. the scanner loads the driver, starts the network and sends the PC's
      PCI devices to POST /api/v1/boot/scan, which keeps the card's instance
      ID; then it restarts the PC;
@@ -29,11 +32,10 @@ from __future__ import annotations
 import json
 import logging
 import re
-import shutil
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from app.windows_setup import NET_CLASS, NIC_ID_RE, NIC_INSTANCE_RE
 
@@ -43,7 +45,8 @@ SCANNER_EXE = "ggnet-scan.exe"
 # The Windows PE files (from Windows installation media or the ADK) and wimboot.
 WINPE_FILES = ("wimboot", "BCD", "boot.sdi", "boot.wim")
 WINPESHL_INI = "[LaunchApps]\r\n%SYSTEMROOT%\\System32\\ggnet-scan.exe\r\n"
-_DRIVER_FILE = re.compile(r"^[A-Za-z0-9_.~-]{1,200}$")
+_DRIVER_FILE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+_PACKAGE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _CHIP = re.compile(r"^[0-9a-f]{4}-[0-9a-f]{4}$")
 
 
@@ -77,7 +80,7 @@ def chip_key(nic: str) -> str:
     return f"{m.group(1)}-{m.group(2)}".lower()
 
 
-def ipxe_scan_script(base: str, mac: str, chip: str | None, drivers: list[str]) -> str:
+def ipxe_scan_script(base: str, mac: str, chip: str, package: str | None, drivers: list[str]) -> str:
     """
     The iPXE script that boots WinPE with the scanner. `base` is this server's
     URL with a trailing slash. index=1: Windows PE, not Windows Setup, in a
@@ -93,10 +96,10 @@ def ipxe_scan_script(base: str, mac: str, chip: str | None, drivers: list[str]) 
         f"initrd -n boot.sdi {boot}/boot.sdi || goto failed",
         f"initrd -n winpeshl.ini {scan}/winpeshl.ini || goto failed",
         f"initrd -n {SCANNER_EXE} {scan}/{SCANNER_EXE} || goto failed",
-        f"initrd -n ggnet-scan.json {scan}/config?mac={mac}&chip={chip or ''} || goto failed",
+        f"initrd -n ggnet-scan.json {scan}/config?mac={mac}&chip={chip} || goto failed",
     ]
     for name in drivers:
-        lines.append(f"initrd -n {name} {scan}/driver/{chip}/{name} || goto failed")
+        lines.append(f"initrd -n {name} {scan}/driver/{package}/{name} || goto failed")
     lines += [
         f"initrd -n boot.wim {boot}/boot.wim || goto failed",
         "boot || goto failed",
@@ -108,11 +111,9 @@ def ipxe_scan_script(base: str, mac: str, chip: str | None, drivers: list[str]) 
     return "\n".join(lines) + "\n"
 
 
-def scan_config(base: str, mac: str, files: list[str]) -> str:
-    """ggnet-scan.json: the driver's INF files to load and the catalogs that sign it."""
-    return json.dumps({"server": base.rstrip("/"), "mac": mac,
-                       "drivers": [f for f in files if f.lower().endswith(".inf")],
-                       "catalogs": [f for f in files if f.lower().endswith(".cat")]})
+def scan_config(base: str, mac: str, infs: list[str]) -> str:
+    """ggnet-scan.json: this server, the PC's MAC and the driver's INF files to load."""
+    return json.dumps({"server": base.rstrip("/"), "mac": mac, "drivers": infs})
 
 
 def is_network(device: dict) -> bool:
@@ -156,48 +157,73 @@ def choose_card(devices: list[dict], boot_nic: str | None) -> ChosenCard | None:
     return cards[0] if len(cards) == 1 else None
 
 
-class DriverCache:
+def winpe_drivers_dir(cfg: dict[str, Any]) -> Path:
+    paths = cfg.get("paths") or {}
+    return Path(paths.get("winpe_drivers") or Path(paths.get("data_dir", "/var/lib/ggnet")) / "winpe-drivers")
+
+
+def _inf_text(path: Path) -> str:
+    data = path.read_bytes()
+    if data[:2] == b"\xff\xfe":
+        return data[2:].decode("utf-16-le", "replace")
+    return data.decode("latin-1")
+
+
+class DriverLibrary:
     """
-    Network card drivers for WinPE, one folder per chip under `root`, copied
-    from an OS image's driver store the first time a PC with that chip is
-    scanned. `copy(dest)` fills a folder and returns its INF names or why not.
+    Signed network driver packages for the hardware scan's Windows PE, one
+    folder per package under `root` (INF, SYS, CAT and what the INF copies,
+    as the vendor ships them; only top-level files, as wimboot injects them
+    into one folder). A package fits a chip when one of its INF files names
+    the chip's PCI\\VEN_xxxx&DEV_yyyy.
     """
 
     def __init__(self, root: Path):
         self.root = root
-        self._lock = threading.Lock()
+        self._texts: dict[Path, tuple[int, str]] = {}
 
-    def folder(self, chip: str) -> Path | None:
-        return self.root / chip if _CHIP.match(chip) else None
-
-    def file(self, chip: str, name: str) -> Path | None:
-        folder = self.folder(chip)
-        if folder is None or not _DRIVER_FILE.match(name):
-            return None
-        path = folder / name
-        return path if path.is_file() else None
-
-    def infs(self, nic: str, copy: Callable[[Path], list[str] | str]) -> list[str]:
-        """The INF files for this chip, copied first when missing; [] when there is none."""
-        folder = self.folder(chip_key(nic))
-        assert folder is not None
-        with self._lock:
-            if not folder.is_dir():
-                tmp = folder.with_name(folder.name + ".new")
-                shutil.rmtree(tmp, ignore_errors=True)
-                result = copy(tmp)
-                if isinstance(result, str):
-                    logger.warning("No WinPE driver for PCI\\%s: %s", nic, result)
-                    shutil.rmtree(tmp, ignore_errors=True)
-                    return []
-                tmp.rename(folder)
-            return sorted(p.name for p in folder.iterdir() if p.suffix.lower() == ".inf")
-
-    def files(self, chip: str) -> list[str]:
-        folder = self.folder(chip)
-        if folder is None or not folder.is_dir():
+    def packages(self) -> list[Path]:
+        try:
+            return sorted(p for p in self.root.iterdir() if p.is_dir() and _PACKAGE.match(p.name))
+        except OSError:
             return []
-        return sorted(p.name for p in folder.iterdir() if p.is_file() and _DRIVER_FILE.match(p.name))
+
+    def _text(self, path: Path) -> str:
+        stamp = path.stat().st_mtime_ns
+        cached = self._texts.get(path)
+        if cached is None or cached[0] != stamp:
+            cached = self._texts[path] = (stamp, _inf_text(path))
+        return cached[1]
+
+    def match(self, chip: str) -> tuple[str, list[str]] | None:
+        """(package, its INF files that name the chip) for a chip key like 8086-15bc; None when none fits."""
+        if not _CHIP.match(chip):
+            return None
+        ven, dev = chip.upper().split("-")
+        wanted = f"PCI\\VEN_{ven}&DEV_{dev}"
+        for package in self.packages():
+            infs = []
+            for inf in sorted(package.glob("*.inf")) + sorted(package.glob("*.INF")):
+                try:
+                    if wanted in self._text(inf).upper() and inf.name not in infs:
+                        infs.append(inf.name)
+                except OSError:
+                    continue
+            if infs:
+                return package.name, infs
+        return None
+
+    def files(self, package: str) -> list[str]:
+        folder = self.root / package
+        if not _PACKAGE.match(package) or not folder.is_dir():
+            return []
+        return sorted(p.name for p in folder.iterdir()
+                      if p.is_file() and _DRIVER_FILE.match(p.name) and p.suffix.lower() != ".txt")
+
+    def file(self, package: str, name: str) -> Path | None:
+        if name not in self.files(package):
+            return None
+        return self.root / package / name
 
 
 # ── Which cards a version of an image starts (cached; a version never changes) ──
