@@ -27,16 +27,25 @@ catch (Exception e) when (e is IOException or FormatException or UnauthorizedAcc
     return 1;
 }
 
-// Inbox drivers are signed only in Windows' catalogs: add those first.
-foreach (var catalog in config.Catalogs ?? [])
+// Inbox drivers are signed only in Windows' catalogs: add those first. The
+// catalog service is not running in Windows PE; the kernel also finds a
+// catalog by itself in CatRoot.
+var catalogs = config.Catalogs ?? [];
+if (catalogs.Count > 0)
+    Run("net.exe", "start cryptsvc", TimeSpan.FromMinutes(1));
+foreach (var catalog in catalogs)
 {
-    var problem = Catalogs.Add(Path.Combine(folder, catalog));
-    Say(problem is null ? $"Catalog {catalog} added" : $"Catalog {catalog}: {problem}");
+    var path = Path.Combine(folder, catalog);
+    var copied = Catalogs.CopyToCatRoot(path);
+    var problem = Catalogs.Add(path);
+    Say($"Catalog {catalog}: {(problem is null ? "added" : problem)}{(copied is null ? "" : $"; {copied}")}");
 }
 foreach (var driver in config.Drivers ?? [])
 {
+    // drvload takes only an INF that names its catalog; an inbox INF does not.
+    var inf = catalogs.Count > 0 ? Inf.WithCatalog(Path.Combine(folder, driver), catalogs[0]) : null;
     Say($"Loading network driver {driver}");
-    Run("drvload.exe", $"\"{Path.Combine(folder, driver)}\"", TimeSpan.FromMinutes(2));
+    Run("drvload.exe", $"\"{inf ?? Path.Combine(folder, driver)}\"", TimeSpan.FromMinutes(2));
 }
 Say("Starting the network");
 Run("wpeinit.exe", "", TimeSpan.FromMinutes(3));

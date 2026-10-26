@@ -68,3 +68,35 @@ public class ScanNetworkTests
             ScanConfig.Parse("""{"server": "http://s", "mac": "aa", "catalogs": ["..\\x.cat"]}"""));
     }
 }
+
+public class InfTests
+{
+    [Fact]
+    public void An_inbox_inf_gets_its_catalog_named()
+    {
+        var text = "; Copyright\r\n[Version]\r\nSignature   = \"$Windows NT$\"\r\nDriverVer = 08/03/2015,12.19.1.32\r\n";
+        var lines = Inf.AddCatalog(text, "ggnet1.cat").Split("\r\n");
+        Assert.Equal("CatalogFile=ggnet1.cat", lines[2]);
+        Assert.Single(Inf.AddCatalog(Inf.AddCatalog(text, "a.cat"), "b.cat").Split("\r\n"), l => l.StartsWith("CatalogFile"));
+    }
+
+    [Fact]
+    public void The_copy_keeps_utf16()
+    {
+        var dir = Directory.CreateTempSubdirectory("ggnet-inf-").FullName;
+        try
+        {
+            var path = Path.Combine(dir, "net1ic64.inf");
+            File.WriteAllBytes(path, [0xFF, 0xFE, .. Encoding.Unicode.GetBytes("[Version]\r\nSignature=\"$Windows NT$\"\r\n")]);
+            var copy = Inf.WithCatalog(path, "ggnet1.cat");
+            Assert.Equal(Path.Combine(dir, "ggnet-net1ic64.inf"), copy);
+            var bytes = File.ReadAllBytes(copy!);
+            Assert.Equal([0xFF, 0xFE], bytes[..2]);
+            Assert.Contains("CatalogFile=ggnet1.cat", Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+}
