@@ -136,6 +136,48 @@ class HardwareOut(BaseModel):
     nics: list[NicSupportOut]
 
 
+class HardwareCard(BaseModel):
+    """A PC's boot network card for Add new hardware."""
+
+    nic: str                     # PCI hardware ID: VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10
+    instance: str                # its instance ID on that PC: 3&11583659&0&FE
+
+    @field_validator("nic")
+    @classmethod
+    def _nic(cls, v: str) -> str:
+        from app.windows_setup import NIC_ID_RE
+
+        v = v.strip().upper().removeprefix("PCI\\")
+        if not NIC_ID_RE.match(v):
+            raise ValueError("must be a PCI hardware ID like VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10")
+        return v
+
+    @field_validator("instance")
+    @classmethod
+    def _instance(cls, v: str) -> str:
+        from app.windows_setup import NIC_INSTANCE_RE
+
+        v = v.strip().upper()
+        if not NIC_INSTANCE_RE.match(v):
+            raise ValueError("must be the device instance ID, the part after the hardware ID (e.g. 3&11583659&0&FE)")
+        return v
+
+
+class AddHardwareIn(BaseModel):
+    cards: list[HardwareCard] = Field(min_length=1, max_length=8)
+
+
+class AddHardwareJobOut(BaseModel):
+    cards: list[HardwareCard]
+    step: str                    # starting | job | vm | result | prepare | apply | done
+    running: bool
+    error: str | None
+    snapshot: str | None         # the new version, when done
+    devices: list[dict[str, Any]]
+    started: float
+    finished: float | None
+
+
 class GameDiskCopy(BaseModel):
     """A new image from one version of this one (default: the active version)."""
 

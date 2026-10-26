@@ -858,3 +858,81 @@ def test_prepare_image_turns_ccboot_off(windows, runner, tmp_path):
     assert '[\\ControlSet002\\Services\\CCBootClient]\n"Start"=dword:00000004' in diskless
     assert "CCopyFile" not in diskless                                       # not in this image
     assert '[\\ControlSet002\\Services\\rt640x64]\n"BootFlags"=dword:00000001' in diskless
+
+
+# ── Add new hardware: the toolchain job ──────────────────────────────
+
+I219 = "VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10"
+
+
+def test_pci_ids_as_windows_reads_them_from_a_network_card():
+    from app.windows_setup import pci_ids
+
+    hardware, compatible = pci_ids(I219)
+    assert hardware[0] == "PCI\\VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10"
+    assert "PCI\\VEN_8086&DEV_15BC&CC_020000" in hardware
+    assert compatible[:2] == ["PCI\\VEN_8086&DEV_15BC&REV_10", "PCI\\VEN_8086&DEV_15BC"]
+    with pytest.raises(ValueError):
+        pci_ids("VEN_8086&DEV_15BC")
+
+
+def test_toolchain_job_names_the_card_under_its_instance():
+    from app.windows_setup import NET_CLASS, toolchain_job
+
+    job = toolchain_job([(I219, "3&11583659&0&FE")])
+    device = job["devices"][0]
+    assert device["instance_id"] == f"PCI\\{I219}\\3&11583659&0&FE"
+    assert device["class_guid"] == NET_CLASS
+    for bad in ([(I219, "")], [(I219, "a\\b")], []):
+        with pytest.raises(ValueError):
+            toolchain_job(bad)
+
+
+def _toolchain_image(windows) -> Path:
+    root = _windows_on(windows, "toolchain-win11").parents[3]
+    (root / "Program Files").mkdir()
+    (root / "ProgramData").mkdir()
+    return root
+
+
+def test_start_toolchain_puts_the_agent_and_the_job_in(windows, runner, tmp_path):
+    root = _toolchain_image(windows)
+    folder = root / "ProgramData" / "ggNet" / "toolchain"
+    folder.mkdir(parents=True)
+    (folder / "result.json").write_text("{}")             # from an earlier run
+    merged = _merged(runner)
+
+    assert windows.start_toolchain(DEVICE, [(I219, "3&11583659&0&FE")], _prep(tmp_path), label="win11") is None
+
+    assert (root / "Program Files" / "ggnet-agent" / "ggnet-agent.exe").read_bytes() == b"MZ agent 0.1.13"
+    job = json.loads((folder / "job.json").read_text())
+    assert job["devices"][0]["instance_id"] == f"PCI\\{I219}\\3&11583659&0&FE"
+    assert not (folder / "result.json").exists()
+    assert "[\\ControlSet002\\Services\\ggnet-agent]" in merged["reg"]
+    assert "[\\ControlSet002\\Services\\storahci]" in merged["reg"]
+    assert "[-\\ControlSet002\\Services\\storahci\\StartOverride]" in merged["reg"]
+    assert ["ntfs-3g", "-o", "rw,noatime", "/dev/zd16p3", str(windows.run_dir / "toolchain-win11")] in runner.calls
+
+
+def test_start_toolchain_needs_the_agent_and_a_valid_card(windows, runner, tmp_path):
+    from app.windows_setup import ImagePrep
+
+    assert "agent" in windows.start_toolchain(DEVICE, [(I219, "3&1&0&FE")], ImagePrep(agent=None))
+    assert "instance" in windows.start_toolchain(DEVICE, [(I219, "")], _prep(tmp_path))
+    assert not any(c[0] == "ntfs-3g" for c in runner.calls)
+
+
+def test_toolchain_result_is_read_and_the_job_removed(windows, runner):
+    folder = _toolchain_image(windows) / "ProgramData" / "ggNet" / "toolchain"
+    folder.mkdir(parents=True)
+    (folder / "job.done").write_text("{}")
+    result = {"ok": True, "devices": [{"instance_id": f"PCI\\{I219}\\3&1&0&FE", "ok": True, "driver": "Intel I219-V"}]}
+    (folder / "result.json").write_text("﻿" + json.dumps(result), encoding="utf-8")
+
+    assert windows.toolchain_result(DEVICE, label="win11") == result
+    assert not any(folder.iterdir())
+
+
+def test_toolchain_result_without_a_result(windows, runner):
+    _toolchain_image(windows)
+    assert "no result" in windows.toolchain_result(DEVICE, label="win11")

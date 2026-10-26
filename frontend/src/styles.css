@@ -2635,3 +2635,43 @@ tr.row-warn td {
 .nic-list li:last-child {
   border-bottom: 0;
 }
+
+/* Add new hardware (HardwarePanel) */
+.card-title-action {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.hw-add,
+.hw-job {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.hw-add-head,
+.hw-add-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hw-add-actions {
+  justify-content: flex-end;
+}
+
+.hw-add label.small {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hw-job button {
+  align-self: flex-start;
+}

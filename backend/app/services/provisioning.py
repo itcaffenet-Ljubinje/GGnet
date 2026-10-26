@@ -26,6 +26,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 from app.disk_grow import GrowResult, PartitionGrower
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
@@ -675,6 +676,69 @@ class Provisioner:
             if not self.zfs.destroy(tmp):
                 logger.error("Could not remove %s after a failed prepare", tmp)
             raise err
+
+    def add_hardware(self, master: str, nics: list[tuple[str, str]], prep: ImagePrep,
+                     boot: Callable[[str], str | None], step: Callable[[str], None] = lambda s: None,
+                     ) -> tuple[str, list[dict]]:
+        """
+        Add new hardware: a new version of an OS image with these network
+        cards (PCI hardware ID, instance ID) installed by Windows itself. Its
+        newest version is cloned, the agent and a job are written into the
+        clone, `boot(device)` runs the clone in the toolchain VM until the
+        agent has installed the cards and shut it down (None, or why it
+        failed), the clone is prepared again (the new card's driver marked
+        for a network boot) and made the next version. Returns the new
+        snapshot and the agent's per-device results. Nothing changes on
+        failure. The lock is not held while the VM runs.
+        """
+        if self.windows is None:
+            raise ProvisioningError("Windows setup is not available on this server")
+        label = master.rsplit("/", 1)[-1]
+        tmp = f"{self.zfs.layout.writebacks}/{label}_ggnet_hwadd"   # '_': never a PC
+        with self.lock:
+            self._clear()
+            snaps = self.zfs.list_snapshots(master)
+            if not snaps:
+                raise self._fail(f"Listing versions of {master} failed")
+            base = snaps[-1]
+            if self.zfs.dataset_exists(tmp) and not self.zfs.destroy(tmp):
+                raise self._fail(f"{tmp} is left over from an earlier run and cannot be removed")
+            if not self.zfs.clone(f"{master}@{base}", tmp):
+                raise self._fail(f"Cloning {master}@{base} failed")
+        device = self.zfs.zvol_device_path(tmp)
+        try:
+            step("job")
+            problem = self.windows.start_toolchain(device, nics, prep, label=label)
+            if problem:
+                raise ProvisioningError(f"Preparing the toolchain run failed: {problem}")
+            step("vm")
+            problem = boot(device)
+            if problem:
+                raise ProvisioningError(problem)
+            step("result")
+            result = self.windows.toolchain_result(device, label=label)
+            if isinstance(result, str):
+                raise ProvisioningError(result)
+            devices = [d for d in result.get("devices", []) if isinstance(d, dict)]
+            if not result.get("ok"):
+                failed = "; ".join(f"{d.get('instance_id')}: {d.get('error')}" for d in devices if not d.get("ok"))
+                raise ProvisioningError(f"Windows could not install the hardware: {failed or result.get('error')}")
+            step("prepare")
+            problem = self.windows.prepare_image(device, prep, label=f"hwadd-{label}")
+            if problem:
+                raise ProvisioningError(f"Preparing the new version failed: {problem}")
+            step("apply")
+            with self.lock:
+                self._clear()
+                snaps = self.zfs.list_snapshots(master) or [base]
+                new = next_version(snaps)
+                if not self.zfs.apply_clone(tmp, master, base, new):
+                    raise self._fail(f"Making {tmp} the next version of {master} failed")
+            return new, devices
+        except BaseException:
+            if self.zfs.dataset_exists(tmp) and not self.zfs.destroy(tmp):
+                logger.error("Could not remove %s after a failed Add new hardware", tmp)
+            raise
 
     def deprovision(
         self, machine_name: str, initiator_iqn: str, clone_zvol: str | None,

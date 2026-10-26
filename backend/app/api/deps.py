@@ -43,6 +43,19 @@ def get_disk_importer(db: Session = Depends(get_db), prov: Provisioner = Depends
     return DiskImporter(sessionmaker(bind=db.get_bind(), expire_on_commit=False), prov)
 
 
+@lru_cache(maxsize=4)
+def _hardware_adder(prov: Provisioner):
+    from app.services.os_setup import image_prep
+    from app.services.toolchain import HardwareAdder, ToolchainVm
+
+    return HardwareAdder(prov, ToolchainVm(prov.zfs.runner), image_prep)
+
+
+def get_hardware_adder(prov: Provisioner = Depends(get_provisioner)):
+    """Add new hardware jobs (one per image), kept in memory for the whole process."""
+    return _hardware_adder(prov)
+
+
 def get_usb_disks(prov: Provisioner = Depends(get_provisioner)):
     """The server's USB disks that image files can be imported from."""
     from app.services.imports import UsbDisks

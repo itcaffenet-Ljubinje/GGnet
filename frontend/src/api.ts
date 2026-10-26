@@ -66,6 +66,25 @@ export interface Hardware {
   nics: NicSupport[];
 }
 
+export interface HardwareCard {
+  /** PCI hardware ID: VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10 */
+  nic: string;
+  /** Its instance ID on the PC: 3&11583659&0&FE */
+  instance: string;
+}
+
+/** An Add new hardware run: Windows installs the cards in a VM, then a new version. */
+export interface AddHardwareJob {
+  cards: HardwareCard[];
+  step: "starting" | "job" | "vm" | "result" | "prepare" | "apply" | "done";
+  running: boolean;
+  error: string | null;
+  snapshot: string | null;
+  devices: { instance_id: string; ok: boolean; driver?: string | null; error?: string | null }[];
+  started: number;
+  finished: number | null;
+}
+
 export interface ImportSources {
   /** The imports folder on the pool; null when its dataset is missing. */
   folder: string | null;
@@ -541,6 +560,11 @@ export const api = {
     request<GameDisk>("POST", "/v1/imports", { name, kind, path, ...options }),
   cancelImport: (id: number) => request<void>("POST", `/v1/imports/${id}/cancel`),
   getHardware: (id: number) => request<Hardware>("GET", `/v1/game-disks/${id}/hardware`),
+  getAddHardware: (id: number) => request<AddHardwareJob | null>("GET", `/v1/game-disks/${id}/add-hardware`),
+  addHardware: (id: number, cards: HardwareCard[]) =>
+    request<AddHardwareJob>("POST", `/v1/game-disks/${id}/add-hardware`, { cards }),
+  cancelAddHardware: (id: number) =>
+    request<AddHardwareJob | null>("POST", `/v1/game-disks/${id}/add-hardware/cancel`),
   copyDisk: (id: number, name: string, snapshot?: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/copy`, snapshot ? { name, snapshot } : { name }),
   listSnapshots: (id: number) => request<Snapshot[]>("GET", `/v1/game-disks/${id}/snapshots`),

@@ -277,6 +277,55 @@ def nic_patch(export: str, nic: str, instance: str | None = None) -> tuple[str |
     return "\n".join(lines).lstrip("\n"), None
 
 
+# Add new hardware (app.services.toolchain): the agent in a clone of the image,
+# booted in a VM, installs the devices of this job (agent/src/GgnetAgent/Toolchain.cs).
+TOOLCHAIN_DIR = ("ProgramData", "ggNet", "toolchain")
+TOOLCHAIN_JOB, TOOLCHAIN_RESULT, TOOLCHAIN_DONE = "job.json", "result.json", "job.done"
+# The VM's disk is on its SATA controller: that driver has to start at boot.
+TOOLCHAIN_BOOT_DRIVERS = ("storahci",)
+
+
+def pci_ids(nic: str) -> tuple[list[str], list[str]]:
+    """
+    The hardware and compatible IDs Windows reads from a PCI network card
+    (class 02, subclass 00) with this hardware ID, best match first, as an
+    INF matches them.
+    """
+    m = NIC_ID_RE.match(nic)
+    if m is None:
+        raise ValueError(f"Invalid PCI hardware ID: {nic!r}")
+    ven, dev, sub, rev = m.groups()
+    vd = f"PCI\\VEN_{ven}&DEV_{dev}"
+    hardware = [f"{vd}&SUBSYS_{sub}&REV_{rev}", f"{vd}&SUBSYS_{sub}", f"{vd}&CC_020000", f"{vd}&CC_0200"]
+    compatible = [f"{vd}&REV_{rev}", vd, f"PCI\\VEN_{ven}&CC_020000", f"PCI\\VEN_{ven}&CC_0200",
+                  f"PCI\\VEN_{ven}", "PCI\\CC_020000", "PCI\\CC_0200"]
+    return hardware, compatible
+
+
+def toolchain_job(nics: Sequence[tuple[str, str]]) -> dict:
+    """job.json for the agent: each card as (PCI hardware ID, instance ID)."""
+    devices = []
+    for nic, instance in nics:
+        if not NIC_INSTANCE_RE.match(instance or ""):
+            raise ValueError(f"Invalid device instance ID: {instance!r}")
+        hardware, compatible = pci_ids(nic)
+        devices.append({"instance_id": f"PCI\\{nic}\\{instance}", "hardware_ids": hardware,
+                        "compatible_ids": compatible, "class_guid": NET_CLASS})
+    if not devices:
+        raise ValueError("No devices to add")
+    return {"devices": devices}
+
+
+def toolchain_boot_lines(control_set: int) -> list[str]:
+    """The VM's disk driver started at boot (it may be off in an image made on an NVMe PC)."""
+    cs = f"\\ControlSet{control_set:03d}"
+    lines: list[str] = []
+    for name in TOOLCHAIN_BOOT_DRIVERS:
+        lines += ["", f"[{cs}\\Services\\{name}]", '"Start"=dword:00000000',
+                  "", f"[-{cs}\\Services\\{name}\\StartOverride]"]
+    return lines
+
+
 def _hex(kind: str, data: bytes) -> str:
     return f"{kind}:" + ",".join(f"{b:02x}" for b in data)
 
@@ -764,6 +813,84 @@ class WindowsSetup:
             return f"unexpected error: {e}"
         return problem or result
 
+    def start_toolchain(self, device: str, nics: Sequence[tuple[str, str]], prep: ImagePrep,
+                        label: str = "image") -> str | None:
+        """
+        Make an OS clone ready to boot in the toolchain VM (Add new hardware):
+        the server's agent and its service, the VM's disk driver started at
+        boot, and the job naming the cards to install (each a PCI hardware
+        ID and instance ID). None when done, else why not.
+        """
+        try:
+            job = toolchain_job(nics)
+        except ValueError as e:
+            return str(e)
+        if prep.agent is None:
+            return "the agent that installs the devices is not on this server"
+        agent = prep.agent
+
+        def work(root: Path, hive: Path) -> str | None:
+            agent_ok, problem = self._install_agent(root, agent)
+            if not agent_ok:
+                return problem or "the agent could not be copied into the image"
+            control_set = self.control_set(hive)
+            patch = "\n".join(["Windows Registry Editor Version 5.00", *agent_service_patch(control_set),
+                               *toolchain_boot_lines(control_set)]) + "\n"
+            problem = self._merge_reg(hive, f"toolchain-{label}", patch)
+            if problem:
+                return problem
+            folder = _toolchain_dir(root, create=True)
+            if folder is None:
+                return "no ProgramData folder in the image"
+            try:
+                for name in (TOOLCHAIN_RESULT, TOOLCHAIN_DONE):
+                    (folder / name).unlink(missing_ok=True)
+                (folder / TOOLCHAIN_JOB).write_text(json.dumps(job, indent=2), encoding="utf-8")
+            except OSError as e:
+                return f"writing the job failed: {e}"
+            logger.info("Toolchain job written for %s", ", ".join(d["instance_id"] for d in job["devices"]))
+            return None
+
+        try:
+            return self._on_windows(device, f"toolchain-{label}", work)
+        except Exception as e:
+            logger.exception("Preparing the toolchain run on %s failed", device)
+            return f"unexpected error: {e}"
+
+    def toolchain_result(self, device: str, label: str = "image") -> dict | str:
+        """
+        What the agent wrote after the toolchain run (see ToolchainResult in
+        the agent), or why it cannot be read. The job's files are removed
+        from the image.
+        """
+        result: dict = {}
+
+        def work(root: Path, hive: Path) -> str | None:
+            folder = _toolchain_dir(root)
+            path = folder / TOOLCHAIN_RESULT if folder else None
+            if path is None or not path.is_file():
+                return "the VM left no result: Windows did not start the agent"
+            try:
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError) as e:
+                return f"the result cannot be read: {e}"
+            if not isinstance(data, dict) or not isinstance(data.get("devices"), list):
+                return "the result is not what the agent writes"
+            result.update(data)
+            for name in (TOOLCHAIN_JOB, TOOLCHAIN_DONE, TOOLCHAIN_RESULT):
+                try:
+                    (folder / name).unlink(missing_ok=True)
+                except OSError as e:
+                    logger.warning("Could not remove %s from the image: %s", name, e)
+            return None
+
+        try:
+            problem = self._on_windows(device, f"toolchain-{label}", work)
+        except Exception as e:
+            logger.exception("Reading the toolchain result on %s failed", device)
+            return f"unexpected error: {e}"
+        return problem or result
+
     def _on_windows(self, device: str, name: str, work: Callable[[Path, Path], str | None],
                     readonly: bool = False) -> str | None:
         """Mount the disk's Windows partition and run `work(root, SYSTEM hive)` on it."""
@@ -966,6 +1093,20 @@ def _same_file(path: Path, source: Path, sha256: str) -> bool:
         return h.hexdigest() == sha256
     except OSError:
         return False
+
+
+def _toolchain_dir(root: Path, create: bool = False) -> Path | None:
+    """C:\\ProgramData\\ggNet\\toolchain in a mounted Windows (created when asked)."""
+    found = _find_dir(root, TOOLCHAIN_DIR)
+    if found is not None or not create:
+        return found
+    program_data = _find_dir(root, TOOLCHAIN_DIR[:1])
+    if program_data is None:
+        return None
+    ggnet = _find_dir(program_data, TOOLCHAIN_DIR[1:2]) or program_data / TOOLCHAIN_DIR[1]
+    folder = ggnet / TOOLCHAIN_DIR[2]
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
 
 
 def _find_dir(root: Path, parts: tuple[str, ...]) -> Path | None:

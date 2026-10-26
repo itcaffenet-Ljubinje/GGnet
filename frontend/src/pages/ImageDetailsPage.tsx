@@ -56,7 +56,7 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props
         </p>
       ) : disk.published ? (
         <>
-          {disk.kind === "os" && <HardwarePanel disk={disk} />}
+          {disk.kind === "os" && <HardwarePanel disk={disk} onChanged={reload} />}
           <DiskDetails
             disk={disk}
             onChanged={reload}

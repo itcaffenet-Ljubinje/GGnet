@@ -17,12 +17,14 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.deps import get_disk_copier, get_provisioner
+from app.api.deps import get_disk_copier, get_hardware_adder, get_provisioner
 from app.api.v1.errors import conflict, host_failed, not_found
 from app.api.v1.schemas import (
     ActiveSnapshot,
+    AddHardwareIn,
+    AddHardwareJobOut,
     GameDiskCopy,
     GameDiskCreate,
     GameDiskGrow,
@@ -249,6 +251,66 @@ def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = De
     if None in by_card:
         out.append(NicSupportOut(nic=None, status="unknown", machines=by_card[None]))
     return HardwareOut(snapshot=disk.snapshot, problem=None, nics=out)
+
+
+def _job_out(job) -> AddHardwareJobOut | None:
+    return None if job is None else AddHardwareJobOut.model_validate(job.out())
+
+
+@router.get("/{disk_id}/add-hardware", response_model=AddHardwareJobOut | None)
+def add_hardware_status(disk_id: int, db: Session = Depends(get_db), adder=Depends(get_hardware_adder)):
+    """The image's last Add new hardware run (since ggNet started), or null."""
+    return _job_out(adder.job(_get(db, disk_id).zvol_path))
+
+
+@router.post("/{disk_id}/add-hardware", response_model=AddHardwareJobOut, status_code=status.HTTP_202_ACCEPTED)
+def add_hardware(
+    disk_id: int,
+    body: AddHardwareIn,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+    adder=Depends(get_hardware_adder),
+):
+    """
+    Add new hardware (app.services.toolchain): Windows installs these boot
+    network cards in a clone of the image's newest version, booted in a
+    temporary VM on this server; the clone becomes the next version and is
+    made active. Runs in the background (a few minutes); GET shows how far.
+    """
+    disk = _get(db, disk_id)
+    _published(disk)
+    _not_copying(disk)
+    if disk.kind is not DiskKind.OS:
+        conflict(f"'{disk.name}' is a game disk; only OS images get new hardware")
+    names = [v["name"] for v in _versions(prov, disk)]
+    if names and names[-1] != disk.snapshot:
+        conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
+                 f"make @{names[-1]} active first (a new version always follows the newest)")
+    make_session = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
+    base = disk.snapshot
+
+    def done(snapshot: str) -> None:
+        with make_session() as s:
+            d = s.get(GameDisk, disk_id)
+            if d is not None and d.snapshot == base:      # nobody chose another version meanwhile
+                d.snapshot = snapshot
+                s.commit()
+
+    try:
+        job = adder.start(disk.zvol_path, [(c.nic, c.instance) for c in body.cards], done)
+    except ValueError as e:
+        conflict(str(e))
+    logger.info("Add new hardware on '%s': %s", disk.name, ", ".join(f"{c.nic}\\{c.instance}" for c in body.cards))
+    return _job_out(job)
+
+
+@router.post("/{disk_id}/add-hardware/cancel", response_model=AddHardwareJobOut | None)
+def cancel_add_hardware(disk_id: int, db: Session = Depends(get_db), adder=Depends(get_hardware_adder)):
+    """Stop a running Add new hardware: the VM is stopped and the clone removed."""
+    disk = _get(db, disk_id)
+    if not adder.cancel(disk.zvol_path):
+        conflict(f"Add new hardware is not running for '{disk.name}'")
+    return _job_out(adder.job(disk.zvol_path))
 
 
 def _not_copying(disk: GameDisk) -> None:
