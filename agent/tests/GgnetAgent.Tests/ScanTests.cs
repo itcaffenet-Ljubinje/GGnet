@@ -47,3 +47,24 @@ public class ScanTests
         Assert.True(json.GetProperty("adapters")[0].GetProperty("has_address").GetBoolean());
     }
 }
+
+public class ScanNetworkTests
+{
+    [Fact]
+    public void A_card_without_a_driver_is_found_by_its_class_code()
+    {
+        var bare = new ScanDevice("PCI\\VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10\\3&11583659&0&FE",
+            ["PCI\\VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10"], ["PCI\\VEN_8086&CC_020000"], null, null, null);
+        var gpu = bare with { CompatibleIds = ["PCI\\VEN_10DE&CC_030000"] };
+        Assert.True(bare.IsNetwork);
+        Assert.False(gpu.IsNetwork);
+    }
+
+    [Fact]
+    public void Catalogs_must_be_plain_cat_names()
+    {
+        Assert.Equal(["x.cat"], ScanConfig.Parse("""{"server": "http://s", "mac": "aa", "catalogs": ["x.cat"]}""").Catalogs);
+        Assert.Throws<FormatException>(() =>
+            ScanConfig.Parse("""{"server": "http://s", "mac": "aa", "catalogs": ["..\\x.cat"]}"""));
+    }
+}

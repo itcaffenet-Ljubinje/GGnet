@@ -8,7 +8,8 @@ namespace GgnetScan;
 /// the scanner by wimboot: where to send the report, the PC's boot MAC (as
 /// iPXE saw it) and the network card drivers to load first.
 /// </summary>
-public sealed record ScanConfig(string Server, string Mac, IReadOnlyList<string>? Drivers = null)
+public sealed record ScanConfig(
+    string Server, string Mac, IReadOnlyList<string>? Drivers = null, IReadOnlyList<string>? Catalogs = null)
 {
     public static ScanConfig Parse(string json)
     {
@@ -27,11 +28,14 @@ public sealed record ScanConfig(string Server, string Mac, IReadOnlyList<string>
         if (string.IsNullOrWhiteSpace(config.Mac))
             throw new FormatException("ggnet-scan.json has no MAC address");
         // Only plain file names: they are loaded from the scanner's own folder.
-        if (config.Drivers?.Any(d => d.Contains('/') || d.Contains('\\') || d.Contains("..")
-                                     || !d.EndsWith(".inf", StringComparison.OrdinalIgnoreCase)) == true)
-            throw new FormatException("ggnet-scan.json names a driver that is not an .inf file name");
+        if (!PlainNames(config.Drivers, ".inf") || !PlainNames(config.Catalogs, ".cat"))
+            throw new FormatException("ggnet-scan.json names a driver or catalog that is not a plain file name");
         return config;
     }
+
+    private static bool PlainNames(IReadOnlyList<string>? names, string extension) =>
+        names is null || names.All(d => !d.Contains('/') && !d.Contains('\\') && !d.Contains("..")
+                                        && d.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
 
     public Uri ReportUrl => new(new Uri(Server.TrimEnd('/') + "/"), "api/v1/boot/scan");
 }
@@ -43,7 +47,16 @@ public sealed record ScanDevice(
     IReadOnlyList<string> CompatibleIds,
     string? ClassGuid,
     string? Description,
-    string? Service);
+    string? Service)
+{
+    /// <summary>
+    /// A network controller: of the Net class, or (with no driver yet, so no
+    /// class) PCI class code 02 in its IDs.
+    /// </summary>
+    public bool IsNetwork =>
+        string.Equals(ClassGuid, PciDevices.NetClass, StringComparison.OrdinalIgnoreCase)
+        || HardwareIds.Concat(CompatibleIds).Any(id => id.Contains("CC_02", StringComparison.OrdinalIgnoreCase));
+}
 
 /// <summary>A network adapter WinPE brought up: its MAC and whether it got an address.</summary>
 public sealed record ScanAdapter(string Mac, string Description, bool HasAddress);

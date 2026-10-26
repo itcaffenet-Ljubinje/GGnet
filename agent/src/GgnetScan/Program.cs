@@ -27,6 +27,12 @@ catch (Exception e) when (e is IOException or FormatException or UnauthorizedAcc
     return 1;
 }
 
+// Inbox drivers are signed only in Windows' catalogs: add those first.
+foreach (var catalog in config.Catalogs ?? [])
+{
+    var problem = Catalogs.Add(Path.Combine(folder, catalog));
+    Say(problem is null ? $"Catalog {catalog} added" : $"Catalog {catalog}: {problem}");
+}
 foreach (var driver in config.Drivers ?? [])
 {
     Say($"Loading network driver {driver}");
@@ -36,7 +42,7 @@ Say("Starting the network");
 Run("wpeinit.exe", "", TimeSpan.FromMinutes(3));
 
 var devices = PciDevices.Present();
-var nics = devices.Where(d => string.Equals(d.ClassGuid, PciDevices.NetClass, StringComparison.OrdinalIgnoreCase)).ToList();
+var nics = devices.Where(d => d.IsNetwork).ToList();
 foreach (var nic in nics)
     Say($"Network card: {nic.InstanceId}{(nic.Service is null ? " (no driver)" : "")}");
 

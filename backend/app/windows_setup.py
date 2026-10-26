@@ -74,6 +74,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence
 
+from app import wof
 from app.runner import CommandRunner
 
 logger = logging.getLogger("ggnet.windows")
@@ -318,6 +319,7 @@ def toolchain_job(nics: Sequence[tuple[str, str]]) -> dict:
 
 DRIVERS_HIVE = ("Windows", "System32", "config", "DRIVERS")
 DRIVER_STORE = ("Windows", "System32", "DriverStore", "FileRepository")
+CATROOT = ("Windows", "System32", "CatRoot", "{F750E6C3-38EE-11D1-85E5-00C04FC295EE}")
 _PACKAGE_RE = re.compile(r"^[A-Za-z0-9_.-]+\.inf_[A-Za-z0-9]+_[0-9a-fA-F]{16}$")
 
 
@@ -744,6 +746,9 @@ class WindowsSetup:
     def __init__(self, runner: Optional[CommandRunner] = None, run_dir: Path = DEFAULT_RUN_DIR):
         self.runner = runner or CommandRunner()
         self.run_dir = run_dir
+        # The partition mounted for the running work (WOF files are read from it directly).
+        self._partition: str | None = None
+        self.read_bytes: Callable[[str, str], bytes | None] = wof.read_file
 
     def _run(self, cmd: list[str], quiet: bool = False) -> tuple[bool, str, str]:
         return self.runner.run(cmd, quiet=quiet)
@@ -935,14 +940,24 @@ class WindowsSetup:
                 return f"the driver package of {inf} is not in the image's driver store"
             try:
                 dest.mkdir(parents=True, exist_ok=True)
+                unsigned: list[bytes] = []
                 for f in sorted(folder.iterdir()):
-                    if f.is_file():
-                        shutil.copyfile(f, dest / f.name)
-                        if f.suffix.lower() == ".inf":
-                            copied.append(f.name)
+                    data = self._volume_file(root, f)
+                    if data is None:
+                        continue
+                    (dest / f.name).write_bytes(data)
+                    if f.suffix.lower() == ".inf":
+                        copied.append(f.name)
+                    elif f.suffix.lower() == ".sys" and not wof.embedded_signature(data):
+                        unsigned += wof.pe_hashes(data)[:1]
             except OSError as e:
                 return f"copying the driver failed: {e}"
             logger.info("Driver %s (%s) for PCI\\%s copied from the image", inf, package, nic)
+            if unsigned:
+                catalogs = self._catalogs_with(root, unsigned, hints=[f.stem for f in folder.iterdir()])
+                for cat in catalogs:
+                    (dest / cat.name).write_bytes(self._volume_file(root, cat) or b"")
+                logger.info("Catalogs signing it: %s", ", ".join(c.name for c in catalogs) or "none found")
             return None if copied else f"{package} has no INF file"
 
         try:
@@ -951,6 +966,43 @@ class WindowsSetup:
             logger.exception("Copying the network driver from %s failed", device)
             return f"unexpected error: {e}"
         return problem or copied
+
+    def _volume_file(self, root: Path, path: Path) -> bytes | None:
+        """A file of the mounted Windows; one Windows keeps compressed (WOF) is read past ntfs-3g."""
+        if not path.is_symlink():
+            return path.read_bytes() if path.is_file() else None
+        try:
+            reparse = os.getxattr(path, "system.ntfs_reparse_data", follow_symlinks=False)
+        except OSError:
+            return None
+        if wof.wof_algorithm(reparse) is None or self._partition is None:
+            return None
+        return self.read_bytes(self._partition, str(path.relative_to(root)))
+
+    def _catalogs_with(self, root: Path, hashes: list[bytes], hints: Sequence[str] = ()) -> list[Path]:
+        """
+        The catalogs of the mounted Windows that list these file hashes
+        (inbox drivers are signed only there); likely names first, as
+        reading all of them takes a minute.
+        """
+        folder = _find_dir(root, CATROOT)
+        if folder is None:
+            return []
+        hints = [h.lower() for h in hints if h] + ["ethernet", "net"]
+        files = sorted((p for p in folder.iterdir() if p.suffix.lower() == ".cat"),
+                       key=lambda p: (not any(h in p.name.lower() for h in hints), p.name))
+        left, found = set(hashes), []
+        for cat in files:
+            data = self._volume_file(root, cat)
+            if not data:
+                continue
+            hit = {h for h in left if h in data}
+            if hit:
+                found.append(cat)
+                left -= hit
+                if not left:
+                    break
+        return found
 
     def toolchain_result(self, device: str, label: str = "image") -> dict | str:
         """
@@ -1017,8 +1069,10 @@ class WindowsSetup:
                 if hive is None:
                     reasons.append(f"{part}: no Windows on it")
                     continue
+                self._partition = part
                 return work(mount, hive)
             finally:
+                self._partition = None
                 if not self._run(["umount", str(mount)])[0]:
                     logger.error("Could not unmount %s", mount)
                 try:

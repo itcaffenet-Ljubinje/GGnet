@@ -358,8 +358,7 @@ def scan_config(request: Request, mac: str = "", chip: str = "",
         mac = _mac(mac)
     except ValueError:
         not_found("PC with MAC", mac)
-    infs = [f for f in drivers.files(chip) if f.lower().endswith(".inf")]
-    return Response(scan.scan_config(str(request.base_url), mac, infs), media_type="application/json")
+    return Response(scan.scan_config(str(request.base_url), mac, drivers.files(chip)), media_type="application/json")
 
 
 @router.get("/scan/driver/{chip}/{name}")
@@ -392,8 +391,7 @@ def scan_report(body: ScanIn, db: Session = Depends(get_db)):
         logger.warning("Hardware scan from unregistered MAC %s", mac)
         return {"message": f"ggNet: this PC ({mac}) is not registered; register it in the web UI."}
     card = scan.choose_card(body.devices, m.boot_nic)
-    nets = [d.get("instance_id") for d in body.devices
-            if str(d.get("class_guid") or "").lower() == scan.NET_CLASS]
+    nets = [d.get("instance_id") for d in body.devices if scan.is_network(d)]
     if card is None:
         logger.warning("Hardware scan of %s: boot network card not found among %s", m.name, nets)
         return {"message": "ggNet: the boot network card was not found among: " + ", ".join(map(str, nets))}

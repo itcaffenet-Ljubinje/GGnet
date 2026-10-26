@@ -298,9 +298,10 @@ apt-get update -qq
 # Secure Boot: shim-signed (shim signed by Microsoft, and its MokManager),
 # sbsigntool and openssl to sign iPXE with the ggNet key.
 # Windows images edited on the server: ntfs-3g (mount, ntfsresize), libwin-hivex-perl
-# (hivexregedit), gdisk and fdisk (sgdisk, sfdisk) to grow a disk's data partition.
+# (hivexregedit), gdisk and fdisk (sgdisk, sfdisk) to grow a disk's data partition,
+# wimtools (libwim: Windows' compressed files, the network driver for the hardware scan).
 apt-get install -y -qq python3 python3-venv python3-pip targetcli-fb python3-rtslib-fb dnsmasq-base ipxe \
-    shim-signed sbsigntool openssl ntfs-3g libwin-hivex-perl gdisk fdisk >/dev/null
+    shim-signed sbsigntool openssl ntfs-3g libwin-hivex-perl gdisk fdisk wimtools >/dev/null
 
 # ---------- 8. ZFS datasets ----------
 if [[ $SET_AUTOTRIM -eq 1 ]]; then

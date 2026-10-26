@@ -43,7 +43,7 @@ SCANNER_EXE = "ggnet-scan.exe"
 # The Windows PE files (from Windows installation media or the ADK) and wimboot.
 WINPE_FILES = ("wimboot", "BCD", "boot.sdi", "boot.wim")
 WINPESHL_INI = "[LaunchApps]\r\n%SYSTEMROOT%\\System32\\ggnet-scan.exe\r\n"
-_DRIVER_FILE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
+_DRIVER_FILE = re.compile(r"^[A-Za-z0-9_.~-]{1,200}$")
 _CHIP = re.compile(r"^[0-9a-f]{4}-[0-9a-f]{4}$")
 
 
@@ -108,8 +108,19 @@ def ipxe_scan_script(base: str, mac: str, chip: str | None, drivers: list[str]) 
     return "\n".join(lines) + "\n"
 
 
-def scan_config(base: str, mac: str, inf_files: list[str]) -> str:
-    return json.dumps({"server": base.rstrip("/"), "mac": mac, "drivers": inf_files})
+def scan_config(base: str, mac: str, files: list[str]) -> str:
+    """ggnet-scan.json: the driver's INF files to load and the catalogs that sign it."""
+    return json.dumps({"server": base.rstrip("/"), "mac": mac,
+                       "drivers": [f for f in files if f.lower().endswith(".inf")],
+                       "catalogs": [f for f in files if f.lower().endswith(".cat")]})
+
+
+def is_network(device: dict) -> bool:
+    """A network controller: Net class, or (no driver in WinPE, so no class) PCI class code 02."""
+    if str(device.get("class_guid") or "").lower() == NET_CLASS:
+        return True
+    ids = [str(i) for i in (device.get("hardware_ids") or []) + (device.get("compatible_ids") or [])]
+    return any("CC_02" in i.upper() for i in ids)
 
 
 @dataclass
@@ -126,7 +137,7 @@ def choose_card(devices: list[dict], boot_nic: str | None) -> ChosenCard | None:
     """
     cards = []
     for d in devices:
-        if str(d.get("class_guid") or "").lower() != NET_CLASS:
+        if not is_network(d):
             continue
         parts = str(d.get("instance_id") or "").split("\\")
         if len(parts) != 3 or parts[0].upper() != "PCI":
