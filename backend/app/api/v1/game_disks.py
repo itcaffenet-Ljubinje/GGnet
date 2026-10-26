@@ -215,37 +215,39 @@ def grow_disk(
 
 
 # Hardware checks per (zvol, version, cards): a version never changes.
-_HARDWARE: dict[tuple[str, str, tuple[str, ...]], dict[str, str] | str] = {}
+_HARDWARE: dict[tuple[str, str, tuple], dict | str] = {}
 
 
 @router.get("/{disk_id}/hardware", response_model=HardwareOut)
 def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
     """
     Which PCs the OS image's active version can boot: each boot network card
-    the PCs reported (iPXE) is "ready" (the image knows it), "added" (the
-    same chip under another revision or board: added at every boot) or
-    "missing" (no driver: those PCs cannot boot it). PCs that never booted
-    over the network are "unknown".
+    the PCs reported (iPXE, and the agent its instance ID) is "ready" (the
+    image knows it), "added" (the same chip under another revision, board or
+    instance: added at every boot) or "missing" (no driver: those PCs cannot
+    boot it). PCs that never booted over the network are "unknown".
     """
     disk = _get(db, disk_id)
     if disk.kind is not DiskKind.OS:
         conflict(f"'{disk.name}' is a game disk; only OS images are checked")
     if not disk.published or disk.copying:
         return HardwareOut(snapshot=None, problem="not published yet", nics=[])
-    by_nic: dict[str | None, list[str]] = {}
+    by_card: dict[tuple[str, str | None] | None, list[str]] = {}
     for m in db.scalars(select(Machine).order_by(Machine.name)):
-        by_nic.setdefault(m.boot_nic, []).append(m.name)
-    nics = tuple(sorted(n for n in by_nic if n))
-    key = (disk.zvol_path, disk.snapshot, nics)
+        card = (m.boot_nic, m.nic_instance) if m.boot_nic else None
+        by_card.setdefault(card, []).append(m.name)
+    cards = tuple(sorted((c for c in by_card if c), key=lambda c: (c[0], c[1] or "")))
+    key = (disk.zvol_path, disk.snapshot, cards)
     if key not in _HARDWARE:
-        _HARDWARE[key] = prov.check_hardware(disk.zvol_path, disk.snapshot, list(nics)) if nics else {}
+        _HARDWARE[key] = prov.check_hardware(disk.zvol_path, disk.snapshot, list(cards)) if cards else {}
     found = _HARDWARE[key]
     if isinstance(found, str):
         _HARDWARE.pop(key)          # try again next time
         return HardwareOut(snapshot=disk.snapshot, problem=found, nics=[])
-    out = [NicSupportOut(nic=n, status=found.get(n, "unknown"), machines=by_nic[n]) for n in nics]
-    if None in by_nic:
-        out.append(NicSupportOut(nic=None, status="unknown", machines=by_nic[None]))
+    out = [NicSupportOut(nic=c[0], instance=c[1], status=found.get(c, "unknown"), machines=by_card[c])
+           for c in cards]
+    if None in by_card:
+        out.append(NicSupportOut(nic=None, status="unknown", machines=by_card[None]))
     return HardwareOut(snapshot=disk.snapshot, problem=None, nics=out)
 
 

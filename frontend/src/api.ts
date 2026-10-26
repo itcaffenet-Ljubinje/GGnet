@@ -54,6 +54,8 @@ export interface UsbPart {
 export interface NicSupport {
   /** PCI hardware ID; null for PCs that never booted over the network. */
   nic: string | null;
+  /** The card's instance ID on these PCs, when their agent reported it. */
+  instance?: string | null;
   status: "ready" | "added" | "missing" | "unknown";
   machines: string[];
 }

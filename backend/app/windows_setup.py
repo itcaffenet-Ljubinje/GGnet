@@ -118,6 +118,8 @@ class OsSetup:
     env: Mapping[str, str] = field(default_factory=dict)
     # The boot network card's hardware ID (VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16), if known.
     boot_nic: str | None = None
+    # Its device instance ID on this PC (from the agent), if known.
+    boot_nic_instance: str | None = None
 
 
 @dataclass(frozen=True)
@@ -200,49 +202,78 @@ def _swap_ids(line: str, swaps: Sequence[tuple[str, str]]) -> str:
     return f"{name}={data}"
 
 
-def nic_patch(export: str, nic: str) -> tuple[str | None, str | None]:
+# The instance ID Windows gives a Realtek card that reports a PCI Device Serial
+# Number (Gigabyte boards, for example): the 8 serial bytes, then the function.
+# Cards without one get an ID from their place on the bus (e.g. 6&95d5d6a&0&...).
+REALTEK_DSN_INSTANCE = "01000000684CE00000"
+NIC_INSTANCE_RE = re.compile(r"^[A-Za-z0-9&_.-]{1,64}$")
+
+
+def nic_patch(export: str, nic: str, instance: str | None = None) -> tuple[str | None, str | None]:
     """
     Add hardware for the boot NIC, from a `hivexregedit --export` of
-    <ControlSet>\\Enum\\PCI: (.reg lines to merge, None) when the image knows
-    the chip under another hardware ID, (None, None) when it knows this one,
-    (None, why) when it has no driver for the chip.
+    <ControlSet>\\Enum\\PCI: (.reg lines to merge, None) when the entry has
+    to be added, (None, None) when the image already knows the card, (None,
+    why) when it has no driver for the chip.
 
-    The entry is copied from the image's entry for the same vendor and device
-    (the same subsystem first, as it is the same board family) that has a
-    driver service; its key and the IDs in its values get the PC's subsystem
-    and revision.
+    Windows starts the boot card from its entry only when the entry has the
+    card's own instance ID, which depends on the board (a serial-number ID on
+    one board, a bus-location ID on another). `instance` is that ID as the
+    PC's agent reported it. The entry is copied from the image's entry for
+    the same card, else for the same vendor and device (the same subsystem
+    first, as it is the same board family) that has a driver service; its key
+    gets the PC's hardware ID and instance, the IDs in its values the PC's
+    subsystem and revision. Without a reported instance the copy keeps the
+    source's instance, and a Realtek card also gets the serial-number ID.
     """
     want = NIC_ID_RE.match(nic)
     if want is None:
         raise ValueError(f"Invalid PCI hardware ID: {nic!r}")
+    if instance is not None and not NIC_INSTANCE_RE.match(instance):
+        raise ValueError(f"Invalid device instance ID: {instance!r}")
     ven, dev, sub, rev = want.groups()
     blocks = _reg_blocks(export)
-    devices: dict[str, str] = {}            # upper-case device key name -> key path prefix
-    services: set[str] = set()
+    # upper-case hardware ID -> {upper-case instance: (key path, has a driver service)}
+    devices: dict[str, dict[str, tuple[str, bool]]] = {}
     for path, values in blocks:
         head, marker, rest = path.partition("\\Enum\\PCI\\")
-        if not marker or not rest:
+        parts = rest.split("\\")
+        if not marker or len(parts) < 2:
             continue
-        name = rest.split("\\", 1)[0]
-        devices.setdefault(name.upper(), f"{head}\\Enum\\PCI\\{name}")
-        if any(v.startswith('"Service"=') for v in values):
-            services.add(name.upper())
-    if nic in devices:
+        hwid, inst = parts[0].upper(), parts[1].upper()
+        key = f"{head}\\Enum\\PCI\\{parts[0]}\\{parts[1]}"
+        known = devices.setdefault(hwid, {})
+        has_service = any(v.startswith('"Service"=') for v in values) if len(parts) == 2 else False
+        old = known.get(inst)
+        known[inst] = (key, (old[1] if old else False) or has_service)
+    mine = devices.get(nic.upper(), {})
+    if instance is None and mine:
+        return None, None                      # the card is known; which instance is not checked
+    if instance is not None and instance.upper() in mine:
         return None, None
-    siblings = sorted(n for n in services
-                      if (m := NIC_ID_RE.match(n)) and m.group(1) == ven and m.group(2) == dev)
-    if not siblings:
+    candidates = [(hwid, inst, key) for hwid, insts in devices.items() for inst, (key, svc) in insts.items()
+                  if svc and (m := NIC_ID_RE.match(hwid)) and m.group(1) == ven and m.group(2) == dev]
+    if not candidates:
         return None, f"the image has no driver for the boot network card PCI\\{nic}"
-    source = next((n for n in siblings if NIC_ID_RE.match(n).group(3) == sub), siblings[0])
+    candidates.sort(key=lambda c: (c[0] != nic.upper(), NIC_ID_RE.match(c[0]).group(3) != sub, c[0], c[1]))
+    source, source_inst, prefix = candidates[0]
     _, _, old_sub, old_rev = NIC_ID_RE.match(source).groups()
     swaps = [(source, nic), (f"SUBSYS_{old_sub}", f"SUBSYS_{sub}"), (f"REV_{old_rev}", f"REV_{rev}")]
-    prefix = devices[source]
-    lines: list[str] = []
-    for path, values in blocks:
-        if path.upper() != prefix.upper() and not path.upper().startswith(prefix.upper() + "\\"):
-            continue
-        new_path = prefix[: -len(source)] + nic + path[len(prefix):]
-        lines += ["", f"[{new_path}]", *(_swap_ids(v, swaps) for v in values)]
+    if instance is not None:
+        targets = [instance]
+    else:
+        targets = [prefix.rsplit("\\", 1)[1]]
+        if ven == "10EC" and targets[0].upper() != REALTEK_DSN_INSTANCE:
+            targets.append(REALTEK_DSN_INSTANCE)
+    base = prefix[: prefix.upper().index("\\ENUM\\PCI\\")] + "\\Enum\\PCI\\" + nic
+    # hivexregedit creates a key only under an existing one: the card's key first.
+    lines: list[str] = [] if mine else [f"[{base}]"]
+    for target in targets:
+        for path, values in blocks:
+            if path.upper() != prefix.upper() and not path.upper().startswith(prefix.upper() + "\\"):
+                continue
+            new_path = f"{base}\\{target}{path[len(prefix):]}"
+            lines += ["", f"[{new_path}]", *(_swap_ids(v, swaps) for v in values)]
     return "\n".join(lines).lstrip("\n"), None
 
 
@@ -680,6 +711,8 @@ class WindowsSetup:
             registry_patch(setup, 1)   # validate before touching the host
             if setup.boot_nic and not NIC_ID_RE.match(setup.boot_nic):
                 raise ValueError(f"Invalid PCI hardware ID: {setup.boot_nic!r}")
+            if setup.boot_nic_instance and not NIC_INSTANCE_RE.match(setup.boot_nic_instance):
+                raise ValueError(f"Invalid device instance ID: {setup.boot_nic_instance!r}")
         except ValueError as e:
             return str(e)
         try:
@@ -700,28 +733,30 @@ class WindowsSetup:
             logger.exception("Preparing the image on %s failed", device)
             return f"unexpected error: {e}"
 
-    def nic_support(self, device: str, nics: Sequence[str]) -> dict[str, str] | str:
+    def nic_support(self, device: str, nics: Sequence[tuple[str, str | None]]
+                    ) -> dict[tuple[str, str | None], str] | str:
         """
         Whether the Windows on `device` can boot PCs with these boot network
-        cards (PCI hardware IDs): "ready" when it knows the card, "added" when
-        it knows the chip under another revision or board (personalize adds
-        the card at every boot), "missing" when it has no driver for it.
+        cards, each a (PCI hardware ID, instance ID or None): "ready" when it
+        knows the card (under that instance, when known), "added" when it
+        knows the chip under another revision, board or instance (personalize
+        adds the card at every boot), "missing" when it has no driver for it.
         A string says why it could not be read. Mounted read-only.
         """
-        result: dict[str, str] = {}
+        result: dict[tuple[str, str | None], str] = {}
 
         def work(root: Path, hive: Path) -> str | None:
             export = self.enum_pci(hive, self.control_set(hive))
             if export is None:
                 return "the image's PCI devices cannot be read"
-            for nic in nics:
-                lines, missing = nic_patch(export, nic)
-                result[nic] = "missing" if missing else "added" if lines else "ready"
+            for nic, instance in nics:
+                lines, missing = nic_patch(export, nic, instance)
+                result[(nic, instance)] = "missing" if missing else "added" if lines else "ready"
             return None
 
-        for nic in nics:
-            if not NIC_ID_RE.match(nic):
-                return f"Invalid PCI hardware ID: {nic!r}"
+        for nic, instance in nics:
+            if not NIC_ID_RE.match(nic) or (instance is not None and not NIC_INSTANCE_RE.match(instance)):
+                return f"Invalid network card: {nic!r} {instance!r}"
         try:
             problem = self._on_windows(device, "hardware-check", work, readonly=True)
         except Exception as e:
@@ -886,7 +921,7 @@ class WindowsSetup:
             if export is None:
                 nic_problem = "cannot read the image's PCI devices"
             else:
-                nic_reg, nic_problem = nic_patch(export, setup.boot_nic)
+                nic_reg, nic_problem = nic_patch(export, setup.boot_nic, setup.boot_nic_instance)
         patch = registry_patch(setup, control_set, fixed, letters, nic_reg)
         problem = self._merge_reg(hive, name or setup.computer_name, patch)
         if problem:

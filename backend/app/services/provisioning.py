@@ -304,7 +304,8 @@ class Provisioner:
                 logger.error("Could not remove %s after a failed resize", tmp)
             raise err
 
-    def check_hardware(self, master: str, snapshot: str, nics: list[str]) -> dict[str, str] | str:
+    def check_hardware(self, master: str, snapshot: str, nics: list[tuple[str, str | None]]
+                       ) -> dict[tuple[str, str | None], str] | str:
         """
         WindowsSetup.nic_support() on one version of an OS image: on a
         temporary clone (a snapshot has no device of its own), removed after.

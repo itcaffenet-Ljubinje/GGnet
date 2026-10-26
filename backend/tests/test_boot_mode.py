@@ -478,7 +478,8 @@ class FakeWindows:
             return self.check_problem
         known = {"VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15": "ready",
                  "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16": "added"}
-        return {n: known.get(n, "missing") for n in nics}
+        # A reported instance the image does not have is added at boot.
+        return {(n, i): "added" if i == "6&95d5d6a&0&0000020A" else known.get(n, "missing") for n, i in nics}
 
     def prepare_image(self, device, prep, label="image"):
         # Whether the clone was already made a version when it was prepared.
@@ -703,27 +704,36 @@ def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
 
 def test_hardware_check_tells_which_pcs_the_image_can_boot(client, host, disks, windows, db_url):
     os_disk, game = disks
-    for name, nic in (("komp-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16"),
-                      ("vip-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15"),
-                      ("new-pc", "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"),
-                      ("disk-pc", None)):
+    for name, nic, inst in (("komp-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", None),
+                            ("vip-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "01000000684CE00000"),
+                            ("asus-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "6&95d5d6a&0&0000020A"),
+                            ("new-pc", "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00", None),
+                            ("disk-pc", None, None)):
         client.post("/api/v1/machines", json={"name": name, "game_disk_id": game["id"]})
         if nic:
             engine = make_engine(db_url)
             with engine.begin() as conn:
-                conn.execute(text("UPDATE machines SET boot_nic = :n WHERE name = :m"), {"n": nic, "m": name})
+                conn.execute(text("UPDATE machines SET boot_nic = :n, nic_instance = :i WHERE name = :m"),
+                             {"n": nic, "i": inst, "m": name})
             engine.dispose()
     host.calls.clear()
     r = client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["snapshot"] == "base" and body["problem"] is None
-    assert [(n["status"], n["machines"]) for n in body["nics"]] == [
-        ("ready", ["vip-01"]), ("added", ["komp-01"]), ("missing", ["new-pc"]), ("unknown", ["disk-pc"])]
+    assert [(n["status"], n["instance"], n["machines"]) for n in body["nics"]] == [
+        ("ready", "01000000684CE00000", ["vip-01"]),
+        ("added", "6&95d5d6a&0&0000020A", ["asus-01"]),      # same card, another board's instance
+        ("added", None, ["komp-01"]),
+        ("missing", None, ["new-pc"]),
+        ("unknown", None, ["disk-pc"]),
+    ]
     tmp = "tank/ggnet/writebacks/win11_ggnet_hw"
     assert windows.checked == [(f"/dev/zvol/{tmp}", [
-        "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16",
-        "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"])]
+        ("VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "01000000684CE00000"),
+        ("VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "6&95d5d6a&0&0000020A"),
+        ("VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", None),
+        ("VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00", None)])]
     assert tmp not in host.datasets                                   # the temporary clone is gone
     client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware")
     assert len(windows.checked) == 1                                  # a version is checked once

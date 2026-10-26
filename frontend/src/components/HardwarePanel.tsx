@@ -8,7 +8,9 @@ const STATUS: Record<NicSupport["status"], { badge: string; label: string; text:
   added: {
     badge: "badge-idle",
     label: "Added at boot",
-    text: "The image knows the chip under another revision or board; ggNet adds the card when the PC boots.",
+    text:
+      "The image knows the chip under another revision, board or instance; ggNet adds the card with the " +
+      "PC's own instance ID when the PC boots.",
   },
   missing: {
     badge: "badge-error",
@@ -68,7 +70,10 @@ export function HardwarePanel({ disk }: { disk: GameDisk }) {
                 <span className={`badge ${STATUS[n.status].badge}`} title={STATUS[n.status].text}>
                   {STATUS[n.status].label}
                 </span>
-                <span className="mono small">{n.nic ?? "network card not known"}</span>
+                <span className="mono small" title={n.instance ? `Instance ${n.instance}` : "Instance not reported yet"}>
+                  {n.nic ?? "network card not known"}
+                  {n.instance && <span className="muted">\{n.instance}</span>}
+                </span>
                 <span className="small">{n.machines.join(", ")}</span>
               </li>
             ))}

@@ -125,6 +125,7 @@ class NicSupportOut(BaseModel):
     """Whether an OS image's active version can boot the PCs with one boot network card."""
 
     nic: str | None              # PCI hardware ID (VEN_..&DEV_..&SUBSYS_..&REV_..); None: never booted over the network
+    instance: str | None = None  # the card's instance ID on these PCs, when their agent reported it
     status: str                  # ready | added | missing | unknown
     machines: list[str]
 
@@ -392,6 +393,7 @@ class MachineOut(BaseModel):
     link_speed_mbps: int | None
     hardware: MachineHardware | None = Field(validation_alias="hardware_info")
     boot_nic: str | None
+    nic_instance: str | None = None   # the boot card's instance ID on this PC (agent)
     mok_state: str | None
     status: MachineStatus
     last_error: str | None
@@ -478,6 +480,8 @@ class AgentInventory(BaseModel):
     memory_bytes: int | None = Field(None, ge=0)
     # Windows booted with UEFI Secure Boot on (null: not UEFI, or an older agent).
     secure_boot: bool | None = None
+    # The network card's Plug and Play ID: PCI\\<hardware ID>\\<instance ID>.
+    nic_pnp_id: str | None = Field(None, max_length=200)
 
     @field_validator("ip_address")
     @classmethod

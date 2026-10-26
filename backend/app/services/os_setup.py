@@ -39,7 +39,7 @@ def os_setup_for(m: Machine) -> OsSetup | None:
         "GGNET_SERVER": server_url(),
         "GGNET_MACHINE_ID": str(m.id),
         "GGNET_MACHINE_NAME": m.name,
-    }, boot_nic=m.boot_nic)
+    }, boot_nic=m.boot_nic, boot_nic_instance=m.nic_instance)
 
 
 def image_prep(defender_off: bool = False) -> ImagePrep:

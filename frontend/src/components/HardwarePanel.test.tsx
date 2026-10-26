@@ -15,7 +15,12 @@ describe("HardwarePanel", () => {
       snapshot: "v2",
       problem: null,
       nics: [
-        { nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", status: "ready", machines: ["vip-01", "vip-02"] },
+        {
+          nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15",
+          instance: "01000000684CE00000",
+          status: "ready",
+          machines: ["vip-01", "vip-02"],
+        },
         { nic: "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", status: "added", machines: ["komp-01"] },
         { nic: "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00", status: "missing", machines: ["new-pc"] },
         { nic: null, status: "unknown", machines: ["server"] },
@@ -28,6 +33,7 @@ describe("HardwarePanel", () => {
     expect(screen.getByText("Not seen yet")).toBeInTheDocument();
     expect(screen.getByText(/new-pc cannot boot this image/)).toBeInTheDocument();
     expect(screen.getByText("vip-01, vip-02")).toBeInTheDocument();
+    expect(screen.getByText("\\01000000684CE00000")).toBeInTheDocument();
   });
 
   it("says when the image could not be checked", async () => {

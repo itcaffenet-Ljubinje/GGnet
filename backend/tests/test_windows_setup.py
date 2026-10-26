@@ -347,18 +347,53 @@ def test_nic_patch_on_another_board_gets_its_subsystem():
     assert "E0001458" not in reg and "e0001458" not in reg
 
 
+ASUS = "6&95d5d6a&0&0000020A"     # a bus-location instance ID: a board without the card's serial number
+
+
+def test_nic_patch_uses_the_pcs_own_instance():
+    # The PC reported its card's instance: the entry gets exactly that one.
+    reg, problem = nic_patch(ENUM, OTHER_BOARD, ASUS)
+    assert problem is None
+    keys = [line for line in reg.splitlines() if line.startswith("[")]
+    assert keys[:2] == [f"[\\ControlSet002\\Enum\\PCI\\{OTHER_BOARD}]",
+                        f"[\\ControlSet002\\Enum\\PCI\\{OTHER_BOARD}\\{ASUS}]"]
+    assert INSTANCE not in reg and "SUBSYS_86771043" in reg
+
+
+def test_nic_patch_adds_a_known_card_under_its_reported_instance():
+    # The image knows REV_15 from another board under another instance: the
+    # same card gets an entry of its own (no parent key: it exists).
+    reg, problem = nic_patch(ENUM, REV15, ASUS)
+    assert problem is None
+    assert reg.splitlines()[0] == f"[\\ControlSet002\\Enum\\PCI\\{REV15}\\{ASUS}]"
+    assert nic_patch(ENUM, REV15, INSTANCE) == (None, None)      # exactly this one is known
+
+
+def test_nic_patch_without_an_instance_adds_the_realtek_serial_instance_too():
+    asus_only = ENUM.replace(INSTANCE, ASUS)
+    reg, _ = nic_patch(asus_only, REV16)
+    keys = [line for line in reg.splitlines() if line.startswith("[") and line.count("\\") == 5]
+    assert keys == [f"[\\ControlSet002\\Enum\\PCI\\{REV16}\\{ASUS}]",
+                    f"[\\ControlSet002\\Enum\\PCI\\{REV16}\\{INSTANCE}]"]
+    with pytest.raises(ValueError):
+        nic_patch(ENUM, REV16, "bad instance\\x")
+
+
 def test_nic_support_reads_the_image_read_only(windows, runner):
     _windows_on(windows, "hardware-check")
     select = runner.responses[("hivexregedit", "--export")]
     runner.responses[("hivexregedit", "--export")] = lambda cmd: (
         (True, ENUM, "") if cmd[-1].endswith("\\Enum\\PCI") else select)
     intel = "VEN_8086&DEV_15B8&SUBSYS_86721043&REV_00"
-    assert windows.nic_support(DEVICE, [REV15, REV16, intel]) == {
-        REV15: "ready", REV16: "added", intel: "missing"}
+    cards = [(REV15, None), (REV15, INSTANCE), (REV15, "6&95d5d6a&0&0000020A"), (REV16, None), (intel, None)]
+    assert windows.nic_support(DEVICE, cards) == {
+        (REV15, None): "ready", (REV15, INSTANCE): "ready",
+        (REV15, "6&95d5d6a&0&0000020A"): "added",          # known card, this board's instance is not
+        (REV16, None): "added", (intel, None): "missing"}
     mounts = [c for c in runner.calls if c[0] == "ntfs-3g"]
     assert mounts and all(c[2] == "ro" for c in mounts)
     assert not any(c[:2] == ["hivexregedit", "--merge"] for c in runner.calls)
-    assert windows.nic_support(DEVICE, ["not an id"]).startswith("Invalid PCI hardware ID")
+    assert windows.nic_support(DEVICE, [("not an id", None)]).startswith("Invalid network card")
 
 
 def test_nic_patch_leaves_a_known_nic_and_reports_an_unknown_chip():
