@@ -209,3 +209,12 @@ def test_a_scan_from_an_unknown_pc(client, pc):
     r = client.post("/api/v1/boot/scan", json={"mac": "aa:bb:cc:00:00:01", "devices": []})
     assert "not registered" in r.json()["message"]
 
+
+
+def test_the_wizard_takes_the_first_pc_that_boots_even_one_the_image_knows(client, prov, pc):
+    prov.windows.installed = True                    # the image starts this PC's card already
+    assert "sanboot" in _ipxe(client)                # without the wizard it just boots
+    client.post(f"/api/v1/game-disks/{pc['os_disk_id']}/add-hardware/wizard")
+    script = _ipxe(client)
+    assert "wimboot" in script and "sanboot" not in script
+    assert _wizard(client, pc)["wizard"]["machine"] == "vip-05"

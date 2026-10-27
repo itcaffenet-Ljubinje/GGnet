@@ -134,6 +134,10 @@ export function AddHardwareWizard({ disk, onClose, onChanged }: Props) {
           ) : current === 0 ? (
             <>
               <p>Once for each new board type; the other PCs with the same board boot right away after it.</p>
+              <p className="warn-text small">
+                After Start, the first PC that boots this image goes through Add new hardware, even if the image
+                knows its card. Power on only the new PC until it is done.
+              </p>
               <ul className="small">
                 <li>The new PC is registered in Machines with {disk.name} as its OS image, and is powered off.</li>
                 <li>In its BIOS: UEFI network boot (PXE) first, Secure Boot off for this run.</li>
