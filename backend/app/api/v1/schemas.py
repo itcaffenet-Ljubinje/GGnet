@@ -178,6 +178,22 @@ class AddHardwareJobOut(BaseModel):
     finished: float | None
 
 
+class AddHardwareWizardOut(BaseModel):
+    step: str                    # waiting | scanning | collected | adding | rebooting | done | failed
+    active: bool
+    machine: str | None          # the PC the wizard works on
+    card: HardwareCard | None
+    error: str | None
+    started: float
+    finished: float | None
+
+
+class AddHardwareStatusOut(BaseModel):
+    wizard: AddHardwareWizardOut | None
+    job: AddHardwareJobOut | None
+    waiting: list[str]           # PCs on screen waiting for Add new hardware for this image
+
+
 class GameDiskCopy(BaseModel):
     """A new image from one version of this one (default: the active version)."""
 

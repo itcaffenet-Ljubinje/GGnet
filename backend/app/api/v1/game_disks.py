@@ -25,6 +25,8 @@ from app.api.v1.schemas import (
     ActiveSnapshot,
     AddHardwareIn,
     AddHardwareJobOut,
+    AddHardwareStatusOut,
+    AddHardwareWizardOut,
     GameDiskCopy,
     GameDiskCreate,
     GameDiskGrow,
@@ -46,6 +48,7 @@ from app.services.agent_package import default_package
 from app.services.os_setup import image_prep
 from app.services.provisioning import Provisioner, ProvisioningError
 from app.services.scan import nic_status
+from app.services.os_setup import legacy_nic_patch
 from app.services.toolchain import activate_when_done
 
 logger = logging.getLogger("ggnet.api.game_disks")
@@ -240,6 +243,9 @@ def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = De
     found = nic_status(prov, disk.zvol_path, disk.snapshot, list(cards)) if cards else {}
     if isinstance(found, str):
         return HardwareOut(snapshot=disk.snapshot, problem=found, nics=[])
+    if not legacy_nic_patch(image=disk.name):
+        # Without the old copy at boot, a chip known only on another board needs Add new hardware too.
+        found = {c: "missing" if st == "added" else st for c, st in found.items()}
     out = [NicSupportOut(nic=c[0], instance=c[1], status=found.get(c, "unknown"), machines=by_card[c])
            for c in cards]
     if None in by_card:
@@ -251,10 +257,55 @@ def _job_out(job) -> AddHardwareJobOut | None:
     return None if job is None else AddHardwareJobOut.model_validate(job.out())
 
 
-@router.get("/{disk_id}/add-hardware", response_model=AddHardwareJobOut | None)
+def _status_out(adder, master: str) -> AddHardwareStatusOut:
+    wizard = adder.wizard(master)
+    return AddHardwareStatusOut(
+        wizard=AddHardwareWizardOut.model_validate(wizard.out()) if wizard else None,
+        job=_job_out(adder.job(master)),
+        waiting=adder.waiting_machines(master),
+    )
+
+
+@router.get("/{disk_id}/add-hardware", response_model=AddHardwareStatusOut)
 def add_hardware_status(disk_id: int, db: Session = Depends(get_db), adder=Depends(get_hardware_adder)):
-    """The image's last Add new hardware run (since ggNet started), or null."""
-    return _job_out(adder.job(_get(db, disk_id).zvol_path))
+    """The image's Add new hardware wizard and last run (since ggNet started), and the PCs waiting for it."""
+    return _status_out(adder, _get(db, disk_id).zvol_path)
+
+
+@router.post("/{disk_id}/add-hardware/wizard", response_model=AddHardwareStatusOut)
+def open_hardware_wizard(
+    disk_id: int,
+    db: Session = Depends(get_db),
+    prov: Provisioner = Depends(get_provisioner),
+    adder=Depends(get_hardware_adder),
+):
+    """
+    Open the Add new hardware wizard (app.services.toolchain.HardwareWizard):
+    the next PC that boots this image and whose network card it cannot start
+    gets the card added to a new version, then boots it.
+    """
+    disk = _get(db, disk_id)
+    _published(disk)
+    _not_copying(disk)
+    if disk.kind is not DiskKind.OS:
+        conflict(f"'{disk.name}' is a game disk; only OS images get new hardware")
+    names = [v["name"] for v in _versions(prov, disk)]
+    if names and names[-1] != disk.snapshot:
+        conflict(f"@{disk.snapshot} is active but @{names[-1]} is newer; "
+                 f"make @{names[-1]} active first (a new version always follows the newest)")
+    try:
+        adder.start_wizard(disk.zvol_path, disk.id, disk.snapshot)
+    except ValueError as e:
+        conflict(str(e))
+    return _status_out(adder, disk.zvol_path)
+
+
+@router.delete("/{disk_id}/add-hardware/wizard", response_model=AddHardwareStatusOut)
+def close_hardware_wizard(disk_id: int, db: Session = Depends(get_db), adder=Depends(get_hardware_adder)):
+    """Finish the wizard, or cancel it (a running install is stopped)."""
+    disk = _get(db, disk_id)
+    adder.close_wizard(disk.zvol_path)
+    return _status_out(adder, disk.zvol_path)
 
 
 @router.post("/{disk_id}/add-hardware", response_model=AddHardwareJobOut, status_code=status.HTTP_202_ACCEPTED)

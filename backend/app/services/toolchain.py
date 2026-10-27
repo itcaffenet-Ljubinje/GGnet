@@ -151,8 +151,48 @@ def activate_when_done(make_session, disk_id: int, base: str) -> Callable[[str],
     return done
 
 
+# How long the wizard waits for the new PC to boot.
+WIZARD_TIMEOUT = 60 * 60
+
+
+@dataclass
+class HardwareWizard:
+    """
+    The Add new hardware wizard of one image: the admin starts it, then
+    powers on the new PC. iPXE sends that PC to the hardware scan (or, when
+    its card is known, straight to the install), the job adds its card to a
+    new version, and the PC boots it (app.api.v1.boot).
+
+    step: waiting (for a PC to boot) → scanning (the PC is in Windows PE) →
+    collected (the scan reported its card) → adding (the toolchain job runs)
+    → rebooting (the new version is active; waiting for the PC to boot it)
+    → done; or failed.
+    """
+
+    disk_id: int
+    base: str
+    step: str = "waiting"
+    machine: str | None = None
+    card: tuple[str, str] | None = None
+    error: str | None = None
+    started: float = field(default_factory=time.time)
+    finished: float | None = None
+
+    @property
+    def active(self) -> bool:
+        return self.finished is None
+
+    def fail(self, error: str) -> None:
+        self.step, self.error, self.finished = "failed", error, time.time()
+
+    def out(self) -> dict:
+        return {"step": self.step, "active": self.active, "machine": self.machine,
+                "card": {"nic": self.card[0], "instance": self.card[1]} if self.card else None,
+                "error": self.error, "started": self.started, "finished": self.finished}
+
+
 class HardwareAdder:
-    """Add new hardware jobs, one per image, in the background."""
+    """Add new hardware jobs and wizards, one per image, in the background."""
 
     def __init__(self, prov: Provisioner, vm: ToolchainVm, prep: Callable[[], ImagePrep],
                  background: bool = True):
@@ -161,10 +201,49 @@ class HardwareAdder:
         self.prep = prep
         self.background = background     # tests run the job in the request
         self.jobs: dict[str, HardwareJob] = {}
+        self.wizards: dict[str, HardwareWizard] = {}
+        # PCs that wait on screen for the wizard: image → {machine: last iPXE request}.
+        self.waiting: dict[str, dict[str, float]] = {}
         self._guard = threading.Lock()
+
+    def note_waiting(self, master: str, machine: str) -> None:
+        self.waiting.setdefault(master, {})[machine] = time.time()
+
+    def waiting_machines(self, master: str) -> list[str]:
+        """PCs that asked iPXE in the last minute (they ask every 10 s while waiting)."""
+        seen = self.waiting.get(master, {})
+        return sorted(m for m, t in seen.items() if time.time() - t < 60)
 
     def job(self, master: str) -> HardwareJob | None:
         return self.jobs.get(master)
+
+    def wizard(self, master: str) -> HardwareWizard | None:
+        wizard = self.wizards.get(master)
+        if (wizard is not None and wizard.active and wizard.step == "waiting"
+                and time.time() - wizard.started > WIZARD_TIMEOUT):
+            wizard.fail(f"no PC booted within {WIZARD_TIMEOUT // 60} minutes")
+        return wizard
+
+    def start_wizard(self, master: str, disk_id: int, base: str) -> HardwareWizard:
+        """ValueError when a wizard or job already runs for the image."""
+        with self._guard:
+            current = self.wizard(master)
+            if current is not None and current.active:
+                raise ValueError("Add new hardware is already open for this image")
+            job = self.jobs.get(master)
+            if job is not None and job.running:
+                raise ValueError("Add new hardware is already running for this image")
+            wizard = self.wizards[master] = HardwareWizard(disk_id=disk_id, base=base)
+        logger.info("Add new hardware wizard opened for %s", master)
+        return wizard
+
+    def close_wizard(self, master: str) -> bool:
+        """Finish (or cancel) the wizard; a running job is cancelled too."""
+        wizard = self.wizards.pop(master, None)
+        cancelled = self.cancel(master)
+        if wizard is not None and wizard.active:
+            wizard.fail("cancelled")
+        return wizard is not None or cancelled
 
     def start(self, master: str, nics: list[tuple[str, str]],
               done: Callable[[str], None] = lambda snapshot: None) -> HardwareJob:
@@ -214,3 +293,9 @@ class HardwareAdder:
             logger.exception("Add new hardware on %s failed", master)
         finally:
             job.finished = time.time()
+            wizard = self.wizards.get(master)
+            if wizard is not None and wizard.active and wizard.card in job.nics:
+                if job.error:
+                    wizard.fail(job.error)
+                else:
+                    wizard.step = "rebooting"

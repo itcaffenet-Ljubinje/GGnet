@@ -595,7 +595,7 @@ def test_boot_nic_id(pci, cls, sub, rev, nic_id):
     assert boot_nic_id(pci, cls, sub, rev) == nic_id
 
 
-def test_a_waiting_pc_reports_its_nic_and_keeps_it_when_added(client, disks, windows):
+def test_a_waiting_pc_reports_its_nic_and_keeps_it_when_added(client, disks, windows, legacy_nic):
     script = _ipxe_nic(client, "aa-bb-cc-dd-ee-99")
     # It asks again with what autoexec.ipxe read.
     assert "&pci=${ggnet_pci}&cls=${ggnet_cls}&sub=${ggnet_sub}&rev=${ggnet_rev} || goto wait" in script
@@ -609,7 +609,7 @@ def test_a_waiting_pc_reports_its_nic_and_keeps_it_when_added(client, disks, win
     assert setup.boot_nic == NIC_ID         # Add hardware on its very first boot
 
 
-def test_a_new_nic_gets_a_fresh_os_writeback_before_boot(client, host, disks, auto, windows):
+def test_a_new_nic_gets_a_fresh_os_writeback_before_boot(client, host, disks, auto, windows, legacy_nic):
     m = _boot_machine(client, disks)
     assert _get(client, m)["boot_nic"] is None
     windows.done.clear()
@@ -703,7 +703,7 @@ def test_a_failed_prepare_changes_nothing(client, host, disks, windows):
     assert ["zfs", "destroy", "tank/ggnet/writebacks/win11_ggnet_prep"] in [c[:3] for c in host.calls]
 
 
-def test_hardware_check_tells_which_pcs_the_image_can_boot(client, host, disks, windows, db_url):
+def test_hardware_check_tells_which_pcs_the_image_can_boot(client, host, disks, windows, db_url, legacy_nic):
     os_disk, game = disks
     for name, nic, inst in (("komp-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", None),
                             ("vip-01", "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_15", "01000000684CE00000"),
@@ -741,7 +741,7 @@ def test_hardware_check_tells_which_pcs_the_image_can_boot(client, host, disks, 
     assert client.get(f"/api/v1/game-disks/{game['id']}/hardware").status_code == 409
 
 
-def test_a_failed_hardware_check_is_reported_and_retried(client, host, disks, windows, db_url):
+def test_a_failed_hardware_check_is_reported_and_retried(client, host, disks, windows, db_url, legacy_nic):
     os_disk, game = disks
     client.post("/api/v1/machines", json={"name": "komp-01", "game_disk_id": game["id"]})
     engine = make_engine(db_url)
@@ -753,6 +753,18 @@ def test_a_failed_hardware_check_is_reported_and_retried(client, host, disks, wi
     assert (body["problem"], body["nics"]) == ("no Windows partition found", [])
     windows.check_problem = None
     assert client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware").json()["nics"][0]["status"] == "added"
+
+
+def test_without_the_legacy_patch_a_card_on_another_board_needs_add_new_hardware(client, host, disks, windows,
+                                                                                db_url):
+    os_disk, game = disks
+    client.post("/api/v1/machines", json={"name": "komp-01", "game_disk_id": game["id"]})
+    engine = make_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE machines SET boot_nic = 'VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16'"))
+    engine.dispose()
+    body = client.get(f"/api/v1/game-disks/{os_disk['id']}/hardware").json()
+    assert [(n["status"], n["machines"]) for n in body["nics"]] == [("missing", ["komp-01"])]
 
 
 # ── Spare writebacks ──────────────────────────────────────────────────

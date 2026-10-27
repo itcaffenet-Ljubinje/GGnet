@@ -2,6 +2,7 @@ import { Fragment, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
   Copy,
+  Cpu,
   Gamepad2,
   HardDriveDownload,
   HardDrive,
@@ -20,6 +21,7 @@ import { api, isImport, type DiskKind, type GameDisk, type Machine } from "../ap
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { EditImage } from "../components/EditImage";
 import { ImportImage } from "../components/ImportImage";
+import { AddHardwareWizard } from "../components/AddHardwareWizard";
 import { PrepareImage } from "../components/PrepareImage";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useAsyncAction } from "../useAsyncAction";
@@ -48,6 +50,8 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   // The OS image in the Prepare image dialog.
   const [preparing, setPreparing] = useState<number | null>(null);
+  // The OS image in the Add new hardware wizard.
+  const [addingHardware, setAddingHardware] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
 
   const assigned = (id: number) =>
@@ -158,6 +162,13 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
               disabled: busy !== null,
               title: "New version with the server's agent and the settings every PC needs",
             },
+            {
+              label: "Add new hardware",
+              icon: Cpu,
+              onSelect: () => setAddingHardware(d.id),
+              disabled: busy !== null,
+              title: "Add a new board type's network card to the image (once per board type)",
+            },
           ]
         : []),
       ...(copying(d) && isImport(d.copy_source)
@@ -209,6 +220,10 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
       onPrepare={(options) => prepare(preparedDisk, options)}
     />
   );
+  const hardwareDisk = disks.find((d) => d.id === addingHardware);
+  const hardwareDialog = hardwareDisk && (
+    <AddHardwareWizard disk={hardwareDisk} onClose={() => setAddingHardware(null)} onChanged={reload} />
+  );
   const noticeBanner = notice && (
     <div className="banner banner-info" role="status">
       <span>{notice}</span>
@@ -226,11 +241,13 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
         {noticeBanner}
         {editDialog}
         {prepareDialog}
+        {hardwareDialog}
         <ImageDetailsPage
           disk={shown}
           machines={machines}
           reload={reload}
           onBack={() => setOpen(null)}
+          onAddHardware={() => setAddingHardware(shown.id)}
           menu={<ActionMenu label={`Actions for ${shown.name}`} actions={menuFor(shown).filter((a) => a.label !== "Details")} />}
         />
       </>
@@ -367,6 +384,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
       {noticeBanner}
       {editDialog}
       {prepareDialog}
+      {hardwareDialog}
 
       <ImageKpis disks={disks} machines={machines} />
 

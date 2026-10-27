@@ -85,6 +85,24 @@ export interface AddHardwareJob {
   finished: number | null;
 }
 
+/** The Add new hardware wizard of an image (step by step, as the new PC boots). */
+export interface AddHardwareWizard {
+  step: "waiting" | "scanning" | "collected" | "adding" | "rebooting" | "done" | "failed";
+  active: boolean;
+  machine: string | null;
+  card: HardwareCard | null;
+  error: string | null;
+  started: number;
+  finished: number | null;
+}
+
+export interface AddHardwareStatus {
+  wizard: AddHardwareWizard | null;
+  job: AddHardwareJob | null;
+  /** PCs on screen waiting for Add new hardware for this image. */
+  waiting: string[];
+}
+
 export interface ImportSources {
   /** The imports folder on the pool; null when its dataset is missing. */
   folder: string | null;
@@ -560,7 +578,11 @@ export const api = {
     request<GameDisk>("POST", "/v1/imports", { name, kind, path, ...options }),
   cancelImport: (id: number) => request<void>("POST", `/v1/imports/${id}/cancel`),
   getHardware: (id: number) => request<Hardware>("GET", `/v1/game-disks/${id}/hardware`),
-  getAddHardware: (id: number) => request<AddHardwareJob | null>("GET", `/v1/game-disks/${id}/add-hardware`),
+  getAddHardware: (id: number) => request<AddHardwareStatus>("GET", `/v1/game-disks/${id}/add-hardware`),
+  openHardwareWizard: (id: number) =>
+    request<AddHardwareStatus>("POST", `/v1/game-disks/${id}/add-hardware/wizard`),
+  closeHardwareWizard: (id: number) =>
+    request<AddHardwareStatus>("DELETE", `/v1/game-disks/${id}/add-hardware/wizard`),
   addHardware: (id: number, cards: HardwareCard[]) =>
     request<AddHardwareJob>("POST", `/v1/game-disks/${id}/add-hardware`, { cards }),
   cancelAddHardware: (id: number) =>

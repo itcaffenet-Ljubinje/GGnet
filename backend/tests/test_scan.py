@@ -127,12 +127,31 @@ def _ipxe(client) -> str:
     return r.text
 
 
-def test_a_pc_with_a_new_card_is_scanned_then_added_then_booted(client, prov, pc):
-    # 1. The image cannot start the card and its instance is unknown: Windows PE with the scanner.
+def _wizard(client, pc) -> dict:
+    return client.get(f"/api/v1/game-disks/{pc['os_disk_id']}/add-hardware").json()
+
+
+def test_a_pc_whose_card_the_image_lacks_waits_for_add_new_hardware(client, pc):
+    script = _ipxe(client)
+    assert "is not in the image win11" in script and "Images -> win11 -> Add new hardware" in script
+    assert "VEN_8086 DEV_15BC" in script and "&DEV" not in script.split("chain")[0]   # no '&' in echo
+    assert "chain --replace" in script and "sanboot" not in script and "wimboot" not in script
+    assert _wizard(client, pc)["waiting"] == ["vip-05"]
+
+
+def test_the_wizard_scans_adds_and_boots_the_new_pc(client, prov, pc):
+    disk = pc["os_disk_id"]
+    r = client.post(f"/api/v1/game-disks/{disk}/add-hardware/wizard")
+    assert r.status_code == 200, r.text
+    assert r.json()["wizard"]["step"] == "waiting"
+    assert client.post(f"/api/v1/game-disks/{disk}/add-hardware/wizard").status_code == 409   # one at a time
+
+    # 1. The new PC boots: its card's instance is unknown, so Windows PE with the scanner.
     script = _ipxe(client)
     assert "wimboot" in script and "sanboot" not in script
     assert "/api/v1/boot/scan/driver/intel-pro1000/e1d.sys" in script
     assert f"/api/v1/boot/scan/config?mac={MAC}&chip=8086-15bc" in script
+    assert (_wizard(client, pc)["wizard"]["step"], _wizard(client, pc)["wizard"]["machine"]) == ("scanning", "vip-05")
     config = client.get("/api/v1/boot/scan/config", params={"mac": MAC, "chip": "8086-15bc"}).json()
     assert config == {"server": "http://testserver", "mac": MAC, "drivers": ["e1d.inf"]}
     assert client.get("/api/v1/boot/scan/driver/intel-pro1000/e1d.cat").content == b"cat"
@@ -146,31 +165,44 @@ def test_a_pc_with_a_new_card_is_scanned_then_added_then_booted(client, prov, pc
         _device(I219, INSTANCE), _device("VEN_8086&DEV_A3A3&SUBSYS_86941043&REV_00", "3&1&0&A0", "{x}")]})
     assert INSTANCE in r.json()["message"]
     assert _get(client, pc)["nic_instance"] == INSTANCE
+    assert _wizard(client, pc)["wizard"]["card"] == {"nic": I219, "instance": INSTANCE}
 
-    # 3. Next boot: Add new hardware runs (here at once) and the PC waits.
+    # 3. Its next boot: the card is added (here at once) and the PC waits.
     script = _ipxe(client)
     assert "Adding the network card" in script and "chain --replace" in script
     assert prov.windows.started == [(I219, INSTANCE)]
-    assert client.get(f"/api/v1/game-disks/{pc['os_disk_id']}").json()["snapshot"] == "v2"
+    assert client.get(f"/api/v1/game-disks/{disk}").json()["snapshot"] == "v2"
+    assert _wizard(client, pc)["wizard"]["step"] == "rebooting"
 
-    # 4. Then it boots the new version.
+    # 4. Then it boots the new version, and the wizard is done.
     assert "sanboot" in _ipxe(client)
+    status = _wizard(client, pc)
+    assert (status["wizard"]["step"], status["wizard"]["active"]) == ("done", False)
+    assert client.delete(f"/api/v1/game-disks/{disk}/add-hardware/wizard").json()["wizard"] is None
 
 
-def test_new_hardware_can_be_turned_off(client, pc, monkeypatch):
-    real = boot.pxe.effective_config
-
-    def off(db, cfg=None):
-        out = dict(real(db, cfg))
-        out["boot"] = {**(out.get("boot") or {}), "new_hardware": "off"}
-        return out
-    monkeypatch.setattr(boot.pxe, "effective_config", off)
-    assert "sanboot" in _ipxe(client)
+def test_the_wizard_takes_one_pc_at_a_time(client, pc):
+    client.post(f"/api/v1/game-disks/{pc['os_disk_id']}/add-hardware/wizard")
+    adder = client.app.dependency_overrides[deps.get_hardware_adder]()
+    adder.wizard("tank/ggnet/images/win11").machine = "other-pc"
+    script = _ipxe(client)
+    assert "adding the card of other-pc now" in script and "wimboot" not in script
 
 
-def test_without_windows_pe_the_pc_boots_as_before(client, pc, monkeypatch, tmp_path):
+def test_without_windows_pe_the_wizard_says_so(client, pc, monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "winpe_dir", lambda cfg: tmp_path / "nothing")
-    assert "sanboot" in _ipxe(client)
+    client.post(f"/api/v1/game-disks/{pc['os_disk_id']}/add-hardware/wizard")
+    script = _ipxe(client)
+    assert "the hardware scan needs Windows PE" in script and script.rstrip().endswith("exit")
+    wizard = _wizard(client, pc)["wizard"]
+    assert (wizard["step"], wizard["active"]) == ("failed", False)
+
+
+def test_closing_the_wizard_lets_the_pc_wait_again(client, pc):
+    disk = pc["os_disk_id"]
+    client.post(f"/api/v1/game-disks/{disk}/add-hardware/wizard")
+    assert client.delete(f"/api/v1/game-disks/{disk}/add-hardware/wizard").status_code == 200
+    assert "Waiting for Add new hardware" in _ipxe(client)
 
 
 def test_a_scan_from_an_unknown_pc(client, pc):

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import time
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
@@ -53,6 +54,7 @@ from app.api.v1.schemas import _mac
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services import discovery, pxe, scan
+from app.services.os_setup import legacy_nic_patch
 from app.services.toolchain import activate_when_done
 from app.services.provisioning import Provisioner
 from app.services.pxe import PxeService
@@ -260,16 +262,20 @@ def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drive
                   m: Machine, nic: str | None, mac: str, again: str, cfg: dict) -> PlainTextResponse | None:
     """
     What a PC gets instead of its Windows while its OS image cannot start its
-    boot network card (app.services.scan): the hardware scan when the card's
-    instance ID is not known, a wait screen while Add new hardware runs
-    (started here when the instance is known). None: boot as usual.
-    `[boot] new_hardware = "off"` turns this off (the PC then just boots).
+    boot network card. None: boot as usual.
+
+    The card is added to the image only by the Add new hardware wizard
+    (app.services.toolchain.HardwareWizard), as with any new board type:
+    while the admin has it open for the PC's image, the PC goes to the
+    hardware scan (its card's instance ID unknown) or straight to the install,
+    waits on screen, and boots the new version. Without the wizard the PC
+    waits on screen with what to do, and goes on by itself once it is opened.
     """
     disk = m.os_disk
-    if (disk is None or prov.windows is None or nic is None or not NIC_ID_RE.match(nic)
-            or str((cfg.get("boot") or {}).get("new_hardware") or "auto") == "off"):
+    if disk is None or prov.windows is None or nic is None or not NIC_ID_RE.match(nic):
         return None
     job = adder.job(disk.zvol_path)
+    wizard = adder.wizard(disk.zvol_path)
     if job is not None and job.running:
         return _hardware_wait(mac, again, disk.name)
     card = (nic, m.nic_instance)
@@ -278,39 +284,51 @@ def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drive
         logger.warning("iPXE: cannot check whether %s can boot %s: %s", m.name, disk.name, status)
         return None
     found = status[card]
-    # A known chip is added at boot (nic_patch): with the PC's instance, or a
-    # Realtek card's serial-number instance, which is the same on every board.
-    if found == "ready" or (found == "added" and (m.nic_instance or nic.startswith("VEN_10EC&"))):
+    # The old way, until a server's boards are added: a chip the image knows on
+    # another board is copied into the writeback at boot (nic_patch).
+    legacy = legacy_nic_patch(image=disk.name) and found == "added" and bool(m.nic_instance or nic.startswith("VEN_10EC&"))
+    if found == "ready" or legacy:
+        if wizard is not None and wizard.active and wizard.machine == m.name and wizard.step == "rebooting":
+            wizard.step, wizard.finished = "done", time.time()
+            logger.info("Add new hardware wizard on %s: %s boots the new version", disk.name, m.name)
         return None
+    if wizard is None or not wizard.active:
+        if m.name not in adder.waiting_machines(disk.zvol_path):
+            logger.info("iPXE: %s waits: its network card PCI\\%s is not in %s", m.name, nic, disk.name)
+        adder.note_waiting(disk.zvol_path, m.name)
+        return _needs_hardware(mac, again, m.name, nic, disk.name)
+    if wizard.machine not in (None, m.name):
+        return _needs_hardware(mac, again, m.name, nic, disk.name, busy=wizard.machine)
+    wizard.machine = m.name
     base = str(request.base_url)
     if m.nic_instance is None:
         folder = scan.winpe_dir(get_config())
         if not scan.winpe_ready(folder) or not _scanner().is_file():
-            logger.warning("iPXE: %s needs the hardware scan, but Windows PE (%s) or %s is missing",
-                           m.name, folder, scan.SCANNER_EXE)
-            return None
+            wizard.fail(f"the hardware scan needs Windows PE in {folder} and {scan.SCANNER_EXE}")
+            logger.warning("iPXE: %s needs the hardware scan: %s", m.name, wizard.error)
+            return exit_script(f"ggNet: {wizard.error}. Booting from the local disk.")
         chip = scan.chip_key(nic)
-        found = drivers.match(chip)
-        package, infs = found if found else (None, [])
+        match = drivers.match(chip)
+        package, infs = match if match else (None, [])
+        wizard.step = "scanning"
         logger.info("iPXE: %s gets the hardware scan (PCI\\%s is new to %s; WinPE driver %s)",
                     m.name, nic, disk.name, f"{package}: {', '.join(infs)}" if package else "none in the library")
         return PlainTextResponse(scan.ipxe_scan_script(base, mac, chip, package,
                                                        drivers.files(package) if package else []))
-    if job is not None and job.error and card in job.nics:
-        return exit_script(f"ggNet: adding the network card of {m.name} to {disk.name} failed: {job.error}. "
-                           f"Try again in the web UI: Images -> {disk.name} -> Add new hardware.")
     versions = prov.zfs.list_snapshots(disk.zvol_path) or []
     if not versions or versions[-1] != disk.snapshot:
-        logger.warning("iPXE: %s needs PCI\\%s in %s, but @%s is not its newest version",
-                       m.name, nic, disk.name, disk.snapshot)
-        return None
+        wizard.fail(f"@{disk.snapshot} is active but not the newest version of {disk.name}; make the newest active first")
+        return exit_script(f"ggNet: Add new hardware stopped: {wizard.error}.")
     done = activate_when_done(sessionmaker(bind=db.get_bind(), expire_on_commit=False), disk.id, disk.snapshot)
+    wizard.card, wizard.step = (nic, m.nic_instance), "adding"
     try:
         adder.start(disk.zvol_path, [(nic, m.nic_instance)], done)
         logger.info("iPXE: Add new hardware started for %s: PCI\\%s\\%s into %s",
                     m.name, nic, m.nic_instance, disk.name)
     except ValueError:
-        pass                                   # started by another PC meanwhile
+        pass                                   # started meanwhile
+    if not wizard.active:                      # failed at once (tests run the job here)
+        return exit_script(f"ggNet: adding the network card of {m.name} to {disk.name} failed: {wizard.error}.")
     return _hardware_wait(mac, again, disk.name)
 
 
@@ -319,6 +337,19 @@ def _hardware_wait(mac: str, again: str, image: str) -> PlainTextResponse:
         f"ggNet: adding this PC's network card to the image {image} (a few minutes).",
         "ggNet: the PC boots by itself when it is done.",
     ], waiting="Adding the network card")
+
+
+def _needs_hardware(mac: str, again: str, name: str, nic: str, image: str,
+                    busy: str | None = None) -> PlainTextResponse:
+    """The image cannot start this PC's card: say what to do, and go on once it is done."""
+    todo = (f"ggNet: Add new hardware is adding the card of {busy} now; then start it again for this PC."
+            if busy else f"ggNet: in the ggNet web UI open Images -> {image} -> Add new hardware.")
+    return wait_script(mac, again, [
+        # No '&' on an iPXE command line: it could be read as an operator.
+        f"ggNet: the network card of {name} ({nic.replace('&', ' ')}) is not in the image {image}.",
+        todo,
+        "ggNet: this PC goes on by itself.",
+    ], waiting="Waiting for Add new hardware")
 
 
 def _scanner():
@@ -381,7 +412,7 @@ class ScanIn(BaseModel):
 
 
 @router.post("/scan")
-def scan_report(body: ScanIn, db: Session = Depends(get_db)):
+def scan_report(body: ScanIn, db: Session = Depends(get_db), adder=Depends(get_hardware_adder)):
     """
     The hardware scan's report: the PC's boot network card and its instance ID
     are kept, so its next boot adds the card to its OS image.
@@ -402,6 +433,9 @@ def scan_report(body: ScanIn, db: Session = Depends(get_db)):
     m.boot_nic = m.boot_nic or card.nic
     m.nic_instance = card.instance
     db.commit()
+    wizard = adder.wizard(m.os_disk.zvol_path) if m.os_disk else None
+    if wizard is not None and wizard.active and wizard.machine == m.name:
+        wizard.step, wizard.card = "collected", (card.nic, card.instance)
     logger.info("Hardware scan of %s (scanner %s): boot network card PCI\\%s\\%s; %d PCI devices",
                 m.name, body.scanner_version or "?", card.nic, card.instance, len(body.devices))
     image = m.os_disk.name if m.os_disk else "its image"

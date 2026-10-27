@@ -13,10 +13,12 @@ interface Props {
   onBack: () => void;
   /** The image's ⋮ menu, the same as on the list. */
   menu?: ReactNode;
+  /** Open the Add new hardware wizard (OS images). */
+  onAddHardware?: () => void;
 }
 
 /** One image on its own page: what it is, its snapshots and the PCs' writebacks. */
-export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props) {
+export function ImageDetailsPage({ disk, machines, reload, onBack, menu, onAddHardware }: Props) {
   const KindIcon = disk.kind === "os" ? Monitor : Gamepad2;
   const editor = machines.find((m) => m.id === disk.editor_id);
   return (
@@ -56,7 +58,7 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu }: Props
         </p>
       ) : disk.published ? (
         <>
-          {disk.kind === "os" && <HardwarePanel disk={disk} onChanged={reload} />}
+          {disk.kind === "os" && <HardwarePanel disk={disk} onAddHardware={onAddHardware} />}
           <DiskDetails
             disk={disk}
             onChanged={reload}

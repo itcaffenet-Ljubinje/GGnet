@@ -119,7 +119,7 @@ def test_add_hardware_makes_a_new_active_version(client, host, adder, prov):
     assert client.get(f"/api/v1/game-disks/{disk['id']}").json()["snapshot"] == "v2"
     versions = client.get(f"/api/v1/game-disks/{disk['id']}/snapshots").json()
     assert versions[-1]["comment"] == f"ggNet: added PCI\\{I219}"
-    assert client.get(f"/api/v1/game-disks/{disk['id']}/add-hardware").json()["snapshot"] == "v2"
+    assert client.get(f"/api/v1/game-disks/{disk['id']}/add-hardware").json()["job"]["snapshot"] == "v2"
 
 
 def test_a_failed_install_changes_nothing(client, host, adder, prov):
@@ -151,5 +151,6 @@ def test_add_hardware_refuses_bad_cards_and_game_disks(client, host, adder):
     r = client.post(f"/api/v1/game-disks/{game['id']}/add-hardware",
                     json={"cards": [{"nic": I219, "instance": "3&1&0&FE"}]})
     assert r.status_code == 409
-    assert client.get(f"/api/v1/game-disks/{disk['id']}/add-hardware").json() is None
+    assert client.get(f"/api/v1/game-disks/{disk['id']}/add-hardware").json() == {
+        "wizard": None, "job": None, "waiting": []}
     assert client.post(f"/api/v1/game-disks/{disk['id']}/add-hardware/cancel").status_code == 409
