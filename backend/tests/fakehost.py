@@ -20,6 +20,7 @@ from typing import Optional
 class FakeHost:
     def __init__(self) -> None:
         self.datasets: dict[str, dict] = {}         # name → {"origin": snap|None, "readonly": bool}
+        self.backstore_attrs: dict[str, dict[str, str]] = {}     # block backstore → its set attributes
         self.snapshots: dict[str, set[str]] = {}    # "ds@snap" → holds
         self.snap_props: dict[str, dict[str, str]] = {}   # "ds@snap" → user properties
         self.backstores: dict[str, str] = {}        # name → /dev/zvol/...
@@ -471,6 +472,13 @@ class FakeHost:
                     return self._err(f"No storage object named {args[0]}")
                 self._drop_backstore(args[0])
                 return self._ok()
+
+        if path.startswith("/backstores/block/") and verb == "set" and args[:1] == ["attribute"]:
+            name = path.rsplit("/", 1)[1]
+            if name not in self.backstores:
+                return self._err(f"No such path {path}")
+            self.backstore_attrs.setdefault(name, {}).update(self._kw(args[1:]))
+            return self._ok()
 
         if path == "/iscsi":
             if verb == "ls":

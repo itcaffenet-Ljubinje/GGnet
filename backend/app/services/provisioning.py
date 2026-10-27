@@ -253,11 +253,12 @@ class Provisioner:
     def create_disk(self, name: str, size_gb: int, os_image: bool = False) -> str:
         """
         Empty zvol for a master (draft). Returns the ZFS path. An OS image
-        gets the properties for Windows' small random I/O (16k, lz4, sync);
-        see docs/architecture.md, "Properties".
+        gets 16k blocks for Windows' small random I/O, a game disk 64k for
+        large game files read in one go; both lz4 and sync=standard (a
+        master must survive a host crash). See docs/architecture.md, "Properties".
         """
         path = self.image_path(name)
-        props = dict(volblocksize="16k", compression="lz4", sync="standard") if os_image else {}
+        props = dict(volblocksize="16k" if os_image else "64k", compression="lz4", sync="standard")
         with self.lock:
             self._clear()
             if self.zfs.dataset_exists(path):

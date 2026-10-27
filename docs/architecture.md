@@ -61,8 +61,10 @@ Why these values:
 - `volblocksize` is fixed at creation and a clone inherits it from its origin. Changing it later means a new
   master and copying the data.
 
-`create_zvol()` currently creates game masters with `compression=off` and `sync=disabled`; this changes to the
-table above with the image-versioning work.
+The installer creates the `writebacks` dataset with `sync=disabled` and the ggNet root with `checksum=blake3`: a
+strong checksum lets ZFS skip a block rewritten with the same data (nop-write), so a writeback's registry hive,
+rewritten whole for the PC's name, costs only the changed blocks. Images written before keep their checksum
+until they are copied. LIO backstores get `emulate_write_cache=1`, so Windows groups its writes.
 
 ### ARC
 

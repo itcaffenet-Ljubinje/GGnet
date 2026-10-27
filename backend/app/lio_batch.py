@@ -87,6 +87,9 @@ def main(argv):
             # targetcli's export_backstore_name_as_model: Windows sees the
             # backstore name as the disk model, as before.
             so.set_attribute("emulate_model_alias", 1)
+            # Windows sees a disk with a write cache and groups its writes instead of
+            # flushing each one; the writeback zvols are sync=disabled anyway.
+            so.set_attribute("emulate_write_cache", 1)
             return None
         if op == "create_lun":
             t = tpg(step["target"])
