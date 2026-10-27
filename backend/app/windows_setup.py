@@ -251,10 +251,12 @@ def nic_patch(export: str, nic: str, instance: str | None = None) -> tuple[str |
         has_service = any(v.startswith('"Service"=') for v in values) if len(parts) == 2 else False
         old = known.get(inst)
         known[inst] = (key, (old[1] if old else False) or has_service)
+    # Only an entry with a driver counts: one whose install failed has none
+    # (ConfigFlags "reinstall"), and Windows cannot start the card from it.
     mine = devices.get(nic.upper(), {})
-    if instance is None and mine:
+    if instance is None and any(svc for _, svc in mine.values()):
         return None, None                      # the card is known; which instance is not checked
-    if instance is not None and instance.upper() in mine:
+    if instance is not None and mine.get(instance.upper(), (None, False))[1]:
         return None, None
     candidates = [(hwid, inst, key) for hwid, insts in devices.items() for inst, (key, svc) in insts.items()
                   if svc and (m := NIC_ID_RE.match(hwid)) and m.group(1) == ven and m.group(2) == dev]

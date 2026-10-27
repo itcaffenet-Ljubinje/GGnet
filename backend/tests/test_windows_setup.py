@@ -936,3 +936,16 @@ def test_toolchain_result_is_read_and_the_job_removed(windows, runner):
 def test_toolchain_result_without_a_result(windows, runner):
     _toolchain_image(windows)
     assert "no result" in windows.toolchain_result(DEVICE, label="win11")
+
+
+def test_a_card_whose_install_failed_is_not_ready():
+    # Windows left the entry without a driver (ConfigFlags 0x20, reinstall): it cannot start the card.
+    failed = ENUM + (
+        "\n[\\ControlSet001\\Enum\\PCI\\VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16]\n"
+        "\n[\\ControlSet001\\Enum\\PCI\\VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16\\01000000684CE00000]\n"
+        '"ConfigFlags"=dword:00000020\n')
+    rev16 = "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16"
+    reg, problem = nic_patch(failed, rev16, "01000000684CE00000")
+    assert reg is not None and problem is None          # not "ready": it still has to be added
+    reg, _ = nic_patch(failed, rev16)
+    assert reg is not None

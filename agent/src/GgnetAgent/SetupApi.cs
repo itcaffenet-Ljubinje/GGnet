@@ -34,6 +34,8 @@ public sealed class SetupApiInstaller : IDeviceInstaller
 
     public ToolchainDeviceResult Install(ToolchainDevice device)
     {
+        // Let Windows finish what it installs at boot first (the VM's own devices).
+        CMP_WaitNoPendingInstallEvents(InstallWaitMs);
         var classGuid = Guid.Parse(device.ClassGuid);
         var set = SetupDiCreateDeviceInfoList(ref classGuid, IntPtr.Zero);
         if (set == InvalidHandle)
@@ -81,12 +83,29 @@ public sealed class SetupApiInstaller : IDeviceInstaller
                 return Fail(device, "read the selected driver");
             if (!DiInstallDevice(IntPtr.Zero, set, ref data, ref driver, 0, out _))
                 return Fail(device, $"install {driver.Description}");
+            // Early in boot Windows defers the install ("Installation deferred (too
+            // early)") and runs it in the background; the device exists only while
+            // this set is open, so wait for it here, then check it really got a driver.
+            CMP_WaitNoPendingInstallEvents(InstallWaitMs);
+            if (DriverKey(set, ref data) is null)
+                return new ToolchainDeviceResult(device.InstanceId, false,
+                    Error: $"Windows did not finish installing {driver.Description} (see setupapi.dev.log)");
             return new ToolchainDeviceResult(device.InstanceId, true, $"{driver.ProviderName} {driver.Description}");
         }
         finally
         {
             SetupDiDestroyDeviceInfoList(set);
         }
+    }
+
+    /// <summary>The device's driver key (SPDRP_DRIVER), set once its driver is installed; null before.</summary>
+    private static string? DriverKey(IntPtr set, ref SpDevinfoData data)
+    {
+        var buffer = new byte[512];
+        if (!SetupDiGetDeviceRegistryPropertyW(set, ref data, SpdrpDriver, out _, buffer, buffer.Length, out var size))
+            return null;
+        var text = System.Text.Encoding.Unicode.GetString(buffer, 0, size).TrimEnd('\0');
+        return text.Length > 0 ? text : null;
     }
 
     private static ToolchainDeviceResult Fail(ToolchainDevice device, string step) =>
@@ -117,6 +136,8 @@ public sealed class SetupApiInstaller : IDeviceInstaller
     private const int ErrorInvalidRegProperty = unchecked((int)0xE0000209);
     private const int SpdrpHardwareId = 0x01;
     private const int SpdrpCompatibleIds = 0x02;
+    private const int SpdrpDriver = 0x09;
+    private const int InstallWaitMs = 5 * 60 * 1000;
     private const int DifSelectBestCompatDrv = 0x17;
     private const int DifRegisterDevice = 0x19;
     private const int SpditCompatDriver = 0x02;
@@ -169,6 +190,14 @@ public sealed class SetupApiInstaller : IDeviceInstaller
 
     [DllImport("setupapi.dll", SetLastError = true)]
     private static extern bool SetupDiDestroyDeviceInfoList(IntPtr set);
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetupDiGetDeviceRegistryPropertyW(IntPtr set, ref SpDevinfoData data, int property,
+        out int type, byte[] buffer, int size, out int requiredSize);
+
+    /// <summary>Waits until Windows has no device install in progress or queued (WAIT_OBJECT_0 = 0).</summary>
+    [DllImport("setupapi.dll")]
+    private static extern int CMP_WaitNoPendingInstallEvents(int timeoutMs);
 
     [DllImport("newdev.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool DiInstallDevice(IntPtr hwndParent, IntPtr set, ref SpDevinfoData data,
