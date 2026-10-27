@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { api, isImport, type DiskKind, type GameDisk, type Machine } from "../api";
+import { api, isImport, needsHardware, type DiskKind, type GameDisk, type Machine } from "../api";
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { EditImage } from "../components/EditImage";
 import { ImportImage } from "../components/ImportImage";
@@ -307,6 +307,10 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
                         ) : d.copy_error ? (
                           <span className="badge badge-error" title={d.copy_error}>
                             {isImport(d.copy_source) ? "Import failed" : "Copy failed"}
+                          </span>
+                        ) : needsHardware(d) ? (
+                          <span className="badge badge-warn" title="No PC can boot it yet: run Add new hardware">
+                            Needs hardware
                           </span>
                         ) : d.published ? (
                           <span className="badge badge-provisioned">Published @{d.snapshot}</span>

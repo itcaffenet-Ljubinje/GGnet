@@ -246,6 +246,8 @@ class GameDiskOut(BaseModel):
     copy_source: str | None = None    # being copied (or failed) from this master@version
     copy_percent: int | None = None
     copy_error: str | None = None
+    # OS image: the network card models Add new hardware installed; none: it needs hardware.
+    nic_models: list[str] = []
 
 
 class GameDiskEdit(BaseModel):

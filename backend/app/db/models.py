@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     Text,
     TypeDecorator,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -105,6 +106,16 @@ class GameDisk(Base):
     editor: Mapped["Machine | None"] = relationship(
         back_populates="editing_disk", foreign_keys="Machine.editing_disk_id"
     )
+    # OS image: the network cards Add new hardware installed in it.
+    hardware: Mapped[list["ImageHardware"]] = relationship(
+        back_populates="disk", cascade="all, delete-orphan", passive_deletes=True,
+        order_by="ImageHardware.id",
+    )
+
+    @property
+    def nic_models(self) -> list[str]:
+        """The network card models the image supports, each once (an OS image without any needs hardware)."""
+        return sorted({h.name for h in self.hardware})
 
     @property
     def editor_id(self) -> int | None:
@@ -133,6 +144,28 @@ class MachineStatus(str, enum.Enum):
     PROVISIONED = "provisioned"    # clone exists and is mapped on the shared target
     EDITING = "editing"            # a draft master is mapped as its game disk
     ERROR = "error"                # a host operation failed; see last_error
+
+
+class ImageHardware(Base):
+    """
+    A network card the Add new hardware wizard installed in an OS image: the
+    card's PCI hardware ID and instance ID on that board type, and its model
+    as Windows names it (from the driver). An OS image without any is not
+    ready: no PC can boot it yet.
+    """
+
+    __tablename__ = "image_hardware"
+    __table_args__ = (UniqueConstraint("disk_id", "nic", "instance", name="uq_image_hardware_card"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    disk_id: Mapped[int] = mapped_column(ForeignKey("game_disks.id", ondelete="CASCADE"))
+    nic: Mapped[str] = mapped_column(String(64))           # VEN_8086&DEV_15BC&SUBSYS_86721043&REV_10
+    instance: Mapped[str] = mapped_column(String(64))      # 3&11583659&0&FE
+    name: Mapped[str] = mapped_column(String(255))         # Intel(R) Ethernet Connection (2) I219-V
+    snapshot: Mapped[str | None] = mapped_column(String(64), default=None)   # the version it came with
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+
+    disk: Mapped[GameDisk] = relationship(back_populates="hardware")
 
 
 class Machine(Base):

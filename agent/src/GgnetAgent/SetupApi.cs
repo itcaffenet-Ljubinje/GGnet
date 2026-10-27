@@ -12,7 +12,7 @@ public sealed record ToolchainDevice(
 
 /// <summary>How installing one device went.</summary>
 public sealed record ToolchainDeviceResult(
-    string InstanceId, bool Ok, string? Driver = null, string? Error = null,
+    string InstanceId, bool Ok, string? Driver = null, string? Error = null, string? Name = null,
     [property: System.Text.Json.Serialization.JsonIgnore] bool Deferred = false);
 
 public interface IDeviceInstaller
@@ -117,7 +117,8 @@ public sealed class SetupApiInstaller : IDeviceInstaller
                 return new ToolchainDeviceResult(device.InstanceId, false,
                     Error: $"Windows did not finish installing {driver.Description} (see setupapi.dev.log)",
                     Deferred: true);
-            return new ToolchainDeviceResult(device.InstanceId, true, $"{driver.ProviderName} {driver.Description}");
+            return new ToolchainDeviceResult(device.InstanceId, true, $"{driver.ProviderName} {driver.Description}",
+                Name: driver.Description);
         }
         finally
         {

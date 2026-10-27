@@ -95,7 +95,9 @@ class NewCardWindows(FakeWindows):
 
     def toolchain_result(self, device, label="image"):
         self.installed = True
-        return {"ok": True, "devices": [{"instance_id": "x", "ok": True, "driver": "Intel"}]}
+        return {"ok": True, "devices": [{"instance_id": f"PCI\\{I219}\\{INSTANCE}", "ok": True,
+                                         "driver": "Intel Intel(R) Ethernet Connection (2) I219-V",
+                                         "name": "Intel(R) Ethernet Connection (2) I219-V"}]}
 
 
 class FakeVm:
@@ -174,6 +176,9 @@ def test_the_wizard_scans_adds_and_boots_the_new_pc(client, prov, pc):
     assert client.get(f"/api/v1/game-disks/{disk}").json()["snapshot"] == "v2"
     assert _wizard(client, pc)["wizard"]["step"] == "rebooting"
 
+    # The image now supports the card's model.
+    assert client.get(f"/api/v1/game-disks/{disk}").json()["nic_models"] == ["Intel(R) Ethernet Connection (2) I219-V"]
+
     # 4. Then it boots the new version, and the wizard is done.
     assert "sanboot" in _ipxe(client)
     status = _wizard(client, pc)
@@ -218,3 +223,25 @@ def test_the_wizard_takes_the_first_pc_that_boots_even_one_the_image_knows(clien
     script = _ipxe(client)
     assert "wimboot" in script and "sanboot" not in script
     assert _wizard(client, pc)["wizard"]["machine"] == "vip-05"
+
+
+def test_a_new_os_image_has_no_network_card_and_a_copy_keeps_its_cards(client, prov, pc):
+    disk = pc["os_disk_id"]
+    assert client.get(f"/api/v1/game-disks/{disk}").json()["nic_models"] == []      # needs hardware
+    client.post(f"/api/v1/game-disks/{disk}/add-hardware/wizard")
+    _ipxe(client)
+    client.post("/api/v1/boot/scan", json={"mac": MAC, "devices": [_device(I219, INSTANCE)]})
+    _ipxe(client)                                                                    # adds it: @v2
+    r = client.post(f"/api/v1/game-disks/{disk}/copy", json={"name": "copy-v2"})
+    assert r.status_code == 201, r.text
+    assert r.json()["nic_models"] == ["Intel(R) Ethernet Connection (2) I219-V"]
+    r = client.post(f"/api/v1/game-disks/{disk}/copy", json={"name": "copy-base", "snapshot": "base"})
+    assert r.json()["nic_models"] == []                                              # @base had no card
+
+
+def test_card_name_falls_back_to_the_driver_then_the_id():
+    from app.services.toolchain import card_name
+
+    devices = [{"instance_id": f"PCI\\{I219}\\{INSTANCE}", "driver": "Intel driver"}]
+    assert card_name(devices, I219, INSTANCE) == "Intel driver"
+    assert card_name([], I219, INSTANCE) == I219

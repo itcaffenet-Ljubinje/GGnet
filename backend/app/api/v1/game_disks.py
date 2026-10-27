@@ -42,7 +42,7 @@ from app.api.v1.schemas import (
     SnapshotOut,
     WritebackOut,
 )
-from app.db.models import DiskKind, GameDisk, Machine, MachineMode, MachineStatus
+from app.db.models import DiskKind, GameDisk, ImageHardware, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services.agent_package import default_package
 from app.services.os_setup import image_prep
@@ -153,6 +153,9 @@ def copy_disk(
         conflict(f"Zvol {path} already exists on the host")
     disk = GameDisk(name=body.name, zvol_path=path, size_gb=src.size_gb, kind=src.kind,
                     copy_source=f"{src.zvol_path}@{snap}", copy_percent=0)
+    # The copy knows the cards the copied version has.
+    disk.hardware = [ImageHardware(nic=h.nic, instance=h.instance, name=h.name, snapshot=h.snapshot)
+                     for h in src.hardware if _version_number(h.snapshot) <= _version_number(snap)]
     db.add(disk)
     try:
         db.commit()
@@ -343,6 +346,13 @@ def cancel_add_hardware(disk_id: int, db: Session = Depends(get_db), adder=Depen
     if not adder.cancel(disk.zvol_path):
         conflict(f"Add new hardware is not running for '{disk.name}'")
     return _job_out(adder.job(disk.zvol_path))
+
+
+def _version_number(snapshot: str | None) -> int:
+    """base → 1, vN → N (a copy made later from @v3 has no card added at @v5); unknown counts as 1."""
+    if snapshot and snapshot.startswith("v") and snapshot[1:].isdigit():
+        return int(snapshot[1:])
+    return 1
 
 
 def _not_copying(disk: GameDisk) -> None:

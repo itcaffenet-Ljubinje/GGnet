@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, Gamepad2, GitBranch, HardDrive, Layers, Monitor } from "lucide-react";
 
-import { isImport, type GameDisk, type Machine, type Snapshot, type Writeback } from "../api";
+import { isImport, needsHardware, type GameDisk, type Machine, type Snapshot, type Writeback } from "../api";
 import { DiskDetails } from "../components/DiskDetails";
 import { HardwarePanel } from "../components/HardwarePanel";
 import { formatBytes } from "../format";
@@ -38,6 +38,8 @@ export function ImageDetailsPage({ disk, machines, reload, onBack, menu, onAddHa
           </span>
         ) : disk.copy_error ? (
           <span className="badge badge-error">{isImport(disk.copy_source) ? "Import failed" : "Copy failed"}</span>
+        ) : needsHardware(disk) ? (
+          <span className="badge badge-warn">Needs hardware</span>
         ) : disk.published ? (
           <span className="badge badge-provisioned">Active @{disk.snapshot}</span>
         ) : editor ? (

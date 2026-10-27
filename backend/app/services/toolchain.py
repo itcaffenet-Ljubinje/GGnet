@@ -137,17 +137,36 @@ class HardwareJob:
                 "devices": self.devices, "started": self.started, "finished": self.finished}
 
 
-def activate_when_done(make_session, disk_id: int, base: str) -> Callable[[str], None]:
-    """A HardwareAdder `done` callback: the new version becomes the image's active one,
-    unless someone chose another version meanwhile."""
-    from app.db.models import GameDisk
+def card_name(devices: list[dict], nic: str, instance: str) -> str:
+    """The model of a card as the agent reported it (the driver's device name)."""
+    wanted = f"PCI\\{nic}\\{instance}".upper()
+    for d in devices:
+        if str(d.get("instance_id") or "").upper() == wanted:
+            return str(d.get("name") or d.get("driver") or nic)[:255]
+    return nic
 
-    def done(snapshot: str) -> None:
+
+def activate_when_done(make_session, disk_id: int, base: str) -> Callable[[str, "HardwareJob"], None]:
+    """
+    A HardwareAdder `done` callback: the image records the cards it now has
+    (app.db.models.ImageHardware), and the new version becomes its active
+    one, unless someone chose another version meanwhile.
+    """
+    from app.db.models import GameDisk, ImageHardware
+
+    def done(snapshot: str, job: "HardwareJob") -> None:
         with make_session() as s:
             d = s.get(GameDisk, disk_id)
-            if d is not None and d.snapshot == base:
+            if d is None:
+                return
+            have = {(h.nic, h.instance) for h in d.hardware}
+            for nic, instance in job.nics:
+                if (nic, instance) not in have:
+                    d.hardware.append(ImageHardware(nic=nic, instance=instance, snapshot=snapshot,
+                                                    name=card_name(job.devices, nic, instance)))
+            if d.snapshot == base:
                 d.snapshot = snapshot
-                s.commit()
+            s.commit()
 
     return done
 
@@ -247,8 +266,8 @@ class HardwareAdder:
         return wizard is not None or cancelled
 
     def start(self, master: str, nics: list[tuple[str, str]],
-              done: Callable[[str], None] = lambda snapshot: None) -> HardwareJob:
-        """Start a job; `done(new snapshot)` runs when it succeeded. ValueError when one runs."""
+              done: Callable[[str, HardwareJob], None] = lambda snapshot, job: None) -> HardwareJob:
+        """Start a job; `done(new snapshot, job)` runs when it succeeded. ValueError when one runs."""
         with self._guard:
             current = self.jobs.get(master)
             if current is not None and current.running:
@@ -267,7 +286,7 @@ class HardwareAdder:
         job.cancel.set()
         return True
 
-    def _run(self, master: str, job: HardwareJob, done: Callable[[str], None]) -> None:
+    def _run(self, master: str, job: HardwareJob, done: Callable[[str, HardwareJob], None]) -> None:
         label = master.rsplit("/", 1)[-1]
 
         def step(name: str) -> None:
@@ -284,7 +303,7 @@ class HardwareAdder:
                 self.prov.set_comment(master, snapshot, comment[:200])
             except Exception as e:      # the version is there; only its comment is missing
                 logger.warning("%s", e)
-            done(snapshot)
+            done(snapshot, job)
             logger.info("Add new hardware on %s done: @%s", master, snapshot)
         except ProvisioningError as e:
             job.error = str(e)

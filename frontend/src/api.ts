@@ -22,7 +22,12 @@ export interface GameDisk {
   copy_source?: string | null;
   copy_percent?: number | null;
   copy_error?: string | null;
+  /** OS image: the network card models Add new hardware installed; none: it needs hardware. */
+  nic_models?: string[];
 }
+
+/** An OS image no PC can boot yet: Add new hardware has not added any network card. */
+export const needsHardware = (d: GameDisk) => d.kind === "os" && d.published && (d.nic_models ?? []).length === 0;
 
 export type DiskKind = "game" | "os";
 
@@ -48,22 +53,6 @@ export interface UsbPart {
   model: string | null;
   /** Where ggNet opened it read-only, or null. */
   mounted: string | null;
-}
-
-/** Whether an OS image's active version can boot the PCs with one boot network card. */
-export interface NicSupport {
-  /** PCI hardware ID; null for PCs that never booted over the network. */
-  nic: string | null;
-  /** The card's instance ID on these PCs, when their agent reported it. */
-  instance?: string | null;
-  status: "ready" | "missing" | "unknown";
-  machines: string[];
-}
-
-export interface Hardware {
-  snapshot: string | null;
-  problem: string | null;
-  nics: NicSupport[];
 }
 
 export interface HardwareCard {
@@ -577,7 +566,6 @@ export const api = {
   startImport: (name: string, kind: DiskKind, path: string, options: { prepare: boolean; defender_off: boolean }) =>
     request<GameDisk>("POST", "/v1/imports", { name, kind, path, ...options }),
   cancelImport: (id: number) => request<void>("POST", `/v1/imports/${id}/cancel`),
-  getHardware: (id: number) => request<Hardware>("GET", `/v1/game-disks/${id}/hardware`),
   getAddHardware: (id: number) => request<AddHardwareStatus>("GET", `/v1/game-disks/${id}/add-hardware`),
   openHardwareWizard: (id: number) =>
     request<AddHardwareStatus>("POST", `/v1/game-disks/${id}/add-hardware/wizard`),
