@@ -78,7 +78,9 @@ def runner() -> FakeRunner:
 
 @pytest.fixture
 def zfs(runner: FakeRunner) -> ZFSManager:
-    return ZFSManager(layout=make_layout(), runner=runner)
+    z = ZFSManager(layout=make_layout(), runner=runner)
+    z.sleep = lambda seconds: None          # destroy()'s busy retries do not wait in tests
+    return z
 
 
 @pytest.fixture(autouse=True)
@@ -140,10 +142,12 @@ def host() -> FakeHost:
 
 @pytest.fixture
 def prov(host: FakeHost) -> Provisioner:
-    return Provisioner(
+    p = Provisioner(
         ZFSManager(layout=make_layout(), runner=host),
         ISCSIManager(config=ISCSIConfig(portal="192.168.10.1:3260"), runner=host),
     )
+    p.zfs.sleep = lambda seconds: None      # destroy()'s busy retries do not wait in tests
+    return p
 
 
 @pytest.fixture

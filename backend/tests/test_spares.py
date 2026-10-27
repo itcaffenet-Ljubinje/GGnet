@@ -132,3 +132,15 @@ def test_spares_never_keep_an_old_version_alive(host, boot):
     assert base["clones"] == []                            # a spare is not a PC using the version
     assert boot.merge_into_base(OS, "v2") == ["base"]      # and does not stop the merge
     assert f"{OS_CLONE}_spare" not in host.datasets
+
+
+def test_a_spare_without_the_boot_cards_driver_is_kept(host, boot):
+    # A reset would make the very same writeback: it boots like that, so the spare
+    # is not removed (and made again) every round.
+    boot.windows.problem = "the image has no driver for the boot network card PCI\\VEN_8086&DEV_15BC"
+    made = boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP)
+    assert made == [f"{CLONE}_spare", f"{OS_CLONE}_spare"]
+    assert host.datasets[f"{OS_CLONE}_spare"]
+    boot.windows.personalized.clear()
+    assert boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP) == []
+    assert boot.windows.personalized == []                  # current: not set up again

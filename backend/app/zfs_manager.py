@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional
 
@@ -110,6 +111,11 @@ def _validate_layout(layout: ZFSLayout) -> None:
             )
 
 
+# destroy(): how often and how long to wait for a zvol still held open after umount.
+BUSY_RETRIES = 4
+BUSY_WAIT = 1.0
+
+
 class ZFSManager:
     def __init__(
         self,
@@ -121,6 +127,7 @@ class ZFSManager:
         # to later let an operation run outside the ggNet tree.
         _validate_layout(self.layout)
         self.runner = runner or CommandRunner()
+        self.sleep: Callable[[float], None] = time.sleep
 
     def _run(self, cmd: list[str], quiet: bool = False) -> tuple[bool, str, str]:
         return self.runner.run(cmd, quiet=quiet)
@@ -311,7 +318,15 @@ class ZFSManager:
         if recursive:
             cmd.append("-r")
         cmd.append(path)
-        ok, _, _ = self._run(cmd)
+        ok, _, err = self._run(cmd)
+        # A zvol that was just mounted with ntfs-3g stays open for a moment
+        # after umount (FUSE closes it later): "dataset is busy". Retry briefly.
+        for _ in range(BUSY_RETRIES):
+            if ok or "dataset is busy" not in err:
+                break
+            self.sleep(BUSY_WAIT)
+            self._run(["udevadm", "settle", "--timeout=5"], quiet=True)
+            ok, _, err = self._run(cmd)
         return ok
 
     def destroy_master(self, zvol_path: str) -> bool:

@@ -209,6 +209,11 @@ REALTEK_DSN_INSTANCE = "01000000684CE00000"
 NIC_INSTANCE_RE = re.compile(r"^[A-Za-z0-9&_.-]{1,64}$")
 
 
+# personalize() reports this when it set the PC up but cannot add its boot
+# card: the writeback is as good as it gets until the image knows the card.
+NO_NIC_DRIVER = "the image has no driver for the boot network card"
+
+
 def nic_patch(export: str, nic: str, instance: str | None = None) -> tuple[str | None, str | None]:
     """
     Add hardware for the boot NIC, from a `hivexregedit --export` of
@@ -254,7 +259,7 @@ def nic_patch(export: str, nic: str, instance: str | None = None) -> tuple[str |
     candidates = [(hwid, inst, key) for hwid, insts in devices.items() for inst, (key, svc) in insts.items()
                   if svc and (m := NIC_ID_RE.match(hwid)) and m.group(1) == ven and m.group(2) == dev]
     if not candidates:
-        return None, f"the image has no driver for the boot network card PCI\\{nic}"
+        return None, f"{NO_NIC_DRIVER} PCI\\{nic}"
     candidates.sort(key=lambda c: (c[0] != nic.upper(), NIC_ID_RE.match(c[0]).group(3) != sub, c[0], c[1]))
     source, source_inst, prefix = candidates[0]
     _, _, old_sub, old_rev = NIC_ID_RE.match(source).groups()
