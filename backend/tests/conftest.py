@@ -130,16 +130,6 @@ def _fresh_hardware_status():
 
 
 @pytest.fixture
-def legacy_nic(monkeypatch):
-    """[boot] legacy_nic_patch = true: a known chip on another board is copied into the writeback at boot."""
-    from app.api.v1 import boot, game_disks
-    from app.services import os_setup
-
-    for module in (os_setup, boot, game_disks):
-        monkeypatch.setattr(module, "legacy_nic_patch", lambda cfg=None, image=None: True)
-
-
-@pytest.fixture
 def host() -> FakeHost:
     h = FakeHost()
     # The tree setup_dataset_tree() leaves on the host.

@@ -204,15 +204,6 @@ def test_the_boot_cards_instance_is_kept_for_add_hardware(client, db_url):
     assert client.get(f"/api/v1/machines/{m['id']}").json()["nic_instance"] == "6&95d5d6a&0&0000020A"
 
 
-def test_os_setup_carries_the_instance(legacy_nic):
-    from app.db.models import Machine, MachineMode
-    from app.services.os_setup import os_setup_for
-
-    m = Machine(id=3, name="asus-01", mode=MachineMode.BOOT, boot_nic=REV16, nic_instance="6&95d5d6a&0&0000020A")
-    setup = os_setup_for(m)
-    assert (setup.boot_nic, setup.boot_nic_instance) == (REV16, "6&95d5d6a&0&0000020A")
-
-
 @pytest.mark.parametrize("bad", [
     {"ip_address": "not-an-ip"},
     {"mac_address": "zz"},
@@ -229,22 +220,11 @@ def test_a_bad_inventory_never_fails_the_heartbeat(client, bad):
     assert (got["reported_ip"], got["hardware"], got["last_seen_at"] is not None) == (None, None, True)
 
 
-def test_without_the_legacy_patch_the_writeback_gets_no_card():
+def test_the_writeback_never_gets_the_card():
     from app.db.models import Machine, MachineMode
     from app.services.os_setup import os_setup_for
 
     m = Machine(id=3, name="komp-01", mode=MachineMode.BOOT,
                 boot_nic="VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16", nic_instance="01000000684CE00000")
-    setup = os_setup_for(m)
-    assert (setup.boot_nic, setup.boot_nic_instance) == (None, None)    # the card belongs in the image
-
-
-def test_the_legacy_patch_can_be_kept_for_some_images():
-    from app.services.os_setup import legacy_nic_patch
-
-    cfg = {"boot": {"legacy_nic_patch": ["win11-25-10-26"]}}
-    assert legacy_nic_patch(cfg, image="win11-25-10-26")
-    assert not legacy_nic_patch(cfg, image="hw-test") and not legacy_nic_patch(cfg)
-    assert legacy_nic_patch({"boot": {"legacy_nic_patch": True}}, image="any")
-    assert not legacy_nic_patch({"boot": {}}, image="any")
-    assert not legacy_nic_patch({"boot": {"legacy_nic_patch": "yes"}}, image="any")   # only true or a list
+    assert os_setup_for(m).env["GGNET_MACHINE_NAME"] == "komp-01"
+    assert not hasattr(os_setup_for(m), "boot_nic")          # the card belongs in the image

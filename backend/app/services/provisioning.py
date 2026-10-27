@@ -30,7 +30,7 @@ from typing import Callable
 
 from app.disk_grow import GrowResult, PartitionGrower
 from app.iscsi_manager import SLOTS, Disk, ISCSIManager
-from app.windows_setup import NO_NIC_DRIVER, ImagePrep, OsSetup, WindowsSetup
+from app.windows_setup import ImagePrep, OsSetup, WindowsSetup
 from app.zfs_manager import ZFSManager
 
 logger = logging.getLogger("ggnet.provisioning")
@@ -71,7 +71,7 @@ def setup_tag(setup: OsSetup | None) -> str:
     """A short fingerprint of what personalize() writes, to tell a stale OS spare."""
     if setup is None:
         return "none"
-    data = json.dumps([setup.computer_name, sorted(setup.env.items()), setup.boot_nic])
+    data = json.dumps([setup.computer_name, sorted(setup.env.items())])
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -225,11 +225,6 @@ class Provisioner:
                     continue
                 if tag is not None:
                     problem = self._set_up_os(spare, setup, label=f"{machine_name}-spare")
-                    # Without the boot card's driver the PC is set up all the same, and a
-                    # reset would make the very same writeback: the spare is kept (made
-                    # again only for a new image version), not removed every round.
-                    if problem and problem.startswith(NO_NIC_DRIVER):
-                        problem = None
                     if problem or not self.zfs.set_property(spare, SETUP_PROP, tag):
                         self.zfs.destroy(spare, recursive=True)
                         failed = True

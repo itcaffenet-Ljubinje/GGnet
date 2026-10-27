@@ -56,7 +56,7 @@ export interface NicSupport {
   nic: string | null;
   /** The card's instance ID on these PCs, when their agent reported it. */
   instance?: string | null;
-  status: "ready" | "added" | "missing" | "unknown";
+  status: "ready" | "missing" | "unknown";
   machines: string[];
 }
 

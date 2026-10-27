@@ -13,7 +13,7 @@ CLONE = "tank/ggnet/writebacks/pc01"
 OS_CLONE = "tank/ggnet/writebacks/pc01-os"
 IQN = "iqn.2025-05.net.ggnet:pc-aabbccddee01"
 TARGET = "iqn.2025-05.net.ggnet:storage"
-SETUP = OsSetup("pc01", {"GGNET_MACHINE_ID": "1"}, "VEN_10EC&DEV_8168&SUBSYS_E0001458&REV_16")
+SETUP = OsSetup("pc01", {"GGNET_MACHINE_ID": "1"})
 
 
 class FakeWindows:
@@ -77,7 +77,7 @@ def test_a_reset_swaps_the_spares_in_without_cloning_or_setting_up(host, boot):
 
 def test_a_stale_os_spare_is_not_used_and_is_renewed(host, boot):
     boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP)
-    renamed = OsSetup("pc01", {"GGNET_MACHINE_ID": "1"}, None)   # e.g. another network card
+    renamed = OsSetup("pc01", {"GGNET_MACHINE_ID": "2"})          # e.g. the PC registered anew
     host.calls.clear()
     _reset(boot, setup=renamed)
     assert ["zfs", "rename", f"{CLONE}_spare", CLONE] in host.calls          # the game spare still fits
@@ -132,15 +132,3 @@ def test_spares_never_keep_an_old_version_alive(host, boot):
     assert base["clones"] == []                            # a spare is not a PC using the version
     assert boot.merge_into_base(OS, "v2") == ["base"]      # and does not stop the merge
     assert f"{OS_CLONE}_spare" not in host.datasets
-
-
-def test_a_spare_without_the_boot_cards_driver_is_kept(host, boot):
-    # A reset would make the very same writeback: it boots like that, so the spare
-    # is not removed (and made again) every round.
-    boot.windows.problem = "the image has no driver for the boot network card PCI\\VEN_8086&DEV_15BC"
-    made = boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP)
-    assert made == [f"{CLONE}_spare", f"{OS_CLONE}_spare"]
-    assert host.datasets[f"{OS_CLONE}_spare"]
-    boot.windows.personalized.clear()
-    assert boot.make_spares("pc01", CLONE, f"{GAME}@base", OS_CLONE, f"{OS}@base", SETUP) == []
-    assert boot.windows.personalized == []                  # current: not set up again

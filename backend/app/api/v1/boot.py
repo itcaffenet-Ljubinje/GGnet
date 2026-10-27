@@ -54,7 +54,6 @@ from app.api.v1.schemas import _mac
 from app.db.models import DiscoverySource, Machine, MachineMode, MachineStatus
 from app.db.session import get_db
 from app.services import discovery, pxe, scan
-from app.services.os_setup import legacy_nic_patch
 from app.services.toolchain import activate_when_done
 from app.services.provisioning import Provisioner
 from app.services.pxe import PxeService
@@ -289,11 +288,7 @@ def _new_hardware(request: Request, db: Session, prov: Provisioner, adder, drive
     if isinstance(status, str):
         logger.warning("iPXE: cannot check whether %s can boot %s: %s", m.name, disk.name, status)
         return None
-    found = status[card]
-    # The old way, until a server's boards are added: a chip the image knows on
-    # another board is copied into the writeback at boot (nic_patch).
-    legacy = legacy_nic_patch(image=disk.name) and found == "added" and bool(m.nic_instance or nic.startswith("VEN_10EC&"))
-    if found == "ready" or legacy:
+    if status[card] == "ready":
         return None
     if job is not None and job.running:
         return _hardware_wait(mac, again, disk.name)

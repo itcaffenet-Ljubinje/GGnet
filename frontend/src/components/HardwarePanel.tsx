@@ -5,13 +5,6 @@ import { api, type GameDisk, type Hardware, type NicSupport } from "../api";
 
 const STATUS: Record<NicSupport["status"], { badge: string; label: string; text: string }> = {
   ready: { badge: "badge-provisioned", label: "Ready", text: "The image knows this network card." },
-  added: {
-    badge: "badge-idle",
-    label: "Added at boot",
-    text:
-      "Old way ([boot] legacy_nic_patch): the image knows the chip on another board, and ggNet copies the card " +
-      "into the PC's writeback at every boot. Run Add new hardware to put it in the image.",
-  },
   missing: {
     badge: "badge-error",
     label: "Needs Add new hardware",

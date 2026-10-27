@@ -5,8 +5,9 @@ learns any new device, by installing it.
 A PC whose boot network card the image has never had installed stops at
 0x7B: Windows loads the boot card's driver before Plug and Play runs only
 when the card's device entry (under its exact instance ID) is configured.
-Copying another board's entry (windows_setup.nic_patch) covers the same chip
-on another board; a new chip needs a real install. So the server
+That entry is the same on every PC with the same board, so it is added
+once per board type, by the Add new hardware wizard (HardwareWizard). The
+server
 
   1. clones the image's newest version and writes into the clone the agent,
      its service and a job naming the cards (PCI hardware ID + instance ID,

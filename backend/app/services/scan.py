@@ -4,8 +4,8 @@ Hardware scan: a new PC tells the server its network card itself.
 Booting an OS image over iSCSI needs the PC's boot network card installed in
 the image under the card's exact instance ID (app.services.toolchain). iPXE
 reports the card's hardware ID, but the instance ID only Windows knows. So
-when a PC boots an image that cannot start its card and its instance ID is
-not known yet, the server answers iPXE with a WinPE boot instead of Windows
+the PC the Add new hardware wizard takes (app.services.toolchain.HardwareWizard)
+gets a WinPE boot instead of Windows
 (wimboot, the Windows PE files from `[paths] winpe_dir`, with
 `ggnet-scan.exe` from the agent folder as its only program):
 
@@ -19,12 +19,9 @@ not known yet, the server answers iPXE with a WinPE boot instead of Windows
   2. the scanner loads the driver, starts the network and sends the PC's
      PCI devices to POST /api/v1/boot/scan, which keeps the card's instance
      ID; then it restarts the PC;
-  3. at the next iPXE request the server starts Add new hardware for the
-     card and the PC waits on screen until the new version is active, then
+  3. at the next iPXE request the server adds the card to a new version
+     of the image and the PC waits on screen until it is active, then
      boots it.
-
-PCs whose card the image already starts (or adds at boot from the same chip,
-app.windows_setup.nic_patch) are never scanned.
 """
 
 from __future__ import annotations

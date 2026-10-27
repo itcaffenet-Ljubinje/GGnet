@@ -31,31 +31,15 @@ def agent_install() -> AgentInstall | None:
     return AgentInstall(exe=exe, sha256=sha, server_url=server_url())
 
 
-def legacy_nic_patch(cfg: dict | None = None, image: str | None = None) -> bool:
-    """
-    `[boot] legacy_nic_patch`: the old way of booting a PC whose card the
-    image knows only on another board, by copying the card's device entry
-    into its writeback at every boot. Off by default: a card belongs in the
-    image, added once per board type with Add new hardware (app.services.toolchain).
-    `true` for every image, or a list of image names: only for a server whose
-    PCs still boot that way, until their boards are added.
-    """
-    value = ((cfg if cfg is not None else get_config()).get("boot") or {}).get("legacy_nic_patch")
-    if value is True:
-        return True
-    return isinstance(value, list) and image is not None and image in value
-
-
 def os_setup_for(m: Machine) -> OsSetup | None:
     """None for a Disk Mode PC: its Windows is its own."""
     if m.mode is not MachineMode.BOOT:
         return None
-    legacy = legacy_nic_patch(image=m.os_disk.name if m.os_disk else None)
     return OsSetup(m.name, {
         "GGNET_SERVER": server_url(),
         "GGNET_MACHINE_ID": str(m.id),
         "GGNET_MACHINE_NAME": m.name,
-    }, boot_nic=m.boot_nic if legacy else None, boot_nic_instance=m.nic_instance if legacy else None)
+    })
 
 
 def image_prep(defender_off: bool = False) -> ImagePrep:

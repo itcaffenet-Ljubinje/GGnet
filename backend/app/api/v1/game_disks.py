@@ -48,7 +48,6 @@ from app.services.agent_package import default_package
 from app.services.os_setup import image_prep
 from app.services.provisioning import Provisioner, ProvisioningError
 from app.services.scan import nic_status
-from app.services.os_setup import legacy_nic_patch
 from app.services.toolchain import activate_when_done
 
 logger = logging.getLogger("ggnet.api.game_disks")
@@ -225,10 +224,9 @@ def grow_disk(
 def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = Depends(get_provisioner)):
     """
     Which PCs the OS image's active version can boot: each boot network card
-    the PCs reported (iPXE, and the agent its instance ID) is "ready" (the
-    image knows it), "added" (the same chip under another revision, board or
-    instance: added at every boot) or "missing" (no driver: those PCs cannot
-    boot it). PCs that never booted over the network are "unknown".
+    the PCs reported (iPXE, and the agent or the hardware scan its instance
+    ID) is "ready" (installed in the image) or "missing" (those PCs need Add
+    new hardware). PCs that never booted over the network are "unknown".
     """
     disk = _get(db, disk_id)
     if disk.kind is not DiskKind.OS:
@@ -243,9 +241,6 @@ def hardware(disk_id: int, db: Session = Depends(get_db), prov: Provisioner = De
     found = nic_status(prov, disk.zvol_path, disk.snapshot, list(cards)) if cards else {}
     if isinstance(found, str):
         return HardwareOut(snapshot=disk.snapshot, problem=found, nics=[])
-    if not legacy_nic_patch(image=disk.name):
-        # Without the old copy at boot, a chip known only on another board needs Add new hardware too.
-        found = {c: "missing" if st == "added" else st for c, st in found.items()}
     out = [NicSupportOut(nic=c[0], instance=c[1], status=found.get(c, "unknown"), machines=by_card[c])
            for c in cards]
     if None in by_card:
