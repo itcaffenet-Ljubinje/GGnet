@@ -45,9 +45,15 @@ public sealed class SetupApiInstaller : IDeviceInstaller
             var data = new SpDevinfoData { CbSize = Marshal.SizeOf<SpDevinfoData>() };
             if (!SetupDiCreateDeviceInfoW(set, device.InstanceId, ref classGuid, null, IntPtr.Zero, 0, ref data))
             {
-                // Already known to the image (an earlier run, another board): install on it.
+                // Left in the image by an earlier run whose install failed: Windows only marks
+                // such a non-present device for reinstall, so it is removed and made anew.
                 if (Marshal.GetLastWin32Error() != ErrorDevinstAlreadyExists
                     || !SetupDiOpenDeviceInfoW(set, device.InstanceId, IntPtr.Zero, 0, ref data))
+                    return Fail(device, "SetupDiCreateDeviceInfo");
+                if (!SetupDiCallClassInstaller(DifRemove, set, ref data))
+                    return Fail(device, "remove the device an earlier run left");
+                data = new SpDevinfoData { CbSize = Marshal.SizeOf<SpDevinfoData>() };
+                if (!SetupDiCreateDeviceInfoW(set, device.InstanceId, ref classGuid, null, IntPtr.Zero, 0, ref data))
                     return Fail(device, "SetupDiCreateDeviceInfo");
             }
             // Windows 10 and later take hardware IDs through SetupAPI only for
@@ -138,6 +144,7 @@ public sealed class SetupApiInstaller : IDeviceInstaller
     private const int SpdrpCompatibleIds = 0x02;
     private const int SpdrpDriver = 0x09;
     private const int InstallWaitMs = 5 * 60 * 1000;
+    private const int DifRemove = 0x05;
     private const int DifSelectBestCompatDrv = 0x17;
     private const int DifRegisterDevice = 0x19;
     private const int SpditCompatDriver = 0x02;
