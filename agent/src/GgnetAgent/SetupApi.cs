@@ -12,7 +12,8 @@ public sealed record ToolchainDevice(
 
 /// <summary>How installing one device went.</summary>
 public sealed record ToolchainDeviceResult(
-    string InstanceId, bool Ok, string? Driver = null, string? Error = null);
+    string InstanceId, bool Ok, string? Driver = null, string? Error = null,
+    [property: System.Text.Json.Serialization.JsonIgnore] bool Deferred = false);
 
 public interface IDeviceInstaller
 {
@@ -33,6 +34,26 @@ public sealed class SetupApiInstaller : IDeviceInstaller
     public const string NetClass = "{4d36e972-e325-11ce-bfc1-08002be10318}";
 
     public ToolchainDeviceResult Install(ToolchainDevice device)
+    {
+        // Early in boot Windows defers an install ("Installation deferred (too
+        // early)") to its own service, which cannot see the device this process
+        // created ("removed unexpectedly", 0xE000020B): the card is left without a
+        // driver. Later in boot it installs at once, so a failed try is repeated.
+        ToolchainDeviceResult result = null!;
+        for (var attempt = 1; attempt <= InstallAttempts; attempt++)
+        {
+            result = InstallOnce(device);
+            if (result.Ok || !result.Deferred)
+                return result;
+            Thread.Sleep(RetryDelay);
+        }
+        return result;
+    }
+
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(20);
+    private const int InstallAttempts = 4;
+
+    private ToolchainDeviceResult InstallOnce(ToolchainDevice device)
     {
         // Let Windows finish what it installs at boot first (the VM's own devices).
         CMP_WaitNoPendingInstallEvents(InstallWaitMs);
@@ -89,13 +110,13 @@ public sealed class SetupApiInstaller : IDeviceInstaller
                 return Fail(device, "read the selected driver");
             if (!DiInstallDevice(IntPtr.Zero, set, ref data, ref driver, 0, out _))
                 return Fail(device, $"install {driver.Description}");
-            // Early in boot Windows defers the install ("Installation deferred (too
-            // early)") and runs it in the background; the device exists only while
-            // this set is open, so wait for it here, then check it really got a driver.
+            // A deferred install runs in the background: wait for it, then check
+            // that the card really got a driver (a retry removes and remakes it).
             CMP_WaitNoPendingInstallEvents(InstallWaitMs);
             if (DriverKey(set, ref data) is null)
                 return new ToolchainDeviceResult(device.InstanceId, false,
-                    Error: $"Windows did not finish installing {driver.Description} (see setupapi.dev.log)");
+                    Error: $"Windows did not finish installing {driver.Description} (see setupapi.dev.log)",
+                    Deferred: true);
             return new ToolchainDeviceResult(device.InstanceId, true, $"{driver.ProviderName} {driver.Description}");
         }
         finally
