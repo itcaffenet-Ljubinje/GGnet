@@ -7,6 +7,13 @@ export interface Health {
   server_ip: string;
 }
 
+/** Prepare image's options beyond what every image gets. */
+export interface PrepareOptions {
+  defender_off: boolean;
+  /** Background services a cafe PC does not need off (faster startup). */
+  services_off: boolean;
+}
+
 export interface GameDisk {
   id: number;
   name: string;
@@ -563,7 +570,7 @@ export const api = {
   ejectUsb: (part: string) => request<void>("POST", `/v1/imports/usb/${part}/eject`),
   deleteImportFile: (path: string) =>
     request<void>("DELETE", `/v1/imports/file?path=${encodeURIComponent(path)}`),
-  startImport: (name: string, kind: DiskKind, path: string, options: { prepare: boolean; defender_off: boolean }) =>
+  startImport: (name: string, kind: DiskKind, path: string, options: { prepare: boolean } & PrepareOptions) =>
     request<GameDisk>("POST", "/v1/imports", { name, kind, path, ...options }),
   cancelImport: (id: number) => request<void>("POST", `/v1/imports/${id}/cancel`),
   getAddHardware: (id: number) => request<AddHardwareStatus>("GET", `/v1/game-disks/${id}/add-hardware`),
@@ -586,7 +593,7 @@ export const api = {
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/comment`, { comment }),
   setSnapshotLock: (id: number, name: string, locked: boolean) =>
     request<Snapshot>("PUT", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/lock`, { locked }),
-  prepareImage: (id: number, options?: { defender_off: boolean }) =>
+  prepareImage: (id: number, options?: PrepareOptions) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/prepare`, options),
   mergeIntoBase: (id: number, name: string) =>
     request<GameDisk>("POST", `/v1/game-disks/${id}/snapshots/${encodeURIComponent(name)}/merge-into-base`),

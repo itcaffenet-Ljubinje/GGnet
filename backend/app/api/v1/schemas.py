@@ -117,6 +117,7 @@ class ImportIn(BaseModel):
     path: str
     prepare: bool = True          # an OS image: Prepare image right after the import
     defender_off: bool = False    # ... with Microsoft Defender turned off
+    services_off: bool = False    # ... with background services a cafe PC does not need turned off
 
     check_name = field_validator("name")(_disk_name)
 
@@ -207,6 +208,7 @@ class PrepareImage(BaseModel):
     """Options of Prepare image beyond what every image gets."""
 
     defender_off: bool = False     # Microsoft Defender's services and drivers disabled
+    services_off: bool = False     # background services a cafe PC does not need disabled (faster startup)
 
 
 class GameDiskGrow(BaseModel):

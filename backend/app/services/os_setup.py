@@ -42,6 +42,6 @@ def os_setup_for(m: Machine) -> OsSetup | None:
     })
 
 
-def image_prep(defender_off: bool = False) -> ImagePrep:
+def image_prep(defender_off: bool = False, services_off: bool = False) -> ImagePrep:
     """What prepare_image makes part of an OS image: the server's agent, if any."""
-    return ImagePrep(agent=agent_install(), defender_off=defender_off)
+    return ImagePrep(agent=agent_install(), defender_off=defender_off, services_off=services_off)

@@ -70,6 +70,7 @@ def cancel(disk_id: int) -> bool:
 class ImportOptions:
     prepare: bool = True           # an OS image: Prepare image right after the import
     defender_off: bool = False     # ... with Microsoft Defender turned off
+    services_off: bool = False     # ... with background services a cafe PC does not need turned off
 
 
 @dataclass
@@ -262,8 +263,10 @@ class DiskImporter:
             from app.services.provisioning import ProvisioningError
 
             try:
-                snapshot = self.prov.prepare_image(target, image_prep(defender_off=options.defender_off))
-                defender = ", Defender off" if options.defender_off else ""
+                snapshot = self.prov.prepare_image(target, image_prep(defender_off=options.defender_off,
+                                                                      services_off=options.services_off))
+                defender = (", Defender off" if options.defender_off else "") + \
+                    (", background services off" if options.services_off else "")
                 self.prov.set_comment(target, snapshot, f"ggNet: prepared for all PCs after the import{defender}")
             except ProvisioningError as e:
                 note += f"; Prepare image failed: {e}"[:150]

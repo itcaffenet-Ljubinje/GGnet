@@ -123,6 +123,8 @@ class ImagePrep:
     tuning: bool = True
     # Microsoft Defender's services and drivers off (defender_off_lines()).
     defender_off: bool = False
+    # Background services a cafe PC does not need off, for a faster startup (services_off_lines()).
+    services_off: bool = False
 
 
 def _reg_string(value: str) -> str:
@@ -525,6 +527,85 @@ def software_patch() -> str:
 DEFENDER_SERVICES = ("WinDefend", "WdNisSvc", "WdNisDrv", "WdFilter", "WdBoot", "Sense", "MDCoreSvc")
 
 
+# Background services a diskless cafe PC does not need, which start with
+# Windows, run at idle or write to the disk: the writeback is discarded at
+# every restart, so their work is redone at every boot. Not touched: what
+# games, launchers, anti-cheat and Microsoft/Xbox sign-in rely on (TokenBroker,
+# InstallService, SENS, Xbox services, FontCache, Windows Update itself).
+BACKGROUND_SERVICES = (
+    "DoSvc",                    # Delivery Optimization: peer-to-peer update downloads
+    "WaaSMedicSvc",             # Windows Update Medic: turns automatic updates back on
+    "DiagTrack",                # telemetry
+    "dmwappushservice",         # telemetry push messages
+    "diagnosticshub.standardcollector.service",
+    "WdiServiceHost", "WdiSystemHost",   # diagnostic policy hosts
+    "WerSvc",                   # Windows Error Reporting
+    "PcaSvc",                   # Program Compatibility Assistant
+    "defragsvc",                # Optimize drives
+    "MapsBroker",               # downloaded maps
+    "lfsvc",                    # geolocation
+    "SensorDataService", "SensorService", "SensrSvc",    # sensors a desktop has none of
+    "BDESVC",                   # BitLocker
+    "SharedAccess",             # Internet Connection Sharing
+    "StiSvc",                   # scanners
+    "wmiApSrv",                 # WMI performance adapter
+    "RetailDemo", "WMPNetworkSvc", "Fax",
+)
+# Browser updaters (their service names carry a version): they update the
+# browsers at every boot, and the writeback throws it away.
+BACKGROUND_SERVICE_PREFIXES = ("edgeupdate", "GoogleUpdater", "gupdate", "MozillaMaintenance", "brave")
+
+
+def background_services(services_export: str, control_set: int) -> list[str]:
+    """The BACKGROUND_SERVICES and browser updaters in an export of <ControlSet>\\Services."""
+    prefix = f"\\ControlSet{control_set:03d}\\Services\\".lower()
+    present = []
+    for path, _ in _reg_blocks(services_export):
+        if not path.lower().startswith(prefix):
+            continue
+        name = path[len(prefix):]
+        if "\\" in name:
+            continue
+        if name in BACKGROUND_SERVICES or name.lower().startswith(
+                tuple(p.lower() for p in BACKGROUND_SERVICE_PREFIXES)):
+            present.append(name)
+    return present
+
+
+def services_off_lines(control_set: int, present: Sequence[str]) -> str:
+    """SYSTEM hive .reg: these services disabled, and NTFS no longer writes last-access times."""
+    cs = f"\\ControlSet{control_set:03d}"
+    lines = ["Windows Registry Editor Version 5.00",
+             "", f"[{cs}\\Control\\FileSystem]",
+             '"NtfsDisableLastAccessUpdate"=dword:80000001']
+    for name in present:
+        lines += ["", f"[{cs}\\Services\\{name}]", '"Start"=dword:00000004']
+    return "\n".join(lines) + "\n"
+
+
+def services_policy_patch() -> str:
+    """
+    SOFTWARE hive .reg: no telemetry, no apps Windows installs by itself
+    (consumer features), no error reports and no System Restore points,
+    which would all be redone at every boot of a diskless PC.
+    """
+    return "\n".join([
+        "Windows Registry Editor Version 5.00",
+        "", "[\\Policies\\Microsoft]",
+        "", "[\\Policies\\Microsoft\\Windows]",
+        "", "[\\Policies\\Microsoft\\Windows\\DataCollection]",
+        '"AllowTelemetry"=dword:00000000',
+        "", "[\\Policies\\Microsoft\\Windows\\CloudContent]",
+        '"DisableWindowsConsumerFeatures"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\Windows\\Windows Error Reporting]",
+        '"Disabled"=dword:00000001',
+        "", "[\\Policies\\Microsoft\\Windows NT]",
+        "", "[\\Policies\\Microsoft\\Windows NT\\SystemRestore]",
+        '"DisableSR"=dword:00000001',
+        '"DisableConfig"=dword:00000001',
+    ]) + "\n"
+
+
 def defender_off_lines(control_set: int, present: Sequence[str]) -> str:
     """
     SYSTEM hive .reg that keeps Defender from starting: its services and
@@ -907,14 +988,17 @@ class WindowsSetup:
         diskless_problem = self._diskless_boot(hive, control_set) if prep.tuning and problem is None else None
         defender_problem = self._defender_off(root, hive, control_set) \
             if prep.defender_off and problem is None else None
+        services_problem = self._services_off(root, hive, control_set) \
+            if prep.services_off and problem is None else None
         if problem is None:
-            logger.info("Image prepared (agent: %s, diskless tuning: %s, Defender off: %s, DHCP: %s, "
-                        "letters forgotten: %s)",
+            logger.info("Image prepared (agent: %s, diskless tuning: %s, Defender off: %s, "
+                        "background services off: %s, DHCP: %s, letters forgotten: %s)",
                         "yes" if agent_ok else "no", "yes" if prep.tuning and not tuning_problem else "no",
                         "yes" if prep.defender_off and not defender_problem else "no",
+                        "yes" if prep.services_off and not services_problem else "no",
                         ", ".join(fixed) or "-", ", ".join(letters) or "-")
-        return "; ".join(p for p in (problem, agent_problem, tuning_problem, diskless_problem, defender_problem)
-                         if p) or None
+        return "; ".join(p for p in (problem, agent_problem, tuning_problem, diskless_problem, defender_problem,
+                                     services_problem) if p) or None
 
     def _has_key(self, hive: Path, key: str) -> bool:
         ok, out, _ = self._run(["hivexregedit", "--export", str(hive), key], quiet=True)
@@ -935,6 +1019,21 @@ class WindowsSetup:
         if foreign:
             logger.info("Other diskless systems' drivers turned off in the image: %s", ", ".join(foreign))
         return None
+
+    def _services_off(self, root: Path, hive: Path, control_set: int) -> str | None:
+        """Background services off and NTFS last-access times (SYSTEM), their policies (SOFTWARE)."""
+        ok, out, _ = self._run(["hivexregedit", "--export", str(hive),
+                                f"\\ControlSet{control_set:03d}\\Services"], quiet=True)
+        present = background_services(out, control_set) if ok else []
+        problem = self._merge_reg(hive, "prepare-services", services_off_lines(control_set, present))
+        if problem:
+            return f"background services: {problem}"
+        software = _find(root, SOFTWARE_HIVE)
+        if software is None:
+            return "background services: no SOFTWARE hive in the image"
+        problem = self._merge_reg(software, "prepare-services-policy", services_policy_patch())
+        logger.info("Background services turned off in the image: %s", ", ".join(present) or "none found")
+        return f"background services: {problem}" if problem else None
 
     def _defender_off(self, root: Path, hive: Path, control_set: int) -> str | None:
         """Defender's services and drivers disabled (SYSTEM), its policies off (SOFTWARE)."""

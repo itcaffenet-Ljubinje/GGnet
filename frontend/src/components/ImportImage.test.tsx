@@ -62,6 +62,7 @@ describe("ImportImage", () => {
           path: "/STORAGE-01/ggnet/imports/PC-07 Win11.vhdx",
           prepare: true,
           defender_off: true,
+          services_off: true,                      // on unless unticked
         },
       },
     ]);
@@ -87,6 +88,7 @@ describe("ImportImage", () => {
       path: "/run/ggnet/usb/sdj1/games.qcow2",
       prepare: false,
       defender_off: false,
+      services_off: false,
     });
     await userEvent.click(screen.getByRole("button", { name: "Eject" }));
     expect(calls(mock).filter((c) => c.method === "POST").at(-1)?.url).toBe("/api/v1/imports/usb/sdj1/eject");

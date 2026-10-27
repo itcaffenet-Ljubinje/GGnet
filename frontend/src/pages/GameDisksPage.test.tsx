@@ -298,9 +298,10 @@ describe("GameDisksPage", () => {
     const dialog = screen.getByRole("dialog", { name: "Prepare win11" });
     expect(calls(fetchMock)).toEqual([]);                      // nothing until confirmed
     await userEvent.click(within(dialog).getByLabelText("Turn off Microsoft Defender"));
+    await userEvent.click(within(dialog).getByLabelText(/Turn off background services/));   // on by default
     await userEvent.click(within(dialog).getByRole("button", { name: /Prepare image/ }));
     expect(calls(fetchMock).filter((c) => c.method !== "GET")).toEqual([
-      { url: "/api/v1/game-disks/3/prepare", method: "POST", body: { defender_off: true } },
+      { url: "/api/v1/game-disks/3/prepare", method: "POST", body: { defender_off: true, services_off: false } },
     ]);
     expect(reload).toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();

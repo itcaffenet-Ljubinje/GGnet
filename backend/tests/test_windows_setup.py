@@ -878,3 +878,41 @@ def test_a_card_whose_install_failed_is_not_ready():
         '"ConfigFlags"=dword:00000020\n')
     assert not nic_known(failed, REV16, INSTANCE)
     assert not nic_known(failed, REV16)
+
+
+# ── Background services off (faster startup) ─────────────────────────
+
+def test_background_services_finds_the_listed_services_and_browser_updaters():
+    from app.windows_setup import background_services
+
+    export = "\n".join(f"[\\ControlSet002\\Services\\{n}]\n\"Start\"=dword:00000002\n" for n in (
+        "DoSvc", "WaaSMedicSvc", "DiagTrack", "TokenBroker", "SENS", "XblAuthManager", "wuauserv",
+        "GoogleUpdaterService149.0.7814.0", "edgeupdatem", "Tcpip"))
+    export += "[\\ControlSet002\\Services\\DoSvc\\Parameters]\n"
+    found = background_services(export, 2)
+    assert found == ["DoSvc", "WaaSMedicSvc", "DiagTrack", "GoogleUpdaterService149.0.7814.0", "edgeupdatem"]
+    # What games, Store and Microsoft/Xbox sign-in need, and Windows Update itself, stay.
+    assert not {"TokenBroker", "SENS", "XblAuthManager", "wuauserv"} & set(found)
+
+
+def test_prepare_image_turns_background_services_off_only_when_asked(windows, runner, tmp_path):
+    from app.windows_setup import ImagePrep, services_off_lines, services_policy_patch
+
+    (_image(windows) / "Program Files").mkdir()
+    select = runner.responses[("hivexregedit", "--export")]
+    services = "[\\ControlSet002\\Services\\DoSvc]\n\"Start\"=dword:00000003\n"
+    runner.responses[("hivexregedit", "--export")] = lambda cmd: (
+        (True, services, "") if cmd[-1] == "\\ControlSet002\\Services" else select)
+    merges = []
+
+    def merge(cmd):
+        merges.append((Path(cmd[2]).name.upper(), Path(cmd[3]).read_text(encoding="utf-8")))
+        return True, "", ""
+    runner.responses[("hivexregedit", "--merge")] = merge
+    assert windows.prepare_image(DEVICE, ImagePrep(agent=_agent(tmp_path), services_off=True), label="win11") is None
+    assert ("SYSTEM", services_off_lines(2, ["DoSvc"])) in merges
+    assert ("SOFTWARE", services_policy_patch()) in merges
+    assert '"NtfsDisableLastAccessUpdate"=dword:80000001' in services_off_lines(2, [])
+    merges.clear()
+    assert windows.prepare_image(DEVICE, _prep(tmp_path), label="win11") is None
+    assert not any("DoSvc" in text for _, text in merges)

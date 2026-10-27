@@ -44,6 +44,7 @@ export function ImportImage({ onClose, onStarted }: Props) {
   const [kind, setKind] = useState<DiskKind>("os");
   const [prepare, setPrepare] = useState(true);
   const [defenderOff, setDefenderOff] = useState(false);
+  const [servicesOff, setServicesOff] = useState(true);
   const [upload, setUpload] = useState<{ name: string; sent: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -103,7 +104,11 @@ export function ImportImage({ onClose, onStarted }: Props) {
       `Import ${chosen.name} (${formatBytes(chosen.size)}) as the ${what} "${name}"?\n\n` +
       "It is copied into a new zvol in the background and published when done; the file stays where it is.";
     if (!window.confirm(msg)) return;
-    const options = { prepare: kind === "os" && prepare, defender_off: kind === "os" && prepare && defenderOff };
+    const options = {
+      prepare: kind === "os" && prepare,
+      defender_off: kind === "os" && prepare && defenderOff,
+      services_off: kind === "os" && prepare && servicesOff,
+    };
     const ok = await run("import", () => api.startImport(name.trim().toLowerCase(), kind, chosen.path, options));
     if (ok) await onStarted();
   }
@@ -290,18 +295,27 @@ export function ImportImage({ onClose, onStarted }: Props) {
                   Prepare image for all PCs after the import (agent, diskless settings)
                 </label>
                 {prepare && (
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={defenderOff}
-                      onChange={(e) => setDefenderOff(e.target.checked)}
-                    />
-                    Turn off Microsoft Defender
-                  </label>
+                  <>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={servicesOff}
+                        onChange={(e) => setServicesOff(e.target.checked)}
+                      />
+                      Turn off background services a cafe PC does not need (faster startup)
+                    </label>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={defenderOff}
+                        onChange={(e) => setDefenderOff(e.target.checked)}
+                      />
+                      Turn off Microsoft Defender
+                    </label>
+                  </>
                 )}
                 <p className="muted small">
-                  After the import, the image&apos;s page shows which PCs it can boot: their network card must be
-                  known to it.
+                  After the import, run Add new hardware once for each board type: until then no PC can boot it.
                 </p>
               </>
             )}

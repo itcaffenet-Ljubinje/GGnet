@@ -170,7 +170,8 @@ def start_import(
         prov.delete_disk(path, published=False)
         conflict(f"Game disk '{body.name}' already exists")
     logger.info("Import of %s (%s, %d GB) into '%s' started", file, fmt, size_gb, disk.name)
-    importer.start(disk.id, imports.ImportOptions(prepare=body.prepare, defender_off=body.defender_off))
+    importer.start(disk.id, imports.ImportOptions(prepare=body.prepare, defender_off=body.defender_off,
+                                                  services_off=body.services_off))
     db.refresh(disk)
     return disk
 

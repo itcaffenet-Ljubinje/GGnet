@@ -17,7 +17,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { api, isImport, needsHardware, type DiskKind, type GameDisk, type Machine } from "../api";
+import {
+  api,
+  isImport,
+  needsHardware,
+  type DiskKind,
+  type GameDisk,
+  type Machine,
+  type PrepareOptions,
+} from "../api";
 import { ActionMenu, type MenuAction } from "../components/ActionMenu";
 import { EditImage } from "../components/EditImage";
 import { ImportImage } from "../components/ImportImage";
@@ -98,7 +106,7 @@ export function GameDisksPage({ disks, machines, reload }: Props) {
     await reload();
   }
 
-  async function prepare(disk: GameDisk, options: { defender_off: boolean }) {
+  async function prepare(disk: GameDisk, options: PrepareOptions) {
     const ok = await run(`prepare-${disk.id}`, () => api.prepareImage(disk.id, options));
     if (ok) setPreparing(null);
     await reload();
