@@ -120,7 +120,7 @@ def heartbeat(
             "hardware": json.dumps(hw),
         }
         card = split_pnp_id(inv.nic_pnp_id)
-        # The card's instance on this board, for Add hardware: only for the
+        # The card's instance on this board, for Add new hardware: only for the
         # card the PC boots from (iPXE's), or any card while iPXE has not
         # reported one (a Disk Mode PC), which then becomes the boot card.
         if card is not None and machine.boot_nic in (None, card[0]):

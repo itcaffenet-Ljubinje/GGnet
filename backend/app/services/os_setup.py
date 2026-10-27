@@ -2,7 +2,7 @@
 What a Boot Mode PC's Windows is told about itself at every fresh OS
 writeback (app.windows_setup): its computer name, environment variables
 the agent and other software on the PC can read instead of being configured
-in the image, and its boot network card (Add hardware).
+in the image. Its network card is the image's (Add new hardware).
 
 image_prep(): what every OS image version gets once (app.windows_setup.prepare_image).
 """

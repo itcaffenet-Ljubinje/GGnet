@@ -18,9 +18,9 @@ boot falls through to its next boot device instead of stopping in iPXE:
                                 (also set in the web UI: Settings → Network boot).
 
 autoexec.ipxe (scripts/install_ggnet.sh) also sends the boot NIC's PCI IDs
-(pci, cls, sub, rev); the server keeps them as the PC's `boot_nic` and adds
-that card to its OS writeback when the image knows the chip only in another
-revision or board (Add hardware, app.windows_setup).
+(pci, cls, sub, rev); the server keeps them as the PC's `boot_nic`. A PC
+whose card its OS image cannot start waits on screen until the Add new
+hardware wizard has installed the card in the image (_new_hardware).
 
 Before it answers a provisioned PC, the server discards its writebacks like
 the watcher does after a disconnect (app.services.writebacks), unless the PC
