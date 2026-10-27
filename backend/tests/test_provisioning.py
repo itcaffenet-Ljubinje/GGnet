@@ -91,7 +91,6 @@ def test_reset_sends_few_targetcli_commands(host, prov, published):
         ["/backstores/block", "ls", "depth=1"],                  # both slots checked at once
         [f"/iscsi/{TARGET}/tpg1/luns", "ls", "depth=1"],         # the shared target is known by now
         ["/backstores/block", "create", "name=pc01-game", f"dev={DEV}"],
-        ["/backstores/block/pc01-game", "set", "attribute", "emulate_write_cache=1"],   # Windows groups writes
         [f"/iscsi/{TARGET}/tpg1/luns", "create", "/backstores/block/pc01-game", "lun=0", "add_mapped_luns=false"],
         [f"/iscsi/{TARGET}/tpg1/acls", "create", IQN, "add_mapped_luns=false"],
         [f"/iscsi/{TARGET}/tpg1/acls/{IQN}", "create", "mapped_lun=0", "tpg_lun_or_backstore=lun0",
@@ -99,7 +98,6 @@ def test_reset_sends_few_targetcli_commands(host, prov, published):
         ["saveconfig"],                                           # saved once
     ]
     assert host.visible(IQN) == [DEV]
-    assert host.backstore_attrs["pc01-game"] == {"emulate_write_cache": "1"}
 
 
 def test_new_game_disks_get_64k_blocks_and_lz4(host, prov):

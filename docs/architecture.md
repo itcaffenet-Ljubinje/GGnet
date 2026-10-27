@@ -64,7 +64,8 @@ Why these values:
 The installer creates the `writebacks` dataset with `sync=disabled` and the ggNet root with `checksum=blake3`: a
 strong checksum lets ZFS skip a block rewritten with the same data (nop-write), so a writeback's registry hive,
 rewritten whole for the PC's name, costs only the changed blocks. Images written before keep their checksum
-until they are copied. LIO backstores get `emulate_write_cache=1`, so Windows groups its writes.
+until they are copied. (LIO's `emulate_write_cache` cannot be set on a block backstore: the zvol reports its
+own write cache, and setting it fails with EINVAL.)
 
 ### ARC
 

@@ -423,7 +423,6 @@ class ISCSIManager:
             tpg_luns.append(index)
             steps += [
                 ["targetcli", "/backstores/block", "create", f"name={name}", f"dev={disk.device}"],
-                ["targetcli", f"/backstores/block/{name}", "set", "attribute", "emulate_write_cache=1"],
                 ["targetcli", f"{self._tpg}/luns", "create", f"/backstores/block/{name}",
                  f"lun={index}", "add_mapped_luns=false"],
             ]
